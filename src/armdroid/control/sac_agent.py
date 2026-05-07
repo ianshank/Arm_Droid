@@ -147,3 +147,8 @@ class SACAgent:
     def is_trained(self) -> bool:
         """Whether the model has been trained."""
         return self._is_trained
+
+    @property
+    def is_built(self) -> bool:
+        """Whether ``build(env)`` has been called and a model is ready."""
+        return self._model is not None

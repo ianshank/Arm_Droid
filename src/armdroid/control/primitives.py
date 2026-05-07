@@ -43,6 +43,11 @@ class ActionPrimitives:
         self._home = np.array(arm_cfg.home_position, dtype=np.float64)
         _log.info("action_primitives_init", dof=arm_cfg.dof)
 
+    @property
+    def driver(self) -> ArmDriverProtocol:
+        """Return the arm driver (for orchestrator handoff)."""
+        return self._driver
+
     async def transit(self, target_pose: NDArray[np.float64]) -> bool:
         """Move end-effector to target pose without grasping.
 

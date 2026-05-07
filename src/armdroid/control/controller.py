@@ -43,6 +43,16 @@ class ArmController:
         self._primitives = primitives
         _log.info("arm_controller_init", is_trained=agent.is_trained)
 
+    @property
+    def agent(self) -> SACAgent:
+        """Return the underlying SAC+HER agent (for orchestrator wiring)."""
+        return self._agent
+
+    @property
+    def primitives(self) -> ActionPrimitives:
+        """Return the action primitive library (for orchestrator wiring)."""
+        return self._primitives
+
     async def execute_action(self, action: NDArray[np.float64]) -> dict[str, Any]:
         """Execute continuous action via the RL policy.
 
