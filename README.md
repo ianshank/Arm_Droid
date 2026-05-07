@@ -37,15 +37,17 @@ pip install -e ".[anthropic]"       # LLM replanner backend
 
 ## Run
 
+`--config` overlays go BEFORE the subcommand. Repeat `--config` to layer multiple overlays.
+
 ```bash
 # Sim rollout (Tower of Hanoi, mock hardware)
-python -m armdroid sim --config config/tower_of_hanoi.yaml --episodes 5
+python -m armdroid --config config/tower_of_hanoi.yaml sim --episodes 5
 
 # Train SAC+HER policy
-python -m armdroid train --config config/training.yaml
+python -m armdroid --config config/training.yaml train
 
 # Rollout against the real arm (requires SO-ARM100 connected)
-python -m armdroid rollout --config config/tower_of_hanoi.yaml
+python -m armdroid --config config/tower_of_hanoi.yaml rollout
 ```
 
 ## Test
