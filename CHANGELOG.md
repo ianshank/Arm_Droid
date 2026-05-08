@@ -60,6 +60,25 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - **`SoArm100Driver`** — replaced wholesale by `Esp32JsonDriver`. The
   SO-ARM100 hardware target is out; the MakerWorld ESP32 arm is in.
 
+### Deferred to a follow-up
+
+- **Default `dof` bump from 6 → 7** is gated on authoring 7-DoF MuJoCo
+  scene XMLs (`sim/tower_of_hanoi.xml`, `sim/laundry_sorting.xml`).
+  The infrastructure is in place: `ArmConfig.gripper_joint_index`
+  returns ``dof - 1`` at `dof >= 7`, primitives switch to the gripper-as-joint
+  code path automatically, the firmware codegen handles arbitrary joint
+  counts, and the per-joint config (`joint_limits`, `servos`) auto-sizes
+  when `dof` changes. Operators who want 7-DoF today can set
+  `cfg.arm.dof = 7` in YAML and the primitives use the modern path; the
+  default stays at 6 to keep the existing test suite green until the
+  scene assets land.
+- **Env-side reward shaping refresh** — `BaseArmEnv` and the per-task
+  envs (`TowerOfHanoiEnv`, `LaundrySortingEnv`) read `dof` from config
+  and adapt observation / action spaces dynamically, but reward shaping
+  still treats the gripper as a separate concern. Folding the gripper
+  joint into the reward (e.g. penalising mid-task gripper actuation)
+  pairs with the dof-7 default switch.
+
 ### Documentation
 
 - **`docs/architecture/C4.md`** — Mermaid C4 diagrams (System Context,
