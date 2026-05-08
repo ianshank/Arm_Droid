@@ -17,7 +17,14 @@ backwards compatibility and will continue to do so for the v0.2.x line.
 
 from __future__ import annotations
 
-from armdroid.domain.errors import ArmCommandRejected, ArmDriverError
+from armdroid.domain.errors import (
+    ArmCommandRejected,
+    ArmDriverError,
+    ArmDroidError,
+    ConfigError,
+    PerceptionError,
+    PlanningError,
+)
 from armdroid.domain.protocols import (
     ArmControllerProtocol,
     ArmDriverProtocol,
@@ -32,11 +39,15 @@ __all__ = [
     "ArmControllerProtocol",
     "ArmDriverError",
     "ArmDriverProtocol",
+    "ArmDroidError",
     "ArmEnvironmentProtocol",
     "ArmPerceptionProtocol",
     "ArmPlannerProtocol",
     "ArmState",
+    "ConfigError",
     "DetectedObject",
+    "PerceptionError",
     "PlanStep",
+    "PlanningError",
     "SymbolicState",
 ]

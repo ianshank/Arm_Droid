@@ -16,7 +16,9 @@ Re-exports:
     :class:`ArmControllerProtocol`, :class:`ArmEnvironmentProtocol`
     Value types: :class:`ArmState`, :class:`DetectedObject`,
     :class:`SymbolicState`, :class:`PlanStep`
-    Errors: :class:`ArmDriverError`, :class:`ArmCommandRejected`
+    Errors: :class:`ArmDroidError` (root), :class:`ConfigError`,
+    :class:`ArmDriverError`, :class:`ArmCommandRejected`,
+    :class:`PerceptionError`, :class:`PlanningError`
     :data:`__version__`
 """
 
@@ -24,7 +26,14 @@ from __future__ import annotations
 
 from armdroid.api.version import __version__
 from armdroid.config.schema import ArmSettings
-from armdroid.domain.errors import ArmCommandRejected, ArmDriverError
+from armdroid.domain.errors import (
+    ArmCommandRejected,
+    ArmDriverError,
+    ArmDroidError,
+    ConfigError,
+    PerceptionError,
+    PlanningError,
+)
 from armdroid.domain.protocols import (
     ArmControllerProtocol,
     ArmDriverProtocol,
@@ -48,14 +57,18 @@ __all__ = [
     "ArmControllerProtocol",
     "ArmDriverError",
     "ArmDriverProtocol",
+    "ArmDroidError",
     "ArmEnvironmentProtocol",
     "ArmOrchestrator",
     "ArmPerceptionProtocol",
     "ArmPlannerProtocol",
     "ArmSettings",
     "ArmState",
+    "ConfigError",
     "DetectedObject",
+    "PerceptionError",
     "PlanStep",
+    "PlanningError",
     "SymbolicState",
     "__version__",
     "build_arm_controller",
