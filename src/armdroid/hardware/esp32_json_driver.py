@@ -280,7 +280,16 @@ class Esp32JsonDriver:
         return np.array(state.joint_positions, dtype=np.float64)
 
     async def send_joint_command(self, target_angles: NDArray[np.float64]) -> None:
-        """Legacy step command — silent per-joint clipping, configured duration."""
+        """Legacy step command — silent per-joint clipping, configured duration.
+
+        Matches :class:`MockArmDriver.send_joint_command` semantics: out-of-range
+        angles are silently clipped and velocity limits are *not* enforced.
+        The configured ``home_duration_s`` is used as a target, but is
+        automatically stretched if any joint would exceed its
+        ``max_velocity_rad_s`` — this preserves the legacy "no velocity check"
+        contract while still passing the strict validation in
+        :meth:`send_joint_positions`.
+        """
         if not self._connected:
             await self.connect()
         if len(target_angles) != self._dof:
@@ -293,8 +302,21 @@ class Esp32JsonDriver:
             )
             for i, v in enumerate(target_angles)
         )
+        # Auto-stretch duration so velocity limits never reject the legacy
+        # command. Mock arm bypasses velocity validation entirely; mirroring
+        # that behaviour here keeps the legacy adapter contract identical
+        # across drivers.
+        anchor = self._velocity_anchor()
+        min_duration = self._cfg.home_duration_s
+        for idx, (s, t) in enumerate(zip(anchor, clipped, strict=True)):
+            limit = self._cfg.joint_limits[idx].max_velocity_rad_s
+            if limit > 0.0:
+                # +1% headroom to absorb float rounding in the validator.
+                required = abs(t - s) / limit * 1.01
+                if required > min_duration:
+                    min_duration = required
         try:
-            await self.send_joint_positions(clipped, duration_s=self._cfg.home_duration_s)
+            await self.send_joint_positions(clipped, duration_s=min_duration)
         except ArmCommandRejected as exc:
             msg = str(exc)
             raise ValueError(msg) from exc

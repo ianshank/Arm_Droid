@@ -409,6 +409,7 @@ async def test_encode_returns_tuple_with_req_id(
 @pytest.mark.asyncio
 async def test_encode_max_line_bytes_boundary(
     fake_serial_module: type[_FakeSerial],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """_encode boundary: exactly max_line_bytes content bytes is accepted;
     max_line_bytes+1 content bytes is rejected.
@@ -416,9 +417,49 @@ async def test_encode_max_line_bytes_boundary(
     The firmware's PumpSerial counts content bytes (newline is not stored),
     so the host check must exclude the trailing '\\n' from the byte count.
     """
+    from armdroid.hardware import esp32_json_driver as _drv_mod
     from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
 
+    # Freeze time so the ``"ts"`` field has a stable string width across the
+    # three _encode() calls below; otherwise float-formatting drift makes the
+    # padding maths flaky (notably on Linux where monotonic resolution differs).
+    monkeypatch.setattr(_drv_mod.time, "monotonic", lambda: 1234.5)
+
     max_bytes = 128  # small value to keep padding manageable
+    drv = Esp32JsonDriver(
+        _make_config(
+            transport=ArmTransportConfig(
+                protocol="serial",
+                serial_port="/dev/null",
+                serial_baud=115_200,
+                connect_timeout_s=1.0,
+                command_timeout_s=0.5,
+                heartbeat_hz=10.0,
+                drain_pings_on_connect=1,
+                max_line_bytes=max_bytes,
+            )
+        )
+    )
+
+    # Measure overhead with the _pad key already present (empty value).
+    # This ensures subsequent additions to _pad value don't change key overhead.
+    drv._next_id = 0  # type: ignore[attr-defined]
+    base_line, _ = drv._encode("ping", {"_pad": ""})  # type: ignore[attr-defined]
+    base_content_len = len(base_line.encode("ascii")) - 1  # exclude '\n'
+    pad_needed = max_bytes - base_content_len
+    assert pad_needed >= 0, (
+        f"base frame ({base_content_len} bytes) already exceeds max_bytes={max_bytes}"
+    )
+
+    # Exactly max_bytes content bytes — must NOT raise.
+    drv._next_id = 0  # type: ignore[attr-defined]
+    line_exact, _ = drv._encode("ping", {"_pad": "x" * pad_needed})  # type: ignore[attr-defined]
+    assert len(line_exact.encode("ascii")) - 1 == max_bytes
+
+    # max_bytes + 1 content bytes — must raise ArmCommandRejected.
+    drv._next_id = 0  # type: ignore[attr-defined]
+    with pytest.raises(ArmCommandRejected, match=str(max_bytes)):
+        drv._encode("ping", {"_pad": "x" * (pad_needed + 1)})  # type: ignore[attr-defined]
     drv = Esp32JsonDriver(
         _make_config(
             transport=ArmTransportConfig(
