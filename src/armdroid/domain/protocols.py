@@ -9,12 +9,13 @@ and :mod:`armdroid.environments`.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
-
-import numpy as np
-from numpy.typing import NDArray
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from armdroid.domain.state import ArmState, DetectedObject, PlanStep, SymbolicState
+
+if TYPE_CHECKING:
+    import numpy as np
+    from numpy.typing import NDArray
 
 
 @runtime_checkable

@@ -37,6 +37,31 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   fake-serial test helpers, and regression coverage around the new public
   surface.
 
+### Fixed
+
+- **CI gate stability** — Windows test job no longer fails to parse
+  multi-line `pytest` invocations under PowerShell (collapsed to a single
+  line). The ESP32 protocol-conformance regression test now skips cleanly
+  when the optional `[hardware]` extra (pyserial) is absent instead of
+  asserting against an environment that legitimately cannot construct the
+  driver. `firmware-ci/codegen-check` and `pio-build` now install
+  `numpy>=1.24` because the public API re-exports protocol types whose
+  annotations reference `numpy.typing.NDArray`.
+- **Plugin entry-point hygiene** — the `armdroid.drivers` group now points
+  the `esp32` entry at the canonical `armdroid.hardware.esp32` package
+  instead of the deprecated shim, so `importlib.metadata.entry_points`
+  no longer triggers a spurious `DeprecationWarning`.
+- **Domain protocol typing** — `numpy` / `numpy.typing` are now imported
+  under `TYPE_CHECKING` in `armdroid.domain.protocols`, keeping the
+  protocol surface pure and preventing optional-dependency import failures
+  in lightweight tooling environments (e.g. firmware codegen).
+- **Documentation polish** — restored clickable status badges in
+  `README.md`, fixed the broken ADR cross-reference in
+  `docs/architecture/PHASES.md` (now points at ADR-0003), and switched
+  the migration guide's `sed -i` example to portable `sed -i.bak` syntax.
+- **Dependabot ergonomics** — added explicit `timezone: "Etc/UTC"` to both
+  the `pip` and `github-actions` schedule blocks for unambiguous timing.
+
 ### Changed
 
 - **`MockArmDriver`** now implements the extended protocol with

@@ -87,6 +87,11 @@ class TestProtocolRegression:
         assert isinstance(driver, ArmDriverProtocol)
 
     def test_esp32_driver_satisfies_protocol(self) -> None:
+        # The ESP32 driver requires the optional ``[hardware]`` extra (pyserial)
+        # to instantiate. CI's default ``[dev]`` install omits that extra, so
+        # skip cleanly when pyserial is not importable rather than asserting
+        # against environments that legitimately can't construct the driver.
+        pytest.importorskip("serial", reason="pyserial not installed; install with .[hardware]")
         from armdroid.hardware.esp32 import Esp32JsonDriver
 
         cfg = ArmSettings(mock_hardware=True)

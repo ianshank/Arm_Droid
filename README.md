@@ -2,10 +2,10 @@
 
 **Robot arm manipulation platform — MakerWorld 6-DoF arm + ESP32, MuJoCo simulation, SAC+HER RL, and PDDL planning.**
 
-![CI](https://img.shields.io/badge/CI-passing-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
-![mypy](https://img.shields.io/badge/mypy-strict-blue)
-![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
+[![CI](https://img.shields.io/github/actions/workflow/status/ianshank/Arm_Droid/ci.yml?branch=main&label=CI)](https://github.com/ianshank/Arm_Droid/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)](https://github.com/ianshank/Arm_Droid/actions/workflows/ci.yml)
+[![mypy](https://img.shields.io/badge/mypy-strict-blue)](https://mypy.readthedocs.io/en/stable/command_line.html#cmdoption-mypy-strict)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org/downloads/)
 
 ---
 

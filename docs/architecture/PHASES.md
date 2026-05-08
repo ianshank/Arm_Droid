@@ -94,5 +94,5 @@ training curve visualisation. Driven by control-plane API above.
 4. Add config discriminator (`cfg.<axis>.kind`).
 5. Document under `docs/extension/add-a-<kind>.md`.
 
-See [ADR-0002 Plugin registries](ADR/ADR-0002-plugin-registries.md) (forthcoming
-in Phase 2) for the canonical pattern.
+See [ADR-0003: Generic Registry pattern for extension points](ADR/ADR-0003-registry-pattern.md)
+for the canonical pattern.

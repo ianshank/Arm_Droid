@@ -54,7 +54,7 @@ armdroid = "armdroid.main:cli_entry"
 # additional entries under the same group names.
 [project.entry-points."armdroid.drivers"]
 mock = "armdroid.hardware.mock_arm_driver:MockArmDriver"
-esp32 = "armdroid.hardware.esp32_json_driver:Esp32JsonDriver"
+esp32 = "armdroid.hardware.esp32:Esp32JsonDriver"
 
 [project.entry-points."armdroid.planners"]
 pyperplan = "armdroid.planning.symbolic_planner:SymbolicPlanner"
