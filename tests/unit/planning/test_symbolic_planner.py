@@ -80,7 +80,7 @@ class TestSymbolicPlannerPlan:
 def _make_mock_planner_module(
     return_value: list[MagicMock] | None = None,
     side_effect: Exception | None = None,
-) -> MagicMock:
+) -> tuple[MagicMock, MagicMock]:
     """Build a mock for the ``pyperplan.planner`` sub-module.
 
     The production code does ``from pyperplan import planner as _pio_planner``
@@ -97,7 +97,7 @@ def _make_mock_planner_module(
 
     mock_pkg = MagicMock()
     mock_pkg.planner = mock_planner
-    return mock_pkg, mock_planner  # type: ignore[return-value]
+    return mock_pkg, mock_planner
 
 
 def _make_operator(name: str) -> MagicMock:

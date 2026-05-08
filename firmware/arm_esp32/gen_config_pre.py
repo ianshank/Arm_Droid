@@ -55,7 +55,10 @@ def main() -> int:
 
 # Entry point when invoked from PlatformIO's SCons context (extra_scripts).
 # PlatformIO executes the file body directly, so ``main()`` runs here.
-main()
+# When run directly as a script, the ``if __name__ == "__main__"`` block
+# below handles the call so main() does not execute twice.
+if __name__ != "__main__":
+    main()
 
 if __name__ == "__main__":  # pragma: no cover
     sys.exit(main())

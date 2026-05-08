@@ -321,8 +321,7 @@ class ArmConfig(BaseModel):
         default=2.0,
         gt=0.0,
         description="Duration over which the firmware interpolates from any "
-        "pose back to home_position. Used by primitives.home() and on "
-        "MockArmDriver.connect().",
+        "pose back to home_position. Used by primitives.home().",
     )
     transit_duration_s: float = Field(
         default=2.0,
@@ -388,6 +387,31 @@ class ArmConfig(BaseModel):
         description="Minimum permitted distance between any two non-adjacent "
         "links. Used by the self-collision check.",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _mirror_legacy_transport(cls, data: object) -> object:
+        """Mirror legacy top-level transport fields into ``transport.*``.
+
+        Old configs may set ``arm.serial_port``, ``arm.serial_baud``, or
+        ``arm.command_timeout_s`` at the top level.  When no explicit
+        ``transport`` sub-config is present those values are forwarded into
+        the transport block so the real driver still picks them up.
+        """
+        if not isinstance(data, dict):
+            return data
+        if "transport" in data:
+            return data  # explicit transport block wins; nothing to mirror
+        transport: dict[str, object] = {}
+        if "serial_port" in data:
+            transport["serial_port"] = data["serial_port"]
+        if "serial_baud" in data:
+            transport["serial_baud"] = data["serial_baud"]
+        if "command_timeout_s" in data:
+            transport["command_timeout_s"] = data["command_timeout_s"]
+        if transport:
+            data["transport"] = transport
+        return data
 
     @model_validator(mode="before")
     @classmethod

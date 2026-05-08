@@ -381,9 +381,9 @@ async def test_keepalive_pings_when_idle(
         # Wait 3x the keepalive interval — at least one ping should fire.
         await asyncio.sleep(0.18)
         ping_count_after = drv._next_id  # type: ignore[attr-defined]
-        assert (
-            ping_count_after > ping_count_before
-        ), "Expected at least one keepalive ping to be sent"
+        assert ping_count_after > ping_count_before, (
+            "Expected at least one keepalive ping to be sent"
+        )
     finally:
         await drv.disconnect()
 
