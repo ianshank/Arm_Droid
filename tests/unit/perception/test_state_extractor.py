@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 
 from armdroid.config.schema import ArmTaskConfig
+from armdroid.domain.state import DetectedObject
 from armdroid.perception.state_extractor import StateExtractor
-from armdroid.protocols import DetectedObject
 
 
 def _make_extractor(num_pegs: int = 3) -> StateExtractor:

@@ -21,8 +21,8 @@ import numpy as np
 import pytest
 
 from armdroid.config.schema import ArmSettings
-from armdroid.factory import build_arm_orchestrator
-from armdroid.protocols import SymbolicState
+from armdroid.domain.state import SymbolicState
+from armdroid.orchestration.factory import build_arm_orchestrator
 
 pytestmark = pytest.mark.e2e
 

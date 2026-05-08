@@ -7,7 +7,15 @@ import pytest
 from armdroid._registry import RegistryError
 from armdroid.config.schema import ArmSettings, ArmTaskConfig
 from armdroid.control.controller import ArmController
-from armdroid.factory import (
+from armdroid.domain.protocols import (
+    ArmControllerProtocol,
+    ArmDriverProtocol,
+    ArmEnvironmentProtocol,
+    ArmPerceptionProtocol,
+    ArmPlannerProtocol,
+)
+from armdroid.hardware.mock_arm_driver import MockArmDriver
+from armdroid.orchestration.factory import (
     build_arm_controller,
     build_arm_driver,
     build_arm_environment,
@@ -15,15 +23,7 @@ from armdroid.factory import (
     build_arm_perception,
     build_arm_planner,
 )
-from armdroid.hardware.mock_arm_driver import MockArmDriver
-from armdroid.orchestrator import ArmOrchestrator
-from armdroid.protocols import (
-    ArmControllerProtocol,
-    ArmDriverProtocol,
-    ArmEnvironmentProtocol,
-    ArmPerceptionProtocol,
-    ArmPlannerProtocol,
-)
+from armdroid.orchestration.orchestrator import ArmOrchestrator
 
 
 class TestBuildArmDriver:

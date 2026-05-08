@@ -14,9 +14,9 @@ import importlib.util
 import pytest
 
 from armdroid.config.schema import ArmSettings
-from armdroid.factory import build_arm_driver, build_arm_orchestrator
+from armdroid.domain.protocols import ArmDriverProtocol
 from armdroid.hardware.mock_arm_driver import MockArmDriver
-from armdroid.protocols import ArmDriverProtocol
+from armdroid.orchestration.factory import build_arm_driver, build_arm_orchestrator
 
 # Esp32JsonDriver requires pyserial at construction time. Skip the
 # real-hardware factory dispatch test when pyserial is not installed

@@ -9,13 +9,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from armdroid.config.schema import LLMReplannerConfig
+from armdroid.domain.state import PlanStep, SymbolicState
 from armdroid.planning.llm_replanners.anthropic_backend import (
     AnthropicReplanner,
     AnthropicSDKMissingError,
 )
 from armdroid.planning.llm_replanners.base import LLMReplannerProtocol
 from armdroid.planning.llm_replanners.null_backend import NullLLMReplanner
-from armdroid.protocols import PlanStep, SymbolicState
 
 
 def _state(predicates: set[str] | None = None) -> SymbolicState:

@@ -20,9 +20,9 @@ from __future__ import annotations
 import pytest
 
 from armdroid.config.schema import ArmSettings, load_settings
-from armdroid.factory import build_arm_orchestrator
+from armdroid.domain.protocols import ArmDriverProtocol
 from armdroid.hardware.mock_arm_driver import MockArmDriver
-from armdroid.protocols import ArmDriverProtocol
+from armdroid.orchestration.factory import build_arm_orchestrator
 
 pytestmark = pytest.mark.regression
 
@@ -68,13 +68,14 @@ class TestProtocolRegression:
         assert isinstance(driver, ArmDriverProtocol)
 
     def test_esp32_driver_satisfies_protocol(self) -> None:
-        from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+        from armdroid.hardware.esp32 import Esp32JsonDriver
 
         cfg = ArmSettings(mock_hardware=True)
         driver = Esp32JsonDriver(cfg.arm)
         assert isinstance(driver, ArmDriverProtocol)
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 class TestNamedConstantsRegression:
     """Named poll-interval constants must remain present and correctly typed."""
 

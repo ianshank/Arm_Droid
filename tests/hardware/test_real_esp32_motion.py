@@ -13,8 +13,8 @@ import contextlib
 import pytest
 
 from armdroid.config.schema import ArmSettings
-from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
-from armdroid.protocols import ArmCommandRejected
+from armdroid.domain.errors import ArmCommandRejected
+from armdroid.hardware.esp32 import Esp32JsonDriver
 
 
 @pytest.mark.asyncio

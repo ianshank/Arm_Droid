@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from armdroid.protocols import ArmCommandRejected, ArmDriverError, ArmState
+from armdroid.domain.errors import ArmCommandRejected, ArmDriverError
+from armdroid.domain.state import ArmState
 
 
 class TestArmState:

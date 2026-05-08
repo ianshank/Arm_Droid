@@ -15,8 +15,8 @@ import asyncio
 import pytest
 
 from armdroid.config.schema import ArmSettings
-from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
-from armdroid.protocols import ArmDriverProtocol
+from armdroid.domain.protocols import ArmDriverProtocol
+from armdroid.hardware.esp32 import Esp32JsonDriver
 
 
 @pytest.mark.asyncio

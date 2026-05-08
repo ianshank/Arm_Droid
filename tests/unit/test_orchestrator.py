@@ -8,9 +8,9 @@ import pytest
 
 from armdroid.config.schema import ArmSettings
 from armdroid.control.controller import ArmController
-from armdroid.factory import build_arm_orchestrator
-from armdroid.orchestrator import ArmOrchestrator, _step_args_to_target
-from armdroid.protocols import PlanStep, SymbolicState
+from armdroid.domain.state import PlanStep, SymbolicState
+from armdroid.orchestration.factory import build_arm_orchestrator
+from armdroid.orchestration.orchestrator import ArmOrchestrator, _step_args_to_target
 
 
 @pytest.fixture

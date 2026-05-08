@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from armdroid.config.schema import ArmPlanningConfig, ArmTaskConfig
+from armdroid.domain.state import SymbolicState
 from armdroid.planning.pddl_domain import optimal_move_count
 from armdroid.planning.symbolic_planner import PlanningError, SymbolicPlanner
-from armdroid.protocols import SymbolicState
 
 
 def _make_planner(num_disks: int = 3) -> SymbolicPlanner:

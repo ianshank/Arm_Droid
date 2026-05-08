@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from armdroid.protocols import DetectedObject, PlanStep, SymbolicState
+from armdroid.domain.state import DetectedObject, PlanStep, SymbolicState
 
 
 class TestSymbolicState:

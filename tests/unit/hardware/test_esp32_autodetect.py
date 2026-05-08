@@ -24,7 +24,7 @@ from armdroid.config.schema import (
     ArmTransportConfig,
     JointLimits,
 )
-from armdroid.protocols import ArmDriverError
+from armdroid.domain.errors import ArmDriverError
 from tests.helpers.fake_serial import PingOnlyFakeSerial as _RespondingFakeSerial
 from tests.helpers.fake_serial import SilentFakeSerial as _SilentFakeSerial
 
@@ -82,7 +82,7 @@ def _install_fake_serial(
 @pytest.mark.asyncio
 async def test_no_candidates_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_serial(monkeypatch, _RespondingFakeSerial, ports=[])
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(_make_config())
     with pytest.raises(ArmDriverError, match="no candidate"):
@@ -101,7 +101,7 @@ async def test_all_candidates_silent_raises(
             _FakePortInfo("/dev/ttyUSB1"),
         ],
     )
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(_make_config())
     with pytest.raises(ArmDriverError, match="probed 2"):
@@ -117,7 +117,7 @@ async def test_responding_port_is_bound(
         _RespondingFakeSerial,
         ports=[_FakePortInfo("/dev/ttyUSB0")],
     )
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(_make_config())
     await drv.connect()
@@ -149,7 +149,7 @@ async def test_excluded_ports_are_skipped(
             exclude_ports=["/dev/ttyUSB0"],
         ),
     )
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(cfg)
     with pytest.raises(ArmDriverError, match="no candidate"):
@@ -181,7 +181,7 @@ async def test_vid_pid_hints_filter_candidates(
             usb_vid_pid_hints=["1234:5678"],
         ),
     )
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(cfg)
     await drv.connect()
@@ -212,7 +212,7 @@ async def test_explicit_path_bypasses_autodetect(
             drain_pings_on_connect=1,
         ),
     )
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(cfg)
     await drv.connect()

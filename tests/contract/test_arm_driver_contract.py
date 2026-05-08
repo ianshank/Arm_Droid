@@ -30,11 +30,9 @@ from armdroid.config.schema import (
     ArmTransportConfig,
     JointLimits,
 )
+from armdroid.domain.errors import ArmCommandRejected
+from armdroid.domain.protocols import ArmDriverProtocol
 from armdroid.hardware.mock_arm_driver import MockArmDriver
-from armdroid.protocols import (
-    ArmCommandRejected,
-    ArmDriverProtocol,
-)
 from tests.helpers.fake_serial import FakeSerial as _ContractFakeSerial
 
 pytestmark = pytest.mark.contract
@@ -85,7 +83,7 @@ def _make_mock(monkeypatch: pytest.MonkeyPatch) -> MockArmDriver:
 
 def _make_esp32(monkeypatch: pytest.MonkeyPatch) -> Any:
     _install_contract_fake(monkeypatch)
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     return Esp32JsonDriver(_cfg())
 
@@ -204,7 +202,7 @@ class TestContractReadState:
         self,
         driver_factory: Any,
     ) -> None:
-        from armdroid.protocols import ArmState
+        from armdroid.domain.state import ArmState
 
         drv = driver_factory
         await drv.connect()
