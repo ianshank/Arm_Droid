@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from armdroid.control.trajectory import TrajectoryGenerator
 from armdroid.config.schema import ArmConfig
+from armdroid.control.trajectory import TrajectoryGenerator
 
 
 def _make_generator(dof: int = 6, max_vel: float = 2.0) -> TrajectoryGenerator:

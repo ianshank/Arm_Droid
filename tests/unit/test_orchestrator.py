@@ -7,8 +7,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from armdroid.config.schema import ArmSettings
+from armdroid.control.controller import ArmController
 from armdroid.factory import build_arm_orchestrator
-from armdroid.orchestrator import ArmOrchestrator
+from armdroid.orchestrator import ArmOrchestrator, _step_args_to_target
+from armdroid.protocols import PlanStep, SymbolicState
 
 
 @pytest.fixture
@@ -33,8 +35,9 @@ class TestArmOrchestratorTrain:
 
     def test_train_builds_agent_lazily(self, orchestrator: ArmOrchestrator) -> None:
         """The agent must be unbuilt before train() and built after."""
-        agent = orchestrator.controller.agent  # type: ignore[attr-defined]
-        assert not agent.is_built
+        ctrl = orchestrator.controller
+        assert isinstance(ctrl, ArmController)
+        assert not ctrl.agent.is_built
 
         with (
             patch("armdroid.control.sac_agent.SAC") as mock_sac_cls,
@@ -49,6 +52,101 @@ class TestArmOrchestratorTrain:
             mock_sac_cls.assert_called_once()
             mock_model.learn.assert_called_once_with(total_timesteps=100)
             mock_model.save.assert_called_once()
+
+    def test_train_skips_build_if_already_built(self, orchestrator: ArmOrchestrator) -> None:
+        """build_for_env should not rebuild a model that is already built."""
+        ctrl = orchestrator.controller
+        assert isinstance(ctrl, ArmController)
+
+        with (
+            patch("armdroid.control.sac_agent.SAC") as mock_sac_cls,
+            patch("armdroid.control.sac_agent.HerReplayBuffer"),
+        ):
+            mock_model = MagicMock()
+            mock_sac_cls.return_value = mock_model
+            mock_model.save = MagicMock()
+
+            orchestrator.train(total_timesteps=50)
+            orchestrator.train(total_timesteps=50)
+
+            # SAC constructor called only once (second train reuses the built model)
+            assert mock_sac_cls.call_count == 1
+
+
+class TestArmOrchestratorRollout:
+    """orchestrator.rollout plans and dispatches steps through the controller."""
+
+    @pytest.mark.asyncio
+    async def test_rollout_success_all_steps_executed(self, orchestrator: ArmOrchestrator) -> None:
+        initial = SymbolicState(predicates=frozenset(), objects={})
+        goal = SymbolicState(predicates=frozenset(), objects={})
+        plan_stub = [PlanStep("move", ["disk1", "peg_A", "peg_C"])]
+
+        mock_exec = AsyncMock(return_value=True)
+        with (
+            patch.object(orchestrator._planner, "plan", return_value=plan_stub),
+            patch.object(orchestrator._controller, "execute_primitive", mock_exec),
+        ):
+            result = await orchestrator.rollout(initial, goal)
+
+        assert result["success"] is True
+        assert result["executed"] == 1
+        assert result["plan"] is plan_stub
+
+    @pytest.mark.asyncio
+    async def test_rollout_aborts_on_step_failure(self, orchestrator: ArmOrchestrator) -> None:
+        initial = SymbolicState(predicates=frozenset(), objects={})
+        goal = SymbolicState(predicates=frozenset(), objects={})
+        plan_stub = [
+            PlanStep("move", ["disk1", "peg_A", "peg_B"]),
+            PlanStep("move", ["disk2", "peg_A", "peg_C"]),
+        ]
+
+        with (
+            patch.object(orchestrator._planner, "plan", return_value=plan_stub),
+            patch.object(
+                orchestrator._controller,
+                "execute_primitive",
+                AsyncMock(side_effect=[False, True]),
+            ),
+        ):
+            result = await orchestrator.rollout(initial, goal)
+
+        assert result["success"] is False
+        assert result["executed"] == 0
+
+    @pytest.mark.asyncio
+    async def test_rollout_empty_plan(self, orchestrator: ArmOrchestrator) -> None:
+        initial = SymbolicState(predicates=frozenset(), objects={})
+        goal = SymbolicState(predicates=frozenset(), objects={})
+
+        with patch.object(orchestrator._planner, "plan", return_value=[]):
+            result = await orchestrator.rollout(initial, goal)
+
+        assert result["success"] is True
+        assert result["executed"] == 0
+
+
+class TestStepArgsToTarget:
+    """_step_args_to_target adapter."""
+
+    def test_returns_zero_array_with_args(self) -> None:
+        import numpy as np
+
+        target = _step_args_to_target(["disk1", "peg_A", "peg_C"])
+        np.testing.assert_array_equal(target, np.zeros(3, dtype=np.float64))
+
+    def test_returns_zero_array_without_args(self) -> None:
+        import numpy as np
+
+        target = _step_args_to_target([])
+        np.testing.assert_array_equal(target, np.zeros(3, dtype=np.float64))
+
+    def test_returns_float64(self) -> None:
+        import numpy as np
+
+        target = _step_args_to_target(["x"])
+        assert target.dtype == np.float64
 
 
 class TestArmOrchestratorShutdown:

@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from armdroid.perception.facade import ArmPerception
 from armdroid.config.schema import ArmPerceptionConfig, ArmTaskConfig
+from armdroid.perception.facade import ArmPerception
 
 
 def _make_perception() -> ArmPerception:

@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from armdroid.config.schema import LLMReplannerConfig
 from armdroid.planning.llm_replanners.anthropic_backend import (
     AnthropicReplanner,
     AnthropicSDKMissingError,
@@ -15,7 +16,6 @@ from armdroid.planning.llm_replanners.anthropic_backend import (
 from armdroid.planning.llm_replanners.base import LLMReplannerProtocol
 from armdroid.planning.llm_replanners.null_backend import NullLLMReplanner
 from armdroid.protocols import PlanStep, SymbolicState
-from armdroid.config.schema import LLMReplannerConfig
 
 
 def _state(predicates: set[str] | None = None) -> SymbolicState:
@@ -247,8 +247,8 @@ def test_anthropic_sdk_missing_raises() -> None:
 
 
 def test_replanner_delegates_to_injected_llm() -> None:
-    from armdroid.planning.replanner import Replanner
     from armdroid.config.schema import ArmPlanningConfig
+    from armdroid.planning.replanner import Replanner
 
     captured: list[Any] = []
 
@@ -269,8 +269,8 @@ def test_replanner_delegates_to_injected_llm() -> None:
 
 
 def test_replanner_falls_back_when_llm_returns_empty() -> None:
-    from armdroid.planning.replanner import Replanner
     from armdroid.config.schema import ArmPlanningConfig
+    from armdroid.planning.replanner import Replanner
 
     class _EmptyLLM:
         name = "empty"
@@ -291,8 +291,8 @@ def test_replanner_default_uses_null_llm_when_enabled_flag_set() -> None:
     supplied, the default :class:`NullLLMReplanner` returns ``[]`` and the
     outer ``Replanner`` falls back to the symbolic planner — preserving
     legacy behaviour without requiring the Anthropic SDK."""
-    from armdroid.planning.replanner import Replanner
     from armdroid.config.schema import ArmPlanningConfig
+    from armdroid.planning.replanner import Replanner
 
     planner = MagicMock()
     planner.plan.return_value = [PlanStep(action="legacy", args=[])]
@@ -306,8 +306,8 @@ def test_replanner_uses_new_config_without_legacy_flag() -> None:
     """The new ``arm_planning.llm_replanner.enabled`` sub-config must be
     sufficient to enable the LLM path — callers should not have to also
     set the legacy ``llm_replanner_enabled`` boolean."""
-    from armdroid.planning.replanner import Replanner
     from armdroid.config.schema import ArmPlanningConfig, LLMReplannerConfig
+    from armdroid.planning.replanner import Replanner
 
     class _StubLLM:
         name = "stub"
@@ -329,8 +329,8 @@ def test_replanner_uses_new_config_without_legacy_flag() -> None:
 
 def test_replanner_new_config_disabled_falls_back_to_symbolic() -> None:
     """When neither flag is set, the LLM path must be skipped entirely."""
-    from armdroid.planning.replanner import Replanner
     from armdroid.config.schema import ArmPlanningConfig, LLMReplannerConfig
+    from armdroid.planning.replanner import Replanner
 
     class _ShouldNotBeCalled:
         name = "should_not_run"

@@ -5,9 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from armdroid.config.schema import ArmConfig
 from armdroid.control.primitives import ActionPrimitives
 from armdroid.hardware.mock_arm_driver import MockArmDriver
-from armdroid.config.schema import ArmConfig
 
 
 def _make_cfg() -> ArmConfig:
@@ -91,3 +91,12 @@ class TestHome:
         prims, _driver = _make_primitives()
         result = await prims.home()
         assert result is True
+
+    @pytest.mark.asyncio
+    async def test_home_exception_returns_false(self) -> None:
+        from unittest.mock import AsyncMock, patch
+
+        prims, _driver = _make_primitives()
+        with patch.object(_driver, "home", AsyncMock(side_effect=RuntimeError("driver error"))):
+            result = await prims.home()
+        assert result is False

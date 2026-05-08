@@ -148,9 +148,7 @@ def load_settings(
     empty_nested = [
         k
         for k, v in os.environ.items()
-        if k.upper().startswith(_ENV_PREFIX)
-        and "__" in k[len(_ENV_PREFIX) :]
-        and not v.strip()
+        if k.upper().startswith(_ENV_PREFIX) and "__" in k[len(_ENV_PREFIX) :] and not v.strip()
     ]
     with _ScopedEnvUnset(empty_nested):
         return settings_class(**merged)

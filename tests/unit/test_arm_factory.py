@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from armdroid.config.schema import ArmSettings, ArmTaskConfig
+from armdroid.control.controller import ArmController
 from armdroid.factory import (
     build_arm_controller,
     build_arm_driver,
@@ -65,14 +66,23 @@ class TestBuildArmController:
         cfg = ArmSettings(mock_hardware=True)
         controller = build_arm_controller(cfg)
         assert isinstance(controller, ArmControllerProtocol)
+        assert isinstance(controller, ArmController)
 
     def test_controller_exposes_agent_and_primitives(self) -> None:
         cfg = ArmSettings(mock_hardware=True)
         controller = build_arm_controller(cfg)
-        # public properties (used by orchestrator + factory wiring)
-        assert controller.agent is not None  # type: ignore[attr-defined]
-        assert controller.primitives is not None  # type: ignore[attr-defined]
-        assert not controller.agent.is_built  # type: ignore[attr-defined]
+        assert isinstance(controller, ArmController)
+        assert controller.agent is not None
+        assert controller.primitives is not None
+        assert not controller.agent.is_built
+
+    def test_controller_accepts_explicit_driver(self) -> None:
+        """Passing an existing driver avoids opening a second serial connection."""
+        cfg = ArmSettings(mock_hardware=True)
+        shared_driver = build_arm_driver(cfg)
+        controller = build_arm_controller(cfg, driver=shared_driver)
+        assert isinstance(controller, ArmController)
+        assert controller.primitives.driver is shared_driver
 
 
 class TestBuildArmPerception:
@@ -101,4 +111,6 @@ class TestBuildArmOrchestrator:
         """Single driver instance — same object held by controller's primitives."""
         cfg = ArmSettings(mock_hardware=True)
         orch = build_arm_orchestrator(cfg)
-        assert orch.driver is orch.controller.primitives.driver  # type: ignore[attr-defined]
+        ctrl = orch.controller
+        assert isinstance(ctrl, ArmController)
+        assert orch.driver is ctrl.primitives.driver

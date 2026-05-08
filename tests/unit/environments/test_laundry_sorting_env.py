@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from armdroid.environments.laundry_sorting import LaundrySortingEnv
 from armdroid.config.schema import ArmTaskConfig, ArmTrainingConfig
+from armdroid.environments.laundry_sorting import LaundrySortingEnv
 
 
 def _make_env() -> LaundrySortingEnv:

@@ -23,7 +23,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from armdroid.config.logging import LoggingConfig
 
-
 # ---------------------------------------------------------------------------
 # LLM replanner sub-config (used by ArmPlanningConfig)
 # ---------------------------------------------------------------------------

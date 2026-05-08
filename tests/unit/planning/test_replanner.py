@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
+from armdroid.config.schema import ArmPlanningConfig, ArmTaskConfig
 from armdroid.planning.replanner import Replanner, ReplanningExhaustedError
 from armdroid.planning.symbolic_planner import SymbolicPlanner
 from armdroid.protocols import PlanStep, SymbolicState
-from armdroid.config.schema import ArmPlanningConfig, ArmTaskConfig
 
 
 def _make_state(predicates: set[str] | None = None) -> SymbolicState:

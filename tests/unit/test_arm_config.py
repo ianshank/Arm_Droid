@@ -189,3 +189,13 @@ class TestArmSettings:
         cfg = ArmSettings()
         assert cfg.arm.dof == 7
         assert len(cfg.arm.home_position) == 7
+
+
+class TestLoadSettingsConvenienceFunction:
+    """The module-level load_settings() delegates to the generic loader."""
+
+    def test_load_settings_returns_arm_settings(self) -> None:
+        from armdroid.config.schema import load_settings
+
+        cfg = load_settings()
+        assert isinstance(cfg, ArmSettings)

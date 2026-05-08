@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from armdroid.environments.domain_randomizer import DomainRandomizer
 from armdroid.config.schema import ArmSimConfig
+from armdroid.environments.domain_randomizer import DomainRandomizer
 
 
 def _make_randomizer(enabled: bool = True, seed: int = 42) -> DomainRandomizer:

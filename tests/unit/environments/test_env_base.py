@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 
+from armdroid.config.schema import ArmTaskConfig, ArmTrainingConfig
 from armdroid.environments.laundry_sorting import LaundrySortingEnv
 from armdroid.environments.tower_of_hanoi import TowerOfHanoiEnv
-from armdroid.config.schema import ArmTaskConfig, ArmTrainingConfig
 
 
 def _make_hanoi() -> TowerOfHanoiEnv:

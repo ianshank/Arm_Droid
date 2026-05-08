@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from armdroid.control.sac_agent import SACAgent
 from armdroid.config.schema import ArmTrainingConfig
+from armdroid.control.sac_agent import SACAgent
 
 
 @pytest.fixture

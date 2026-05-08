@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 
+from armdroid.config.schema import ArmPerceptionConfig
 from armdroid.perception.pose_estimator import PoseEstimator
 from armdroid.protocols import DetectedObject
-from armdroid.config.schema import ArmPerceptionConfig
 
 
 def _make_estimator() -> PoseEstimator:

@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from armdroid.hardware.mock_arm_driver import MockArmDriver
 from armdroid.config.schema import ArmConfig
+from armdroid.hardware.mock_arm_driver import MockArmDriver
 
 
 def _make_driver(dof: int = 6) -> MockArmDriver:

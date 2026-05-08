@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from armdroid.perception.depth_processor import DepthProcessor
 from armdroid.config.schema import ArmPerceptionConfig
+from armdroid.perception.depth_processor import DepthProcessor
 
 
 def _make_processor() -> DepthProcessor:

@@ -9,12 +9,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from armdroid.protocols import ArmPlannerProtocol, PlanStep, SymbolicState
 from armdroid.logging.setup import get_logger
+from armdroid.protocols import ArmPlannerProtocol, PlanStep, SymbolicState
 
 if TYPE_CHECKING:
-    from armdroid.planning.llm_replanners.base import LLMReplannerProtocol
     from armdroid.config.schema import ArmPlanningConfig
+    from armdroid.planning.llm_replanners.base import LLMReplannerProtocol
 
 _log = get_logger(__name__)
 

@@ -8,6 +8,7 @@ and :mod:`armdroid.environments`.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
@@ -266,6 +267,27 @@ class ArmControllerProtocol(Protocol):
 
         Returns:
             True if primitive executed successfully.
+        """
+        ...
+
+    def build_for_env(self, env: ArmEnvironmentProtocol) -> None:
+        """Bind the internal RL model to an environment (lazy wiring).
+
+        Safe to call multiple times — only builds if not already built.
+
+        Args:
+            env: Gymnasium-compatible environment for SAC+HER.
+        """
+        ...
+
+    def train_policy(self, total_timesteps: int | None = None) -> Path:
+        """Train the internal RL policy and save a checkpoint.
+
+        Args:
+            total_timesteps: Override config total_timesteps (None = use config).
+
+        Returns:
+            Filesystem path of the saved policy checkpoint.
         """
         ...
 

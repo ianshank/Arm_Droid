@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from armdroid.planning.llm_replanners.base import LLMReplannerProtocol
 from armdroid.logging.setup import get_logger
+from armdroid.planning.llm_replanners.base import LLMReplannerProtocol
 
 if TYPE_CHECKING:
     from armdroid.protocols import PlanStep, SymbolicState

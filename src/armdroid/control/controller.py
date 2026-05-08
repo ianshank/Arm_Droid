@@ -7,6 +7,7 @@ for discrete manipulation commands.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -17,6 +18,7 @@ from armdroid.logging.setup import get_logger
 if TYPE_CHECKING:
     from armdroid.control.primitives import ActionPrimitives
     from armdroid.control.sac_agent import SACAgent
+    from armdroid.protocols import ArmEnvironmentProtocol
 
 _log = get_logger(__name__)
 
@@ -76,6 +78,28 @@ class ArmController:
                 "achieved_state": np.zeros_like(action),
                 "info": {"error": "action_execution_failed"},
             }
+
+    def build_for_env(self, env: ArmEnvironmentProtocol) -> None:
+        """Bind the SAC agent to an environment if not already built.
+
+        Args:
+            env: Gymnasium-compatible environment for SAC+HER training.
+        """
+        if not self._agent.is_built:
+            _log.info("arm_controller_building_agent")
+            self._agent.build(env)
+
+    def train_policy(self, total_timesteps: int | None = None) -> Path:
+        """Train the SAC+HER policy and save a checkpoint.
+
+        Args:
+            total_timesteps: Override config total_timesteps (None = use config).
+
+        Returns:
+            Path of the saved policy checkpoint.
+        """
+        self._agent.train(total_timesteps)
+        return self._agent.save()
 
     async def execute_primitive(self, primitive_name: str, target: NDArray[np.float64]) -> bool:
         """Execute pre-trained action primitive.

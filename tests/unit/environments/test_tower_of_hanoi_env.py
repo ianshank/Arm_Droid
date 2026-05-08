@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from armdroid.environments.tower_of_hanoi import TowerOfHanoiEnv
 from armdroid.config.schema import ArmTaskConfig, ArmTrainingConfig
+from armdroid.environments.tower_of_hanoi import TowerOfHanoiEnv
 
 
 def _make_env(num_disks: int = 3, max_steps: int = 50) -> TowerOfHanoiEnv:

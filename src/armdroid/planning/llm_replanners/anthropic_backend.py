@@ -32,12 +32,12 @@ import os
 import time
 from typing import TYPE_CHECKING, Any
 
-from armdroid.protocols import PlanStep
 from armdroid.logging.setup import get_logger
+from armdroid.protocols import PlanStep
 
 if TYPE_CHECKING:
-    from armdroid.protocols import SymbolicState
     from armdroid.config.schema import LLMReplannerConfig
+    from armdroid.protocols import SymbolicState
 
 _log = get_logger(__name__)
 

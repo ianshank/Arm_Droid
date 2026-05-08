@@ -13,10 +13,11 @@ import asyncio
 import sys
 from pathlib import Path
 
+import numpy as np
+
 from armdroid.config.schema import ArmSettings, load_settings
 from armdroid.factory import build_arm_orchestrator
 from armdroid.logging.setup import configure_logging, get_logger
-from armdroid.orchestrator import ArmOrchestrator
 from armdroid.protocols import SymbolicState
 
 
@@ -160,16 +161,13 @@ def _sim(cfg: ArmSettings, episodes: int) -> None:  # pragma: no cover
     total_reward = 0.0
     try:
         for ep in range(episodes):
-            obs, _info = env.reset(seed=ep)
+            _obs, _info = env.reset(seed=ep)
             ep_reward = 0.0
             terminated = False
             truncated = False
             while not (terminated or truncated):
-                # Random action — this is a sim sanity-check, not policy rollout.
-                import numpy as np
-
                 action = np.zeros(cfg.arm.dof, dtype=np.float64)
-                obs, reward, terminated, truncated, _info = env.step(action)
+                _obs, reward, terminated, truncated, _info = env.step(action)
                 ep_reward += float(reward)
             total_reward += ep_reward
             log.info("armdroid_sim_episode", episode=ep, reward=ep_reward)

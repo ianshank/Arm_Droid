@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from armdroid.environments.reward_shaping import RewardShaper
 from armdroid.config.schema import ArmTrainingConfig
+from armdroid.environments.reward_shaping import RewardShaper
 
 
 def _make_shaper() -> RewardShaper:

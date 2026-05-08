@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from armdroid.environments.curriculum import CurriculumManager
 from armdroid.config.schema import ArmCurriculumConfig
+from armdroid.environments.curriculum import CurriculumManager
 
 
 def _make_manager(

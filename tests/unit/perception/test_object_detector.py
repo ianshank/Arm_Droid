@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import torch
 
-from armdroid.perception.object_detector import ObjectDetector
 from armdroid.config.schema import ArmPerceptionConfig
+from armdroid.perception.object_detector import ObjectDetector
 
 
 def _make_detector() -> ObjectDetector:

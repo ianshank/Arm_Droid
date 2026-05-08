@@ -20,6 +20,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+from numpy.typing import NDArray
+
 from armdroid.logging.setup import get_logger
 
 if TYPE_CHECKING:
@@ -92,7 +95,8 @@ class ArmOrchestrator:
         """Run the SAC+HER training loop and save the resulting policy.
 
         Wires the SAC agent to the environment lazily on the first call
-        (the factory leaves the agent un-built).
+        (the factory leaves the agent un-built). Delegates to the controller's
+        :meth:`build_for_env` + :meth:`train_policy` protocol methods.
 
         Args:
             total_timesteps: Override config ``arm_training.total_timesteps``.
@@ -100,13 +104,10 @@ class ArmOrchestrator:
         Returns:
             Filesystem path of the saved policy checkpoint.
         """
-        agent = self._controller.agent  # type: ignore[attr-defined]
-        if not agent.is_built:
-            _log.info("arm_orchestrator_building_agent_for_env")
-            agent.build(self._environment)
+        _log.info("arm_orchestrator_building_agent")
+        self._controller.build_for_env(self._environment)
         _log.info("arm_orchestrator_train_start", total_timesteps=total_timesteps)
-        agent.train(total_timesteps)
-        path = agent.save()
+        path = self._controller.train_policy(total_timesteps)
         _log.info("arm_orchestrator_train_complete", checkpoint=str(path))
         return path
 
@@ -151,31 +152,29 @@ class ArmOrchestrator:
         _log.info("arm_orchestrator_shutdown_start")
         try:
             await self._driver.stop()
-        except Exception:  # noqa: BLE001
+        except Exception:
             _log.exception("arm_orchestrator_driver_stop_failed")
         try:
             self._environment.close()
-        except Exception:  # noqa: BLE001
+        except Exception:
             _log.exception("arm_orchestrator_env_close_failed")
         _log.info("arm_orchestrator_shutdown_complete")
 
 
-def _step_args_to_target(args: list[str]) -> Any:
-    """Convert PDDL plan-step args to a primitive target.
+def _step_args_to_target(args: list[str]) -> NDArray[np.float64]:
+    """Convert PDDL plan-step args to a zero target vector.
 
-    Plan-step args are symbolic (e.g. ``["disk1", "peg_A", "peg_C"]``).
-    This adapter is intentionally minimal — the symbolic-to-pose
-    conversion lives in the action primitives themselves; here we just
-    pass the args through as a string tuple. Concrete pose lookup is
-    the controller's responsibility.
+    Symbolic-to-pose conversion (peg positions → joint angles) lives inside
+    :class:`ActionPrimitives`, not here. This boundary adapter returns a
+    zero vector so every ``execute_primitive`` call receives a consistent
+    ``NDArray[np.float64]`` shape. The primitives layer does its own
+    lookup against the arm config to resolve actual targets.
 
     Args:
-        args: PDDL action arguments.
+        args: PDDL action arguments (e.g. ``["disk1", "peg_A", "peg_C"]``).
 
     Returns:
-        Args as a numpy array (zero-padded) so callers receive a
-        consistent ``NDArray[np.float64]`` regardless of action.
+        Zero array of shape ``(3,)`` — x/y/z placeholder target.
     """
-    import numpy as np
-
-    return np.zeros(3, dtype=np.float64) if not args else np.zeros(3, dtype=np.float64)
+    _ = args  # consumed by ActionPrimitives via the primitive_name dispatch
+    return np.zeros(3, dtype=np.float64)

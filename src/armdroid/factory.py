@@ -95,22 +95,28 @@ def build_arm_environment(cfg: ArmSettings) -> ArmEnvironmentProtocol:
     return TowerOfHanoiEnv(cfg.arm_task, cfg.arm_training, dof=dof)
 
 
-def build_arm_controller(cfg: ArmSettings) -> ArmControllerProtocol:
+def build_arm_controller(
+    cfg: ArmSettings,
+    driver: ArmDriverProtocol | None = None,
+) -> ArmControllerProtocol:
     """Build the RL controller (SACAgent + ActionPrimitives).
 
     The returned controller's underlying :class:`SACAgent` is **not yet
-    bound to an environment** — the orchestrator calls
-    ``controller.agent.build(env)`` after the env is constructed.
+    bound to an environment** — call :meth:`build_for_env` (via the
+    orchestrator's :meth:`train`) after the environment is constructed.
 
     Args:
         cfg: Root settings.
+        driver: Pre-built driver to reuse. If ``None``, a new driver is
+            constructed from ``cfg``. Pass an existing driver to avoid
+            opening a second serial connection to the SO-ARM100.
 
     Returns:
         Controller conforming to :class:`ArmControllerProtocol`.
     """
-    driver = build_arm_driver(cfg)
+    resolved_driver = driver if driver is not None else build_arm_driver(cfg)
     agent = SACAgent(cfg.arm_training)
-    primitives = ActionPrimitives(cfg.arm, driver)
+    primitives = ActionPrimitives(cfg.arm, resolved_driver)
     _log.info("arm_controller_built", algorithm=cfg.arm_training.algorithm)
     return ArmController(agent, primitives)
 
@@ -140,22 +146,24 @@ def build_arm_perception(cfg: ArmSettings) -> ArmPerceptionProtocol:
 def build_arm_orchestrator(cfg: ArmSettings) -> ArmOrchestrator:
     """Compose the full armdroid orchestrator from sub-component factories.
 
+    The driver is constructed once here and shared with the controller so
+    that only a single serial connection is opened to the SO-ARM100.
+
     Args:
         cfg: Root settings.
 
     Returns:
         :class:`ArmOrchestrator` with perception, planner, controller,
         environment, and driver wired up. The SAC agent inside the
-        controller is not yet built — the orchestrator wires the env
-        in :meth:`ArmOrchestrator.train` lazily.
+        controller is not yet built — call :meth:`ArmOrchestrator.train`
+        which delegates to :meth:`ArmControllerProtocol.build_for_env`
+        lazily.
     """
+    driver = build_arm_driver(cfg)
     perception = build_arm_perception(cfg)
     planner = build_arm_planner(cfg)
-    controller = build_arm_controller(cfg)
+    controller = build_arm_controller(cfg, driver=driver)
     environment = build_arm_environment(cfg)
-    # Reuse the controller's already-built driver instead of constructing
-    # a second one. Keeps the SO-ARM100 serial port lock single-owner.
-    driver = controller.primitives.driver  # type: ignore[attr-defined]
     _log.info("arm_orchestrator_built")
     return ArmOrchestrator(
         perception=perception,

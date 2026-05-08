@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from armdroid.config.schema import ArmTaskConfig
 from armdroid.planning.laundry_rules import (
     DEFAULT_RULES,
     LaundryRuleEngine,
     SortingRule,
 )
-from armdroid.config.schema import ArmTaskConfig
 
 
 def _make_engine(

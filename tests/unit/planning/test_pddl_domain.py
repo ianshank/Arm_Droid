@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from armdroid.config.schema import ArmTaskConfig
 from armdroid.planning.pddl_domain import (
     generate_domain,
     generate_problem,
     optimal_move_count,
 )
-from armdroid.config.schema import ArmTaskConfig
 
 
 class TestOptimalMoveCount:
