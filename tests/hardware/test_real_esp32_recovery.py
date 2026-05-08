@@ -163,7 +163,7 @@ async def test_pending_map_cleared_on_disconnect(
 
        This covers the *clean-disconnect* path.  The abrupt-port-close
        path (futures cancelled mid-flight) is exercised by
-       :func:`test_recovery_after_port_close`.
+       :func:`test_abrupt_disconnect_then_reconnect`.
     """
     pending: dict = hil_driver._pending  # type: ignore[attr-defined]
     # Freshly connected driver must have no orphaned futures.

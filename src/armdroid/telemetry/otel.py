@@ -21,6 +21,7 @@ Wiring example::
 
 from __future__ import annotations
 
+import importlib.util
 from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING, Any
 
@@ -30,17 +31,11 @@ if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
     from opentelemetry.trace import TracerProvider as OtelTracerProvider
 
-# Guard the OTel runtime import so the module stays importable without the extra.
-# Pre-declare as Any so the None assignment in the except branch is valid across
-# all supported mypy versions without needing version-specific type: ignore comments.
-_otel_trace: Any = None
-_OTEL_AVAILABLE: bool = False
-try:
-    import opentelemetry.trace as _otel_trace
-
-    _OTEL_AVAILABLE = True
-except ImportError:
-    pass
+# Check availability without binding a module-level variable.  Using find_spec
+# avoids version-specific ``type: ignore`` or Any gymnastics: mypy 2.0 strict
+# flags both ``type: ignore[assignment]`` (unused-ignore) and a try/except
+# rebind of an Any-annotated module variable (no-redef).
+_OTEL_AVAILABLE: bool = importlib.util.find_spec("opentelemetry") is not None
 
 
 # ---------------------------------------------------------------------------
@@ -114,12 +109,11 @@ class OtelTelemetry:
                 "pip install -e '.[telemetry]'"
             )
             raise ImportError(msg)
-        # _otel_trace is the real module when _OTEL_AVAILABLE is True.
-        assert _otel_trace is not None  # narrowing for mypy; _OTEL_AVAILABLE guard ensures this
+        import opentelemetry.trace as _otel_trace_local  # succeeds: _OTEL_AVAILABLE guard above
         if tracer_provider is not None:
             self._tracer: Tracer = tracer_provider.get_tracer(tracer_name)
         else:
-            self._tracer = _otel_trace.get_tracer(tracer_name)
+            self._tracer = _otel_trace_local.get_tracer(tracer_name)
 
     def start_span(
         self,
@@ -148,8 +142,8 @@ class OtelTelemetry:
             **attrs: Event attributes forwarded to OTel.
         """
         if _OTEL_AVAILABLE:
-            assert _otel_trace is not None  # narrowing for mypy; _OTEL_AVAILABLE guard ensures this
-            _otel_trace.get_current_span().add_event(name, attributes=attrs)
+            import opentelemetry.trace as _otel_trace_local  # succeeds when _OTEL_AVAILABLE is True
+            _otel_trace_local.get_current_span().add_event(name, attributes=attrs)
 
 
 __all__ = ["OtelTelemetry"]

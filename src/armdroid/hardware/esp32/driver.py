@@ -145,12 +145,12 @@ class Esp32JsonDriver:
         """Open the transport. Idempotent."""
         if self._connected:
             return
+        port_path = await resolve_port(self._cfg, _serial_module, _list_ports_module)
         with get_telemetry().start_span(
             SPAN_DRIVER_CONNECT,
-            port=str(self._cfg.transport.serial_port),
+            port=port_path,
             baud=self._cfg.transport.serial_baud,
         ):
-            port_path = await resolve_port(self._cfg, _serial_module, _list_ports_module)
             port = await asyncio.to_thread(open_port_blocking, port_path, self._cfg, _serial_module)
             self._port = port
             self._last_send_monotonic = time.monotonic()
