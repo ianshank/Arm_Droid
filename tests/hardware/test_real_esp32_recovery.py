@@ -151,21 +151,24 @@ async def test_estop_state_observable_after_reconnect(
 async def test_pending_map_cleared_on_disconnect(
     hil_driver: Esp32JsonDriver,
 ) -> None:
-    """All pending reply futures are cancelled when the driver disconnects.
+    """Pending-reply map is empty before and after a clean disconnect.
 
-    Issues a ``ping`` but disconnects before the ack arrives (by closing
-    the port underneath).  After ``_teardown`` the ``_pending`` dict must
-    be empty so subsequent tests don't inherit orphaned futures.
+    Verifies the invariant that a freshly connected driver has no orphaned
+    futures in ``_pending`` and that a clean :meth:`disconnect` leaves the
+    map empty.  This guards against regressions in teardown ordering where
+    a non-empty ``_pending`` map could cause subsequent tests to wait
+    indefinitely for replies that will never arrive.
 
     .. note::
 
-       This test verifies internal driver state to guard against future
-       regressions in cleanup ordering.
+       This covers the *clean-disconnect* path.  The abrupt-port-close
+       path (futures cancelled mid-flight) is exercised by
+       :func:`test_recovery_after_port_close`.
     """
     pending: dict = hil_driver._pending  # type: ignore[attr-defined]
-    # The map should start empty (we just connected, no commands in flight).
+    # Freshly connected driver must have no orphaned futures.
     assert len(pending) == 0
 
-    # After a clean disconnect the map must remain empty.
+    # A clean disconnect must leave the map empty.
     await hil_driver.disconnect()
     assert len(pending) == 0

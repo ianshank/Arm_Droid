@@ -31,13 +31,16 @@ if TYPE_CHECKING:
     from opentelemetry.trace import TracerProvider as OtelTracerProvider
 
 # Guard the OTel runtime import so the module stays importable without the extra.
+# Pre-declare as Any so the None assignment in the except branch is valid across
+# all supported mypy versions without needing version-specific type: ignore comments.
+_otel_trace: Any = None
+_OTEL_AVAILABLE: bool = False
 try:
     import opentelemetry.trace as _otel_trace
 
     _OTEL_AVAILABLE = True
 except ImportError:
-    _otel_trace = None  # type: ignore[assignment]
-    _OTEL_AVAILABLE = False
+    pass
 
 
 # ---------------------------------------------------------------------------

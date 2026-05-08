@@ -15,7 +15,7 @@ When the extra *is* installed the tests verify:
 
 from __future__ import annotations
 
-import importlib
+import importlib.util
 
 import pytest
 
@@ -23,8 +23,12 @@ import pytest
 # Module-level skip guard
 # ---------------------------------------------------------------------------
 
-_otel_sdk = importlib.util.find_spec("opentelemetry.sdk")
-_otel_available = _otel_sdk is not None
+try:
+    # find_spec with a dotted name imports the parent package first;
+    # if 'opentelemetry' is absent this raises ModuleNotFoundError.
+    _otel_available: bool = importlib.util.find_spec("opentelemetry.sdk") is not None
+except ModuleNotFoundError:
+    _otel_available = False
 
 pytestmark = pytest.mark.skipif(
     not _otel_available,
