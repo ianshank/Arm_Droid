@@ -58,13 +58,14 @@ class ArmDriverError(RuntimeError):
 
 
 class ArmCommandRejected(ArmDriverError):  # noqa: N818
-    """Raised when the driver rejects a command before transmission.
+    """Raised when a command is rejected, either locally or by the firmware.
 
-    Typical causes: joint-limit violation, NaN or wrong-length command vector,
-    non-positive duration, or issuing a motion command while the firmware
-    e-stop latch is active. Distinct from :class:`ArmDriverError` because the
-    arm is *not* in a faulted state — the caller can simply correct the
-    command and retry.
+    Raised before transmission for locally detectable violations (joint-limit
+    breach, NaN or wrong-length command vector, non-positive duration, or
+    exceeding the wire line-length cap) and after transmission when the
+    firmware returns a NAK (e.g. ``out_of_range`` or ``estop_latched``).
+    Distinct from :class:`ArmDriverError` because the arm is *not* in a
+    faulted state — the caller can simply correct the command and retry.
     """
 
 
@@ -252,7 +253,9 @@ class ArmDriverProtocol(Protocol):
 
         All subsequent motion commands are rejected with
         :class:`ArmCommandRejected` until :meth:`clear_emergency_stop` is
-        called. Must succeed even if the transport is degraded.
+        called. Implementations make a best-effort attempt to deliver the
+        e-stop command, but may raise :class:`ArmDriverError` if the driver
+        is not connected or if the underlying write fails.
         """
         ...
 

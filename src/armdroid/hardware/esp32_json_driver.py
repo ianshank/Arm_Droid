@@ -25,8 +25,9 @@ Architecture:
 
 Concurrency: an :class:`asyncio.Lock` serialises sends so two overlapping
 calls never interleave bytes on the wire. :meth:`read_state` is lock-free
-and returns the cached heartbeat. The e-stop write bypasses the send
-lock so safety-critical commands always go through.
+and returns the cached heartbeat. E-stop commands also acquire the send
+lock, so they are serialized with other writes and do not preempt an
+in-flight send.
 
 Port discovery: when ``cfg.arm.transport.serial_port == "auto"`` the
 driver enumerates available USB serial ports via
