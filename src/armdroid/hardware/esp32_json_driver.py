@@ -302,12 +302,16 @@ class Esp32JsonDriver:
             )
             for i, v in enumerate(target_angles)
         )
-        # Auto-stretch duration so velocity limits never reject the legacy
-        # command. Mock arm bypasses velocity validation entirely; mirroring
-        # that behaviour here keeps the legacy adapter contract identical
-        # across drivers.
+        # Legacy semantics: "as fast as one firmware interpolator tick".
+        # Using ``home_duration_s`` (default 2 s) here would surprise legacy
+        # callers that expect a near-instant step. We start at one
+        # interpolator period and auto-stretch only when joint velocity
+        # limits force it — mirroring MockArmDriver's "velocity not
+        # enforced" contract while still passing strict validation.
+        interp_hz = self._cfg.firmware.interpolator_hz
+        base_duration = 1.0 / interp_hz if interp_hz > 0.0 else 0.02
         anchor = self._velocity_anchor()
-        min_duration = self._cfg.home_duration_s
+        min_duration = base_duration
         for idx, (s, t) in enumerate(zip(anchor, clipped, strict=True)):
             limit = self._cfg.joint_limits[idx].max_velocity_rad_s
             if limit > 0.0:

@@ -30,6 +30,20 @@ uint32_t g_seq = 0;
 char g_rx_buf[cfg::kMaxLineBytes + 1];
 size_t g_rx_len = 0;
 
+// Single shared JsonDocument reused by every fw->host emitter. The host
+// receives one frame per line, so emitter calls do not nest; each
+// EmitXxx() clears g_emit_doc before populating it. Reusing one doc
+// avoids per-call heap churn on the ESP32, which matters because the
+// state heartbeat fires at cfg::kHeartbeatHz and was previously
+// allocating a fresh JsonDocument every tick.
+//
+// NOTE: We deliberately do NOT share this doc with the inbound
+// deserialiser in ProcessLine() \u2014 the parsed-input doc holds string
+// pointers (e.g. ``cmd``) that callers re-emit via EmitNak("unknown_cmd",
+// cmd), which would alias into the same pool that EmitNak's clear() just
+// reset.  Keeping parse/emit on separate docs avoids that hazard.
+JsonDocument g_emit_doc;
+
 constexpr float kHomePosition[cfg::kNumJoints] = {};  // zero-initialised
 
 // Map joint i's value (radians for rotational joints, [0,1] for the
@@ -57,28 +71,28 @@ void EmitJson(JsonDocument& doc) {
 }
 
 void EmitAck(int id) {
-  JsonDocument doc;
-  doc["t"] = "ack";
-  doc["id"] = id;
-  EmitJson(doc);
+  g_emit_doc.clear();
+  g_emit_doc["t"] = "ack";
+  g_emit_doc["id"] = id;
+  EmitJson(g_emit_doc);
 }
 
 void EmitNak(int id, const char* err, const char* msg) {
-  JsonDocument doc;
-  doc["t"] = "nak";
-  doc["id"] = id;
-  doc["err"] = err;
-  doc["msg"] = msg;
-  EmitJson(doc);
+  g_emit_doc.clear();
+  g_emit_doc["t"] = "nak";
+  g_emit_doc["id"] = id;
+  g_emit_doc["err"] = err;
+  g_emit_doc["msg"] = msg;
+  EmitJson(g_emit_doc);
 }
 
 void EmitState() {
-  JsonDocument doc;
-  doc["t"] = "state";
-  doc["seq"] = ++g_seq;
-  doc["ts"] = millis() / 1000.0;
-  JsonArray q = doc["q"].to<JsonArray>();
-  JsonArray qd = doc["qd"].to<JsonArray>();
+  g_emit_doc.clear();
+  g_emit_doc["t"] = "state";
+  g_emit_doc["seq"] = ++g_seq;
+  g_emit_doc["ts"] = millis() / 1000.0;
+  JsonArray q = g_emit_doc["q"].to<JsonArray>();
+  JsonArray qd = g_emit_doc["qd"].to<JsonArray>();
   float vel[cfg::kNumJoints];
   g_interp.GetVelocities(vel);
   const float* cur = g_interp.current();
@@ -86,28 +100,28 @@ void EmitState() {
     q.add(cur[i]);
     qd.add(vel[i]);
   }
-  doc["mv"] = g_interp.is_moving();
-  doc["es"] = g_estop_latched;
-  EmitJson(doc);
+  g_emit_doc["mv"] = g_interp.is_moving();
+  g_emit_doc["es"] = g_estop_latched;
+  EmitJson(g_emit_doc);
 }
 
 void EmitBootEvent() {
-  JsonDocument doc;
-  doc["t"] = "evt";
-  doc["kind"] = "boot";
-  doc["ver"] = cfg::kFirmwareVersion;
-  doc["ts"] = millis() / 1000.0;
-  EmitJson(doc);
+  g_emit_doc.clear();
+  g_emit_doc["t"] = "evt";
+  g_emit_doc["kind"] = "boot";
+  g_emit_doc["ver"] = cfg::kFirmwareVersion;
+  g_emit_doc["ts"] = millis() / 1000.0;
+  EmitJson(g_emit_doc);
 }
 
 void EmitFault(const char* code, const char* msg) {
-  JsonDocument doc;
-  doc["t"] = "evt";
-  doc["kind"] = "fault";
-  doc["code"] = code;
-  doc["msg"] = msg;
-  doc["ts"] = millis() / 1000.0;
-  EmitJson(doc);
+  g_emit_doc.clear();
+  g_emit_doc["t"] = "evt";
+  g_emit_doc["kind"] = "fault";
+  g_emit_doc["code"] = code;
+  g_emit_doc["msg"] = msg;
+  g_emit_doc["ts"] = millis() / 1000.0;
+  EmitJson(g_emit_doc);
 }
 
 void LatchEstop() {
@@ -206,6 +220,10 @@ void ProcessLine(const char* line, size_t len) {
   if (len > cfg::kMaxLineBytes) {
     return;  // silently drop oversized lines
   }
+  // Local doc for the inbound frame: must NOT alias g_emit_doc, because
+  // string pointers harvested from this doc (e.g. ``cmd``) are passed to
+  // EmitNak() which clears its own emit doc — sharing storage would
+  // produce a use-after-clear hazard.
   JsonDocument doc;
   DeserializationError err = deserializeJson(doc, line, len);
   if (err) {

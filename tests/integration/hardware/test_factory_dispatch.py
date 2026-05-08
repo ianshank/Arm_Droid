@@ -9,12 +9,19 @@ ActionPrimitives and the orchestrator's stored reference).
 
 from __future__ import annotations
 
+import importlib.util
+
 import pytest
 
 from armdroid.config.schema import ArmSettings
 from armdroid.factory import build_arm_driver, build_arm_orchestrator
 from armdroid.hardware.mock_arm_driver import MockArmDriver
 from armdroid.protocols import ArmDriverProtocol
+
+# Esp32JsonDriver requires pyserial at construction time. Skip the
+# real-hardware factory dispatch test when pyserial is not installed
+# rather than failing with ArmDriverError.
+_HAS_PYSERIAL = importlib.util.find_spec("serial") is not None
 
 
 class TestFactoryDispatch:
@@ -24,11 +31,17 @@ class TestFactoryDispatch:
         assert isinstance(drv, MockArmDriver)
         assert isinstance(drv, ArmDriverProtocol)
 
+    @pytest.mark.skipif(
+        not _HAS_PYSERIAL,
+        reason="pyserial not installed — Esp32JsonDriver construction requires it",
+    )
     def test_real_hardware_returns_esp32(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When mock_hardware=False, the factory constructs Esp32JsonDriver.
 
         The driver is instantiated but not connected, so no actual port is
-        opened — we only verify the type.
+        opened — we only verify the type. Skipped when pyserial is missing
+        because the driver's ``__init__`` raises ``ArmDriverError`` in that
+        case.
         """
         cfg = ArmSettings(mock_hardware=False)
         drv = build_arm_driver(cfg)

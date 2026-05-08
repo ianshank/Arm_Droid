@@ -448,7 +448,10 @@ class ArmConfig(BaseModel):
             ]
         # servos — only inject default if absent
         if "servos" not in data:
-            base_pins = [13, 14, 27, 26, 25, 33, 32, 15, 4, 5, 18, 19]
+            # ESP32 strapping pins (GPIO 0, 2, 5, 12, 15) are excluded — they
+            # affect boot mode and flash voltage and must be free at reset.
+            # Pin 4 and 16-23 are general-purpose output-safe.
+            base_pins = [13, 14, 27, 26, 25, 33, 32, 4, 16, 17, 18, 19]
             chosen = (
                 base_pins[:dof_int]
                 if dof_int <= len(base_pins)

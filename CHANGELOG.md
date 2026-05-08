@@ -33,7 +33,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - **ESP32-JSON arm transport** (`Esp32JsonDriver`) — newline-delimited JSON
   over UART speaking the wire protocol in `firmware/arm_esp32/PROTOCOL.md`.
   Background reader task demuxes state/ack/nak/evt frames; per-command
-  futures keyed by request id; e-stop bypasses the send lock.
+  futures keyed by request id; e-stop acquires the send lock so it is
+  serialised with other writes.
 - **Auto-port discovery** — `cfg.arm.transport.serial_port == "auto"`
   enumerates USB serial ports via `serial.tools.list_ports`, optionally
   filtered by `usb_vid_pid_hints` and `exclude_ports`, and probes each in

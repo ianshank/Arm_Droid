@@ -10,14 +10,20 @@ line ordering between command replies and heartbeats.
 
 ## Common envelope fields
 
-Every message — host→fw and fw→host — has:
+Every message has `t` (message type) and almost always `ts`. The other
+envelope fields are present only on the message types listed below — host
+implementations MUST tolerate their absence on other frame types.
 
-| field | type   | meaning                                                |
-|-------|--------|--------------------------------------------------------|
-| `t`   | string | message type (`cmd`, `ack`, `nak`, `state`, `evt`)     |
-| `id`  | int    | monotonic request id (host→fw); echoed in `ack`/`nak`  |
-| `seq` | int    | monotonic sequence (fw→host); used for `state`/`evt`   |
-| `ts`  | float  | sender's monotonic timestamp in seconds                |
+| field | type   | present on              | meaning                              |
+|-------|--------|-------------------------|--------------------------------------|
+| `t`   | string | all                     | message type                         |
+| `id`  | int    | `cmd`, `ack`, `nak`     | monotonic request id (host→fw)       |
+| `seq` | int    | `state`                 | monotonic sequence (fw→host)         |
+| `ts`  | float  | all except `evt:boot/fault` envelopes that omit it | sender's monotonic timestamp in seconds |
+
+In practice: `state` frames carry `seq` + `ts` but no `id`; `evt` frames
+carry `kind` + `ts` (no `id`, no `seq`); `ack`/`nak` carry `id` + `ts`
+(no `seq`).
 
 ## Host → firmware (`t = "cmd"`)
 
@@ -43,17 +49,20 @@ host sent — limit checks happen on both sides defence-in-depth.
 Sent in direct reply to every successful `cmd`. Echoes `id`. No payload.
 
 ### `t = "nak"`
-Sent in reply to a rejected `cmd`. Fields: `id`, `err` (string code),
-`msg` (human-readable). Error codes:
+Sent in reply to a rejected `cmd` whose request id is recoverable.
+Fields: `id`, `err` (string code), `msg` (human-readable). Error codes:
 
 | code              | meaning                                          |
 |-------------------|--------------------------------------------------|
-| `bad_json`        | Could not parse the line                         |
 | `bad_shape`       | Required field missing or wrong type             |
 | `bad_joint_count` | `q` had wrong number of entries                  |
 | `out_of_range`    | A joint value violated firmware-side limits      |
 | `estop_latched`   | Motion command issued while e-stop active        |
 | `unknown_cmd`     | `cmd` value not recognised                       |
+
+Malformed JSON cannot be reported as `nak` because the request `id` is
+not recoverable — the firmware emits an `evt` of `kind = "fault"` with
+`code = "bad_json"` instead. See the `evt` section below.
 
 ### `t = "state"`
 Asynchronous heartbeat at `cfg.transport.heartbeat_hz`. Fields:

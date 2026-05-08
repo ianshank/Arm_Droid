@@ -94,7 +94,9 @@ void test_exact_max_line_is_dispatched() {
 }
 
 // A line one byte longer than kMaxLineBytes must NOT be dispatched and
-// the rx buffer must NOT receive a '\0' write at index kMaxLineBytes+1.
+// the rx buffer must NOT receive a '\0' write at index kMaxLineBytes
+// (that would mean rx_len reached kMaxLineBytes + 1 first and then the
+// '\n' branch wrote ``rx_buf[rx_len] = '\0'`` past the valid range).
 void test_oversize_line_is_dropped_not_dispatched() {
   // Fill a line that is kMaxLineBytes + 1 characters long.
   const size_t oversize = cfg::kMaxLineBytes + 1;
@@ -103,19 +105,24 @@ void test_oversize_line_is_dropped_not_dispatched() {
   line[oversize] = '\n';
   line[oversize + 1] = '\0';
 
-  // Poison the byte just past the buffer to detect an OOB write.
-  const char poison = static_cast<char>(0xCC);
-  // rx_buf has cfg::kMaxLineBytes+1 elements; [kMaxLineBytes] is the one
-  // valid '\0' slot.  We want to detect a write at [kMaxLineBytes+1], which
-  // is outside the array entirely.  We use rx_len after the loop as a
-  // proxy: if the sentinel path ran, rx_len must be 0 (reset by '\n').
+  // Poison sentinel: reset_sim() filled rx_buf with 0xCC, including the
+  // [kMaxLineBytes] slot which is the only valid '\0' write site.  We
+  // assert that slot is *still* 0xCC after pumping the oversize line —
+  // the sentinel branch must have prevented any write there.
+  constexpr unsigned char kPoison = 0xCC;
+
   sim_pump_bytes(line, oversize + 1);
 
-  // The oversize line must NOT have been dispatched.
+  // 1. The oversize line must NOT have been dispatched.
   TEST_ASSERT_NULL(last_dispatched);
 
-  // rx_len must be reset to 0 after the '\n'.
+  // 2. rx_len must be reset to 0 after the '\n'.
   TEST_ASSERT_EQUAL(0u, rx_len);
+
+  // 3. Direct OOB-guard check: the [kMaxLineBytes] '\0' slot must remain
+  //    poisoned — the sentinel path branched away before writing it.
+  TEST_ASSERT_EQUAL_UINT8(kPoison,
+      static_cast<unsigned char>(rx_buf[cfg::kMaxLineBytes]));
 }
 
 // After an oversize line, a normal-length line must be accepted.
