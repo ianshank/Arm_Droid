@@ -99,6 +99,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = [
     "armdroid.config.schema",
+    "armdroid.config.schema.*",
     "armdroid.control.sac_agent",
     "armdroid.perception.object_detector",
     "armdroid.perception.depth_processor",
@@ -106,7 +107,7 @@ module = [
 disallow_subclassing_any = false
 
 [[tool.mypy.overrides]]
-module = ["armdroid.config.schema"]
+module = ["armdroid.config.schema", "armdroid.config.schema.*"]
 disable_error_code = ["arg-type", "call-arg"]
 
 [tool.pytest.ini_options]
