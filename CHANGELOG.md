@@ -9,11 +9,66 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
-- **Hardware integration scaffolding** — `ArmState` dataclass, `ArmDriverError`,
-  and `ArmCommandRejected` exceptions in `armdroid.protocols`. These provide
-  the value-object and exception contract that the upcoming extended
-  `ArmDriverProtocol` surface (lifecycle, latched e-stop, interpolated motion)
-  will use.
+- **ESP32-JSON arm transport** (`Esp32JsonDriver`) — newline-delimited JSON
+  over UART speaking the wire protocol in `firmware/arm_esp32/PROTOCOL.md`.
+  Background reader task demuxes state/ack/nak/evt frames; per-command
+  futures keyed by request id; e-stop bypasses the send lock.
+- **Auto-port discovery** — `cfg.arm.transport.serial_port == "auto"`
+  enumerates USB serial ports via `serial.tools.list_ports`, optionally
+  filtered by `usb_vid_pid_hints` and `exclude_ports`, and probes each in
+  parallel for the firmware boot signature.
+- **ESP32 firmware tree** under `firmware/arm_esp32/` — PlatformIO project
+  (`esp32dev` Arduino target + `native` Unity test env), JSON-over-UART
+  controller (50 Hz interpolator, 10 Hz heartbeat, 1 s+ host-silence
+  watchdog auto-latches e-stop), wire-protocol spec, README with wiring
+  diagram and troubleshooting.
+- **Firmware codegen** (`scripts/gen_firmware_config.py`) — reads
+  `ArmSettings` and emits `firmware/arm_esp32/src/config_generated.h`. CI
+  job (`firmware-ci.yml::codegen-check`) runs `--check` to fail merges
+  that change YAML without regenerating the header.
+- **Structured config sub-models** — `JointLimits` (per-joint min/max +
+  velocity), `ArmServoConfig` (PWM pin + pulse calibration),
+  `ArmTransportConfig` (port, baud, timeouts, line cap, autodetect),
+  `ArmFirmwareConfig` (interpolator hz, watchdog, version). All new
+  fields have defaults; `ArmConfig` autosizes per-joint lists when `dof`
+  is overridden so legacy tests still work.
+- **Modern `ArmDriverProtocol` surface** — `connect`, `disconnect`,
+  `is_connected`, `read_state -> ArmState`, `send_joint_positions`,
+  `clear_emergency_stop`. Legacy methods preserved as backwards-compat
+  adapters.
+- **`ArmState`, `ArmDriverError`, `ArmCommandRejected`** value-types and
+  exceptions in `armdroid.protocols`.
+- **`flash_arm_esp32.sh`** — convenience wrapper around
+  `pio run -t upload` with `ARMDROID_ARM__TRANSPORT__SERIAL_PORT` env-var
+  port discovery.
+- **`firmware-ci.yml`** — three jobs: codegen drift check, native PIO
+  Unity tests for the C++ interpolator, esp32dev compile-only build.
+
+### Changed
+
+- **`MockArmDriver` rewritten** to implement the extended protocol with
+  deterministic linear interpolation, latched e-stop, asyncio-lock-guarded
+  segment state, and per-joint velocity validation. Legacy methods
+  preserved (`send_joint_command` / `home` are instantaneous and clip
+  silently per joint, matching the historical SO-ARM100 mock UX).
+- **`build_arm_driver` real-hardware path** now constructs
+  `Esp32JsonDriver` instead of `SoArm100Driver`. Mock-hardware path
+  unchanged.
+
+### Removed
+
+- **`SoArm100Driver`** — replaced wholesale by `Esp32JsonDriver`. The
+  SO-ARM100 hardware target is out; the MakerWorld ESP32 arm is in.
+
+### Documentation
+
+- **`docs/architecture/C4.md`** — Mermaid C4 diagrams (System Context,
+  Container, RL Controller component) and key design decisions.
+- **README** — full setup/configuration/usage/development/roadmap rewrite.
+- **Regression test layer** — `tests/regression/` baseline with
+  `pytest.mark.regression`; `tests/e2e/` placeholder.
+- **`.gitignore`** — `weights/`, `data/`, `datasets/`, `screenshots/`,
+  `*.log`, `logs/`, `docs/_build/`, `site/` ignored.
 - **Documentation** — full C4 architecture diagrams (System Context, Container,
   RL Controller component) under `docs/architecture/C4.md` with Mermaid source.
 - **Regression test layer** — new `tests/regression/` directory with baseline

@@ -106,7 +106,10 @@ source = ["src/armdroid"]
 omit = [
     "*/tests/*",
     "*/main.py",
-    "*/hardware/so_arm100_driver.py",
+    # Real-hardware reader loop / autodetect / probe paths run only with a
+    # physical ESP32 attached. Covered by the HIL test suite under
+    # tests/hardware/, which is gated by `pytest.mark.hardware`.
+    "*/hardware/esp32_json_driver.py",
 ]
 
 [tool.coverage.report]
