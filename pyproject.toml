@@ -93,8 +93,11 @@ pythonpath = ["src", "."]
 asyncio_mode = "auto"
 markers = [
     "slow: marks tests as slow",
-    "hardware: marks tests requiring real hardware",
+    "hardware: marks tests requiring real hardware (ESP32 + arm wired up)",
     "gpu: marks tests requiring CUDA GPU",
+    "regression: marks regression tests guarding existing behaviour against future change",
+    "e2e: marks end-to-end pipeline tests (planner -> controller -> driver -> state)",
+    "contract: marks driver-protocol contract tests (parametrised over implementations)",
 ]
 addopts = "-v --tb=short"
 

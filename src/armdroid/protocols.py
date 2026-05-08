@@ -8,11 +8,65 @@ and :mod:`armdroid.environments`.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 from numpy.typing import NDArray
+
+# ---------------------------------------------------------------------------
+# Hardware-driver value types and exceptions
+#
+# These types are used by the extended ArmDriverProtocol surface introduced
+# alongside the ESP32-JSON arm transport. They are defined here so callers
+# (controllers, primitives, tests) can import a stable contract regardless
+# of which concrete driver (mock, ESP32) is wired up by the factory.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ArmState:
+    """Snapshot of arm telemetry returned by ``ArmDriverProtocol.read_state``.
+
+    Attributes:
+        joint_positions: Joint angles in radians (gripper joint, when present,
+            is normalised to ``[0, 1]`` with ``0`` = open, ``1`` = closed).
+        joint_velocities: Joint angular velocities in rad/s. Open-loop and
+            mock drivers may report zeros when no motion is in progress.
+        is_moving: ``True`` if any joint is currently slewing toward a
+            commanded target.
+        estop_active: ``True`` if the firmware (or mock) is currently latched
+            in emergency-stop and rejecting motion commands.
+        timestamp_s: Monotonic timestamp (seconds) when the state was sampled.
+    """
+
+    joint_positions: tuple[float, ...]
+    joint_velocities: tuple[float, ...]
+    is_moving: bool
+    estop_active: bool
+    timestamp_s: float
+
+
+class ArmDriverError(RuntimeError):
+    """Base exception for arm driver failures (transport, timeout, protocol).
+
+    Raised when the driver cannot complete an operation due to a transport
+    or firmware fault — the host code should consider the arm in an unknown
+    state and either reconnect or abort the current task.
+    """
+
+
+class ArmCommandRejected(ArmDriverError):  # noqa: N818
+    """Raised when the driver rejects a command before transmission.
+
+    Typical causes: joint-limit violation, NaN or wrong-length command vector,
+    non-positive duration, or issuing a motion command while the firmware
+    e-stop latch is active. Distinct from :class:`ArmDriverError` because the
+    arm is *not* in a faulted state — the caller can simply correct the
+    command and retry.
+    """
+
 
 # ---------------------------------------------------------------------------
 # Data types

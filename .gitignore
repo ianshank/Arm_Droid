@@ -83,3 +83,19 @@ mjcache/
 # Local-only configs
 config/local.yaml
 config/*.local.yaml
+
+# Training weights and datasets (large files — store in DVC or cloud storage)
+weights/
+data/
+datasets/
+
+# Screenshots / screen recordings
+screenshots/
+
+# Log files
+*.log
+logs/
+
+# Documentation build output
+docs/_build/
+site/
