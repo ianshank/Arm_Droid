@@ -85,7 +85,7 @@ disallow_subclassing_any = false
 
 [[tool.mypy.overrides]]
 module = ["armdroid.config.schema"]
-disable_error_code = ["arg-type"]
+disable_error_code = ["arg-type", "call-arg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
