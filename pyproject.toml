@@ -32,6 +32,10 @@ realsense = [
 anthropic = [
     "anthropic>=0.40",
 ]
+telemetry = [
+    "opentelemetry-api>=1.27",
+    "opentelemetry-sdk>=1.27",
+]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",

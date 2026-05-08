@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **Telemetry seam — Axis 6 (Phase 0.3)** — `armdroid.telemetry` package
+  with `TelemetryProvider` Protocol, zero-overhead `NullTelemetry` default
+  (`contextlib.nullcontext`), and `OtelTelemetry` backend available under
+  the new `armdroid[telemetry]` extra (`opentelemetry-api/sdk>=1.27`).
+  `SPAN_DRIVER_CONNECT`, `SPAN_DRIVER_DISCONNECT`, `SPAN_DRIVER_SEND`
+  constants added; all three are now active in `Esp32JsonDriver`.
+- **HIL test hardening (Phase 0.3)** — three new hardware-in-the-loop test
+  modules (`test_real_esp32_protocol_edges`, `test_real_esp32_recovery`) and
+  a parametrised `test_per_joint_sweep` added to `test_real_esp32_motion`.
+  A shared `hil_driver` async fixture is provided in
+  `tests/hardware/conftest.py`.  Amplitude configurable via
+  `ARMDROID_HIL_SWEEP_AMPLITUDE_RAD`; fault injection gated by
+  `ARMDROID_HIL_FAULT_INJECT=1`.
+- **HIL runner scripts** — `scripts/run_hil.sh` (bash) and
+  `scripts/run_hil.ps1` (PowerShell) for one-command hardware gate with
+  optional port override (`ARMDROID_HIL_PORT`).
+
 - **ESP32 MakerWorld platform support** — newline-delimited JSON-over-UART
   transport, auto-port discovery, PlatformIO firmware tree, firmware
   codegen (`scripts/gen_firmware_config.py`), and a dedicated

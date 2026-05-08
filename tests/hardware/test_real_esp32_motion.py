@@ -9,12 +9,17 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 
 import pytest
 
 from armdroid.config.schema import ArmSettings
 from armdroid.domain.errors import ArmCommandRejected
 from armdroid.hardware.esp32 import Esp32JsonDriver
+
+# Default per-joint sweep amplitude used by test_per_joint_sweep.
+# Override via the environment variable to match your workspace constraints.
+_DEFAULT_SWEEP_AMPLITUDE_RAD: float = 0.05
 
 
 @pytest.mark.asyncio
@@ -99,3 +104,64 @@ async def test_watchdog_auto_latches_when_host_silent(
             await drv.clear_emergency_stop()
         finally:
             await drv.disconnect()
+
+
+# ---------------------------------------------------------------------------
+# Parametrized per-joint sweep
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_per_joint_sweep(
+    hil_driver: Esp32JsonDriver,
+    hil_settings: ArmSettings,
+) -> None:
+    """Walk each joint independently through a small ±amplitude arc.
+
+    For each joint ``i`` in ``[0, dof)``:
+
+    1. Build a target vector where joint ``i`` is at ``+amplitude`` and all
+       other joints remain at ``0.0``.
+    2. Command the move and wait for completion.
+    3. Read back the firmware state and assert each joint landed within
+       ``abs=0.15`` of the target.
+    4. Return the arm to the all-zeros pose before testing the next joint.
+
+    The amplitude defaults to :data:`_DEFAULT_SWEEP_AMPLITUDE_RAD` (0.05 rad)
+    and can be overridden via ``ARMDROID_HIL_SWEEP_AMPLITUDE_RAD`` so the
+    test adapts to different workspace constraints.
+
+    The sweep stays within the servo safe-zone (0.05 rad is well inside any
+    sane joint-limit envelope) and is independent of the arm's rest pose.
+    """
+    amplitude = float(
+        os.environ.get(
+            "ARMDROID_HIL_SWEEP_AMPLITUDE_RAD",
+            str(_DEFAULT_SWEEP_AMPLITUDE_RAD),
+        )
+    )
+    dof = hil_settings.arm.dof
+    home_target = (0.0,) * dof
+    move_duration_s = 1.0
+    settle_s = move_duration_s + 0.5
+
+    # Return to neutral before starting the sweep.
+    await hil_driver.send_joint_positions(home_target, duration_s=move_duration_s)
+    await asyncio.sleep(settle_s)
+
+    for joint_idx in range(dof):
+        # Build target: only joint_idx displaced.
+        target = tuple(amplitude if i == joint_idx else 0.0 for i in range(dof))
+        await hil_driver.send_joint_positions(target, duration_s=move_duration_s)
+        await asyncio.sleep(settle_s)
+
+        state = await hil_driver.read_state()
+        for i, (actual, commanded) in enumerate(zip(state.joint_positions, target, strict=True)):
+            assert actual == pytest.approx(commanded, abs=0.15), (
+                f"joint[{i}] mismatch after sweeping joint[{joint_idx}]: "
+                f"commanded={commanded:.4f}, actual={actual:.4f}"
+            )
+
+        # Return to neutral between joints.
+        await hil_driver.send_joint_positions(home_target, duration_s=move_duration_s)
+        await asyncio.sleep(settle_s)

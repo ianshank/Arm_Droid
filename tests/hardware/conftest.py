@@ -16,11 +16,14 @@ ready to run as soon as a runner is available.
 
 from __future__ import annotations
 
+import contextlib
 import os
+from collections.abc import AsyncGenerator
 
 import pytest
 
 from armdroid.config.schema import ArmSettings
+from armdroid.hardware.esp32 import Esp32JsonDriver
 
 
 def _try_discover_esp32() -> str | None:
@@ -65,6 +68,28 @@ def hil_settings(hil_port: str) -> ArmSettings:
     patched_transport = base.arm.transport.model_copy(update={"serial_port": hil_port})
     patched_arm = base.arm.model_copy(update={"transport": patched_transport})
     return base.model_copy(update={"arm": patched_arm})
+
+
+@pytest.fixture
+async def hil_driver(hil_settings: ArmSettings) -> AsyncGenerator[Esp32JsonDriver, None]:
+    """A connected ``Esp32JsonDriver`` for HIL tests — auto-disconnects on teardown.
+
+    Yields the driver after :meth:`~Esp32JsonDriver.connect` completes.
+    On teardown, issues ``clear_emergency_stop`` (best-effort) then
+    ``disconnect`` so each test starts from a clean state.
+
+    Use this fixture instead of the raw ``hil_settings`` fixture whenever
+    a test needs an already-connected driver. Keeps the connect/disconnect
+    boilerplate out of individual test functions.
+    """
+    drv = Esp32JsonDriver(hil_settings.arm)
+    await drv.connect()
+    try:
+        yield drv
+    finally:
+        with contextlib.suppress(Exception):
+            await drv.clear_emergency_stop()
+        await drv.disconnect()
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
