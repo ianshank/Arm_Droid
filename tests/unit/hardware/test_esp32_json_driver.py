@@ -66,12 +66,12 @@ def _make_config(**overrides: object) -> ArmConfig:
 
 @pytest.fixture
 def fake_serial_module(monkeypatch: pytest.MonkeyPatch) -> type[_FakeSerial]:
-    """Install ``_FakeSerial`` as ``armdroid.hardware.esp32_json_driver._serial_module.Serial``."""
-    from armdroid.hardware import esp32_json_driver
+    """Install ``_FakeSerial`` as the serial module used by the ESP32 driver."""
+    from armdroid.hardware.esp32 import driver as _esp32_driver_mod
 
     fake_module = type(sys)("serial")
     fake_module.Serial = _FakeSerial  # type: ignore[attr-defined]
-    monkeypatch.setattr(esp32_json_driver, "_serial_module", fake_module)
+    monkeypatch.setattr(_esp32_driver_mod, "_serial_module", fake_module)
     return _FakeSerial
 
 
@@ -417,7 +417,7 @@ async def test_encode_max_line_bytes_boundary(
     The firmware's PumpSerial counts content bytes (newline is not stored),
     so the host check must exclude the trailing '\\n' from the byte count.
     """
-    from armdroid.hardware import esp32_json_driver as _drv_mod
+    from armdroid.hardware.esp32 import driver as _drv_mod
     from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
 
     # Freeze time so the ``"ts"`` field has a stable string width across the

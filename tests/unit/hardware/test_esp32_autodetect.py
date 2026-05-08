@@ -69,14 +69,14 @@ def _install_fake_serial(
     ports: list[_FakePortInfo],
 ) -> None:
     """Replace _serial_module.Serial and _list_ports_module.comports."""
-    from armdroid.hardware import esp32_json_driver
+    from armdroid.hardware.esp32 import driver as _esp32_driver_mod
 
     fake_serial = type(sys)("serial")
     fake_serial.Serial = serial_class  # type: ignore[attr-defined]
-    monkeypatch.setattr(esp32_json_driver, "_serial_module", fake_serial)
+    monkeypatch.setattr(_esp32_driver_mod, "_serial_module", fake_serial)
     fake_list_ports = type(sys)("serial.tools.list_ports")
     fake_list_ports.comports = lambda: list(ports)  # type: ignore[attr-defined]
-    monkeypatch.setattr(esp32_json_driver, "_list_ports_module", fake_list_ports)
+    monkeypatch.setattr(_esp32_driver_mod, "_list_ports_module", fake_list_ports)
 
 
 @pytest.mark.asyncio

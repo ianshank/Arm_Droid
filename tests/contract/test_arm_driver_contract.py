@@ -65,11 +65,11 @@ def _cfg() -> ArmConfig:
 
 
 def _install_contract_fake(monkeypatch: pytest.MonkeyPatch) -> None:
-    from armdroid.hardware import esp32_json_driver
+    from armdroid.hardware.esp32 import driver as _esp32_driver_mod
 
     fake_serial = type(sys)("serial")
     fake_serial.Serial = _ContractFakeSerial  # type: ignore[attr-defined]
-    monkeypatch.setattr(esp32_json_driver, "_serial_module", fake_serial)
+    monkeypatch.setattr(_esp32_driver_mod, "_serial_module", fake_serial)
 
 
 # --------------------------------------------------------------------- #
