@@ -552,7 +552,8 @@ class Esp32JsonDriver:
         self._next_id += 1
         line = json.dumps(msg, separators=(",", ":")) + "\n"
         max_bytes = self._cfg.transport.max_line_bytes
-        if len(line.encode("ascii")) > max_bytes:
+        # Exclude the trailing '\n' delimiter: firmware counts content bytes only.
+        if len(line.encode("ascii")) - 1 > max_bytes:
             err = f"Encoded command exceeds {max_bytes} bytes"
             raise ArmCommandRejected(err)
         return line, req_id
