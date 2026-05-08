@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "armdroid"
 version = "0.1.0"
-description = "Robot arm manipulation platform — SO-ARM100, MuJoCo, SAC+HER, PDDL planning"
+description = "Robot arm manipulation platform — MakerWorld ESP32 arm, MuJoCo, SAC+HER, PDDL planning"
 requires-python = ">=3.11"
 dependencies = [
     "torch>=2.4",
@@ -39,7 +39,7 @@ dev = [
     "pytest-timeout>=2.3",
     "pytest-xdist>=3.0",
     "hypothesis>=6.80",
-    "ruff==0.8.0",
+    "ruff==0.15.12",
     "mypy>=1.5",
     "types-PyYAML>=6.0",
 ]
