@@ -127,6 +127,103 @@ async def test_responding_port_is_bound(
         await drv.disconnect()
 
 
+# ---------------------------------------------------------------------------
+# Portfinder gap tests — lines 78-79 (JSON decode error) and 146-152 (probe
+# raises OSError → debug-log + return None path inside ``_probe``).
+# ---------------------------------------------------------------------------
+
+
+class _GarbageThenAckSerial:
+    """Fake serial that first emits one line of garbage, then ACKs the ping.
+
+    Exercises the ``except (UnicodeDecodeError, json.JSONDecodeError): continue``
+    branch in ``probe_port_blocking`` (portfinder.py lines 78-79).
+    """
+
+    def __init__(self, *, port: str, baudrate: int, timeout: float, write_timeout: float) -> None:
+        import threading
+        from collections import deque
+
+        self._rx: deque[bytes] = deque()
+        self._lock = threading.Lock()
+        self._timeout = timeout
+        # Prime with a garbage non-JSON line before any ping arrives.
+        self._rx.append(b"not-json!!!\n")
+
+    def readline(self) -> bytes:
+        import time
+
+        deadline = time.monotonic() + self._timeout
+        while True:
+            with self._lock:
+                if self._rx:
+                    return self._rx.popleft()
+            if time.monotonic() >= deadline:
+                return b""
+            time.sleep(0.005)
+
+    def write(self, data: bytes) -> None:
+        import json
+
+        with self._lock:
+            try:
+                msg = json.loads(data.rstrip(b"\n").decode("ascii"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return
+            if msg.get("t") == "cmd" and msg.get("cmd") == "ping":
+                self._rx.append(
+                    (json.dumps({"t": "ack", "id": msg.get("id")}) + "\n").encode("ascii")
+                )
+
+    def flush(self) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
+
+@pytest.mark.asyncio
+async def test_probe_tolerates_garbage_before_ack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """portfinder.py lines 78-79: JSON decode error in probe is skipped; the
+    ack that follows is still recognised and the device is returned."""
+    _install_fake_serial(monkeypatch, _GarbageThenAckSerial, ports=[_FakePortInfo("/dev/ttyUSB9")])
+    from armdroid.hardware.esp32 import Esp32JsonDriver
+
+    drv = Esp32JsonDriver(_make_config())
+    await drv.connect()
+    try:
+        assert drv.is_connected
+    finally:
+        await drv.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_autodetect_probe_os_error_falls_through(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """portfinder.py lines 146-152: when probe_port_blocking raises OSError the
+    exception is caught by the inner _probe coroutine, logged, and None is
+    returned — all-probes-failed path raises ArmDriverError."""
+    from unittest.mock import patch
+
+    _install_fake_serial(
+        monkeypatch,
+        _RespondingFakeSerial,
+        ports=[_FakePortInfo("/dev/ttyUSB0"), _FakePortInfo("/dev/ttyUSB1")],
+    )
+    from armdroid.hardware.esp32 import Esp32JsonDriver
+
+    with patch(
+        "armdroid.hardware.esp32.portfinder.probe_port_blocking",
+        side_effect=OSError("permission denied"),
+    ):
+        drv = Esp32JsonDriver(_make_config())
+        with pytest.raises(ArmDriverError, match="probed 2"):
+            await drv.connect()
+
+
 @pytest.mark.asyncio
 async def test_excluded_ports_are_skipped(
     monkeypatch: pytest.MonkeyPatch,

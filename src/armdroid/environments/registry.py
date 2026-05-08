@@ -7,7 +7,8 @@ on import. Out-of-tree environments may be plugged in via the
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, TypeAlias
 
 from armdroid._registry import Registry
 from armdroid.environments.laundry_sorting import LaundrySortingEnv
@@ -16,7 +17,12 @@ from armdroid.environments.tower_of_hanoi import TowerOfHanoiEnv
 if TYPE_CHECKING:
     from armdroid.domain.protocols import ArmEnvironmentProtocol
 
-_ENVIRONMENTS: Registry[type[ArmEnvironmentProtocol]] = Registry(
+#: An environment factory callable.  Environments accept varied keyword
+#: arguments (task config, training config, ``dof``, …), so the signature
+#: is intentionally open with ``**Any``.
+EnvironmentFactory: TypeAlias = "Callable[..., ArmEnvironmentProtocol]"
+
+_ENVIRONMENTS: Registry[EnvironmentFactory] = Registry(
     kind="environment",
     entry_point_group="armdroid.environments",
 )
@@ -25,13 +31,13 @@ _ENVIRONMENTS.register("tower_of_hanoi", TowerOfHanoiEnv)
 _ENVIRONMENTS.register("laundry_sorting", LaundrySortingEnv)
 
 
-def register_environment(name: str, factory: type[ArmEnvironmentProtocol]) -> None:
+def register_environment(name: str, factory: EnvironmentFactory) -> None:
     """Register an environment class under ``name``."""
     _ENVIRONMENTS.register(name, factory)
 
 
-def get_environment(name: str) -> type[ArmEnvironmentProtocol]:
-    """Return the environment class registered under ``name``."""
+def get_environment(name: str) -> EnvironmentFactory:
+    """Return the environment factory registered under ``name``."""
     return _ENVIRONMENTS.get(name)
 
 

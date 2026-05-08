@@ -12,16 +12,22 @@ cfg.mock_hardware`` branch.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, TypeAlias
 
 from armdroid._registry import Registry
 from armdroid.hardware.esp32 import Esp32JsonDriver
 from armdroid.hardware.mock_arm_driver import MockArmDriver
 
 if TYPE_CHECKING:
+    from armdroid.config.schema import ArmConfig
     from armdroid.domain.protocols import ArmDriverProtocol
 
-_DRIVERS: Registry[type[ArmDriverProtocol]] = Registry(
+#: A driver factory: a callable that accepts an :class:`ArmConfig` and
+#: returns a fully-constructed :class:`ArmDriverProtocol` instance.
+DriverFactory: TypeAlias = "Callable[[ArmConfig], ArmDriverProtocol]"
+
+_DRIVERS: Registry[DriverFactory] = Registry(
     kind="driver",
     entry_point_group="armdroid.drivers",
 )
@@ -30,13 +36,13 @@ _DRIVERS.register("mock", MockArmDriver)
 _DRIVERS.register("esp32", Esp32JsonDriver)
 
 
-def register_driver(name: str, factory: type[ArmDriverProtocol]) -> None:
+def register_driver(name: str, factory: DriverFactory) -> None:
     """Register a driver class under ``name``."""
     _DRIVERS.register(name, factory)
 
 
-def get_driver(name: str) -> type[ArmDriverProtocol]:
-    """Return the driver class registered under ``name``."""
+def get_driver(name: str) -> DriverFactory:
+    """Return the driver factory registered under ``name``."""
     return _DRIVERS.get(name)
 
 

@@ -73,3 +73,30 @@ class TestArmPerception:
         await perception.stop()
         assert perception._last_rgb is None
         assert perception._last_depth is None
+
+    @pytest.mark.asyncio
+    async def test_detect_objects_calls_pose_estimator_when_detections_present(
+        self,
+    ) -> None:
+        """facade.py line 105: pose estimator is called when detector returns results."""
+        from unittest.mock import MagicMock, patch
+
+        perception = _make_perception()
+        await perception.start()
+        rgb = np.zeros((480, 640, 3), dtype=np.uint8)
+        depth = np.full((480, 640), 1.0, dtype=np.float32)
+        perception.update_frames(rgb, depth)
+
+        fake_detection = MagicMock()
+        with (
+            patch.object(perception._detector, "detect", return_value=[fake_detection]),
+            patch.object(
+                perception._pose_estimator,
+                "estimate_poses",
+                return_value=[fake_detection],
+            ) as mock_pose,
+        ):
+            result = await perception.detect_objects()
+
+        mock_pose.assert_called_once()
+        assert result == [fake_detection]

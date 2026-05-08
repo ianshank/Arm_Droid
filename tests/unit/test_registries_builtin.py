@@ -87,3 +87,94 @@ def test_registry_unknown_lookup_raises() -> None:
 
     with pytest.raises(RegistryError, match="unknown driver"):
         get_driver("nonexistent_driver")
+
+
+# ---------------------------------------------------------------------------
+# load_*_plugins() and register_*() wrappers — covers the two uncovered lines
+# in each per-subsystem registry module.
+# ---------------------------------------------------------------------------
+
+
+def test_load_driver_plugins_returns_int() -> None:
+    from armdroid.hardware.registry import load_driver_plugins
+
+    result = load_driver_plugins()
+    assert isinstance(result, int)
+
+
+def test_load_planner_plugins_returns_int() -> None:
+    from armdroid.planning.registry import load_planner_plugins
+
+    result = load_planner_plugins()
+    assert isinstance(result, int)
+
+
+def test_load_environment_plugins_returns_int() -> None:
+    from armdroid.environments.registry import load_environment_plugins
+
+    result = load_environment_plugins()
+    assert isinstance(result, int)
+
+
+def test_load_perception_plugins_returns_int() -> None:
+    from armdroid.perception.registry import load_perception_plugins
+
+    result = load_perception_plugins()
+    assert isinstance(result, int)
+
+
+def test_load_rl_agent_plugins_returns_int() -> None:
+    from armdroid.control.registry import load_rl_agent_plugins
+
+    result = load_rl_agent_plugins()
+    assert isinstance(result, int)
+
+
+def test_register_rl_agent_adds_to_registry() -> None:
+    from armdroid.control.registry import available_rl_agents, get_rl_agent, register_rl_agent
+    from armdroid.control.sac_agent import SACAgent
+
+    register_rl_agent("_test_sac_alias", SACAgent)
+    assert "_test_sac_alias" in available_rl_agents()
+    assert get_rl_agent("_test_sac_alias") is SACAgent
+    # Re-registration with same factory is idempotent.
+    register_rl_agent("_test_sac_alias", SACAgent)
+
+
+def test_register_environment_adds_to_registry() -> None:
+    from armdroid.environments.registry import (
+        available_environments,
+        get_environment,
+        register_environment,
+    )
+    from armdroid.environments.tower_of_hanoi import TowerOfHanoiEnv
+
+    register_environment("_test_toh_alias", TowerOfHanoiEnv)
+    assert "_test_toh_alias" in available_environments()
+    assert get_environment("_test_toh_alias") is TowerOfHanoiEnv
+
+
+def test_register_planner_adds_to_registry() -> None:
+    from armdroid.planning.registry import (
+        available_planners,
+        get_planner,
+        register_planner,
+    )
+    from armdroid.planning.symbolic_planner import SymbolicPlanner
+
+    register_planner("_test_planner_alias", SymbolicPlanner)
+    assert "_test_planner_alias" in available_planners()
+    assert get_planner("_test_planner_alias") is SymbolicPlanner
+
+
+def test_register_perception_adds_to_registry() -> None:
+    from armdroid.perception.facade import ArmPerception
+    from armdroid.perception.registry import (
+        available_perception_backends,
+        get_perception_backend,
+        register_perception_backend,
+    )
+
+    register_perception_backend("_test_perception_alias", ArmPerception)
+    assert "_test_perception_alias" in available_perception_backends()
+    assert get_perception_backend("_test_perception_alias") is ArmPerception

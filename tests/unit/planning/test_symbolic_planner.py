@@ -163,6 +163,14 @@ class TestPyperplanIntegration:
         ):
             planner.plan(_make_initial_state(), _make_goal_state())
 
+    def test_solve_pddl_falls_back_to_recursive_when_pyperplan_missing(self) -> None:
+        """Lines 122-124: ImportError from pyperplan triggers the recursive fallback."""
+        planner = _make_planner(num_disks=2)
+        with patch.dict("sys.modules", {"pyperplan": None}):
+            steps = planner._solve_pddl("(domain)", "(problem)")
+        # Recursive solver always finds a solution.
+        assert len(steps) > 0
+
 
 class TestParseSolution:
     """Test _parse_solution directly."""

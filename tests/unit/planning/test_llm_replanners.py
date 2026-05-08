@@ -348,3 +348,57 @@ def test_replanner_new_config_disabled_falls_back_to_symbolic() -> None:
     replanner = Replanner(cfg, planner, llm_replanner=_ShouldNotBeCalled())
     out = replanner.replan(_state(), _state(), "boom")
     assert out[0].action == "symbolic_only"
+
+
+# ---------------------------------------------------------------------------
+# Anthropic coverage gap tests — areplan retry, exhaustion, cached client,
+# and empty-text parse path.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_anthropic_areplan_retries_then_exhausts_returns_empty() -> None:
+    """Lines 170-177 + 187-192: all retries fail → warning per attempt, then
+    error log + empty list returned."""
+    cfg = LLMReplannerConfig(enabled=True, backend="anthropic", max_retries=1)
+    sdk = _fake_sdk("[]", with_async=True)
+    r = AnthropicReplanner(cfg, sdk=sdk)
+
+    call_count: dict[str, int] = {"n": 0}
+
+    async def _always_fail(**kwargs: Any) -> None:  # type: ignore[misc]
+        call_count["n"] += 1
+        raise RuntimeError("network down")
+
+    # Prime the cached async client so _async_client() returns it immediately.
+    async_client = sdk.AsyncAnthropic()
+    async_client.messages.create = _always_fail
+    r._async_client_cache = async_client  # type: ignore[attr-defined]
+
+    result = await r.areplan(_state(), _state(), "fail")
+
+    assert result == []
+    # max_retries=1 → 2 total attempts (initial + 1 retry).
+    assert call_count["n"] == 2
+
+
+@pytest.mark.asyncio
+async def test_anthropic_areplan_reuses_cached_async_client() -> None:
+    """Line 197: second call to _async_client() returns the cached instance."""
+    cfg = LLMReplannerConfig(enabled=True, backend="anthropic")
+    sdk = _fake_sdk('[{"action": "ok", "args": []}]', with_async=True)
+    r = AnthropicReplanner(cfg, sdk=sdk)
+
+    await r.areplan(_state(), _state(), "first")
+    first_client = r._async_client_cache  # type: ignore[attr-defined]
+
+    await r.areplan(_state(), _state(), "second")
+    assert r._async_client_cache is first_client  # type: ignore[attr-defined]
+
+
+def test_anthropic_parse_steps_empty_text_returns_empty() -> None:
+    """Line 256: _parse_steps('') returns [] immediately."""
+    cfg = LLMReplannerConfig(enabled=True)
+    sdk = _fake_sdk("[]")
+    r = AnthropicReplanner(cfg, sdk=sdk)
+    assert r._parse_steps("") == []  # type: ignore[attr-defined]

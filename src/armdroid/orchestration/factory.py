@@ -55,7 +55,7 @@ def build_arm_driver(cfg: ArmSettings) -> ArmDriverProtocol:
     """
     kind = "mock" if cfg.mock_hardware else "esp32"
     _log.info("arm_driver_built", kind=kind)
-    return get_driver(kind)(cfg.arm)  # type: ignore[call-arg]
+    return get_driver(kind)(cfg.arm)
 
 
 def build_arm_planner(cfg: ArmSettings) -> ArmPlannerProtocol:
@@ -83,7 +83,7 @@ def build_arm_environment(cfg: ArmSettings) -> ArmEnvironmentProtocol:
     dof = cfg.arm.dof
     task_type = cfg.arm_task.task_type
     _log.info("arm_env_built", task_type=task_type)
-    return get_environment(task_type)(cfg.arm_task, cfg.arm_training, dof=dof)  # type: ignore[call-arg]
+    return get_environment(task_type)(cfg.arm_task, cfg.arm_training, dof=dof)
 
 
 def build_arm_controller(
