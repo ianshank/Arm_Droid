@@ -44,7 +44,7 @@ import json
 import math
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
 import numpy as np
 from numpy.typing import NDArray
@@ -109,6 +109,18 @@ class Esp32JsonDriver:
         self._latest_state: ArmState | None = None
         self._connected = False
         self._gripper_open = True
+
+        # Last target we commanded (post-ack). Used to anchor velocity
+        # checks before the first heartbeat lands; None until the first
+        # successful send_joint_positions completes.
+        self._last_commanded_target: tuple[float, ...] | None = None
+
+        # Monotonic timestamp of the last successful wire write. Kept
+        # current by _send_and_await_ack (after the write) and by
+        # emergency_stop. Drives the keepalive loop.
+        self._last_send_monotonic: float = 0.0
+        self._keepalive_task: asyncio.Task[None] | None = None
+
         _log.info(
             "esp32_json_driver_init",
             dof=self._dof,
@@ -127,7 +139,11 @@ class Esp32JsonDriver:
         port_path = await self._resolve_port()
         port = await asyncio.to_thread(self._open_port_blocking, port_path)
         self._port = port
+        self._last_send_monotonic = time.monotonic()
         self._reader_task = asyncio.create_task(self._reader_loop(), name="esp32_json_reader")
+        self._keepalive_task = asyncio.create_task(
+            self._keepalive_loop(), name="esp32_json_keepalive"
+        )
         self._connected = True
         try:
             for _ in range(self._cfg.transport.drain_pings_on_connect):
@@ -173,6 +189,9 @@ class Esp32JsonDriver:
                 "dur_ms": round(duration_s * 1000.0),
             },
         )
+        # Update after a successful ack so the velocity check has a
+        # reliable anchor for the next command.
+        self._last_commanded_target = positions
 
     async def read_state(self) -> ArmState:
         """Return the latest cached state heartbeat.
@@ -201,18 +220,24 @@ class Esp32JsonDriver:
     # ------------------------------------------------------------------ #
 
     async def emergency_stop(self) -> None:
-        """Latch e-stop unconditionally.
+        """Latch e-stop — acquires the send lock and writes immediately.
 
-        Bypasses the send lock so a contested driver can still issue the
-        safety command on the wire.
+        Holding the send lock ensures pyserial is not called concurrently
+        with another sender. Raises :exc:`ArmDriverError` if the driver
+        is not connected rather than propagating an AssertionError.
         """
-        line = self._encode("estop", {}).encode("ascii")
-        try:
-            await asyncio.to_thread(self._write_blocking, line)
-        except Exception as exc:  # pragma: no cover - hardware fault path
-            _log.error("esp32_json_estop_write_failed", error=str(exc))
-            msg = f"E-stop write failed: {exc}"
-            raise ArmDriverError(msg) from exc
+        if not self._connected:
+            msg = "Esp32JsonDriver is not connected — cannot issue e-stop"
+            raise ArmDriverError(msg)
+        async with self._send_lock:
+            line, _req_id = self._encode("estop", {})
+            try:
+                await asyncio.to_thread(self._write_blocking, line.encode("ascii"))
+                self._last_send_monotonic = time.monotonic()
+            except Exception as exc:  # pragma: no cover - hardware fault path
+                _log.error("esp32_json_estop_write_failed", error=str(exc))
+                msg = f"E-stop write failed: {exc}"
+                raise ArmDriverError(msg) from exc
         _log.warning("esp32_json_estop_sent")
 
     async def clear_emergency_stop(self) -> None:
@@ -303,6 +328,28 @@ class Esp32JsonDriver:
             msg = "Esp32JsonDriver is not connected"
             raise ArmDriverError(msg)
 
+    # ------------------------------------------------------------------ #
+    # Velocity-check anchor resolution order:
+    #   1. Most recently *observed* state (latest heartbeat)
+    #   2. Last successfully commanded target (post-ack)
+    #   3. Configured home position
+    # The observed state is preferred because the firmware may still be
+    # executing the previous segment when the next command arrives; using
+    # the actual instantaneous position gives the tightest safety bound.
+    _VELOCITY_CHECK_ANCHOR_FALLBACK_ORDER: Final = (
+        "observed_state",
+        "last_commanded",
+        "home_position",
+    )
+
+    def _velocity_anchor(self) -> tuple[float, ...]:
+        """Return the best available start-position for velocity checks."""
+        if self._latest_state is not None:
+            return self._latest_state.joint_positions
+        if self._last_commanded_target is not None:
+            return self._last_commanded_target
+        return tuple(float(v) for v in self._cfg.home_position)
+
     def _validate_command(
         self,
         positions: tuple[float, ...],
@@ -321,6 +368,19 @@ class Esp32JsonDriver:
             limits = self._cfg.joint_limits[idx]
             if not (limits.min_rad <= value <= limits.max_rad):
                 msg = f"joint[{idx}]={value} outside [{limits.min_rad}, {limits.max_rad}]"
+                raise ArmCommandRejected(msg)
+        # Velocity feasibility — reject moves that would require any joint
+        # to exceed its configured max_velocity_rad_s over the duration.
+        # Uses the best available start-position anchor (see class attr).
+        start = self._velocity_anchor()
+        for idx, (s, t) in enumerate(zip(start, positions, strict=True)):
+            required_speed = abs(t - s) / duration_s
+            limit = self._cfg.joint_limits[idx].max_velocity_rad_s
+            if required_speed > limit:
+                msg = (
+                    f"joint[{idx}] would need {required_speed:.3f} rad/s, "
+                    f"limit is {limit:.3f} rad/s"
+                )
                 raise ArmCommandRejected(msg)
 
     async def _resolve_port(self) -> str:
@@ -449,11 +509,13 @@ class Esp32JsonDriver:
 
     async def _teardown(self) -> None:
         self._connected = False
-        if self._reader_task is not None:
-            self._reader_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError, Exception):
-                await self._reader_task
-            self._reader_task = None
+        for task_attr in ("_keepalive_task", "_reader_task"):
+            task: asyncio.Task[None] | None = getattr(self, task_attr)
+            if task is not None:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await task
+                setattr(self, task_attr, None)
         if self._port is not None:
             with contextlib.suppress(Exception):  # pragma: no cover
                 await asyncio.to_thread(self._port.close)
@@ -463,10 +525,16 @@ class Esp32JsonDriver:
                 pending.future.set_exception(ArmDriverError("Driver disconnected before reply"))
         self._pending.clear()
 
-    def _encode(self, cmd: str, payload: dict[str, Any]) -> str:
+    def _encode(self, cmd: str, payload: dict[str, Any]) -> tuple[str, int]:
+        """Serialise a command and return ``(wire_line, req_id)``.
+
+        Returning the ``req_id`` avoids the caller having to re-parse the
+        serialised JSON just to recover the id.
+        """
+        req_id = self._next_id
         msg: dict[str, Any] = {
             "t": "cmd",
-            "id": self._next_id,
+            "id": req_id,
             "ts": time.monotonic(),
             "cmd": cmd,
             **payload,
@@ -477,7 +545,7 @@ class Esp32JsonDriver:
         if len(line.encode("ascii")) > max_bytes:
             err = f"Encoded command exceeds {max_bytes} bytes"
             raise ArmCommandRejected(err)
-        return line
+        return line, req_id
 
     async def _send_and_await_ack(
         self,
@@ -485,13 +553,13 @@ class Esp32JsonDriver:
         payload: dict[str, Any],
     ) -> None:
         async with self._send_lock:
-            line = self._encode(cmd, payload)
-            req_id = json.loads(line)["id"]
+            line, req_id = self._encode(cmd, payload)
             loop = asyncio.get_running_loop()
             future: asyncio.Future[None] = loop.create_future()
             self._pending[req_id] = _PendingReply(future=future, cmd_name=cmd)
             try:
                 await asyncio.to_thread(self._write_blocking, line.encode("ascii"))
+                self._last_send_monotonic = time.monotonic()
             except Exception as exc:
                 self._pending.pop(req_id, None)
                 err = f"Serial write failed: {exc}"
@@ -513,9 +581,44 @@ class Esp32JsonDriver:
                 self._pending.pop(req_id, None)
 
     def _write_blocking(self, data: bytes) -> None:
-        assert self._port is not None
+        if self._port is None:
+            msg = "Esp32JsonDriver is not connected — cannot write to serial port"
+            raise ArmDriverError(msg)
         self._port.write(data)
         self._port.flush()
+
+    async def _keepalive_loop(self) -> None:
+        """Ping the firmware periodically when the wire is otherwise idle.
+
+        Fires when ``time.monotonic() - _last_send_monotonic`` exceeds
+        ``cfg.transport.keepalive_interval_s``. Using the send lock via
+        ``_send_and_await_ack`` ensures the ping never races a concurrent
+        command. The loop exits cleanly on ``CancelledError`` (issued by
+        ``_teardown``).
+        """
+        interval = self._cfg.transport.keepalive_interval_s
+        # Poll at ¼ of the interval so we never slip by a full period.
+        poll_s = max(0.05, interval / 4.0)
+        try:
+            while True:
+                await asyncio.sleep(poll_s)
+                if not self._connected:
+                    break
+                idle_s = time.monotonic() - self._last_send_monotonic
+                if idle_s >= interval:
+                    _log.debug(
+                        "esp32_json_keepalive_ping",
+                        idle_s=round(idle_s, 3),
+                    )
+                    try:
+                        await self._send_and_await_ack(cmd="ping", payload={})
+                    except ArmDriverError as exc:
+                        _log.warning(
+                            "esp32_json_keepalive_failed",
+                            error=str(exc),
+                        )
+        except asyncio.CancelledError:
+            raise
 
     async def _reader_loop(self) -> None:
         """Read lines forever, dispatch by message type."""
@@ -531,7 +634,8 @@ class Esp32JsonDriver:
             _log.error("esp32_json_reader_crashed", error=str(exc))
 
     def _readline_blocking(self) -> bytes:
-        assert self._port is not None
+        if self._port is None:
+            return b""
         result: bytes = self._port.readline()
         return result
 

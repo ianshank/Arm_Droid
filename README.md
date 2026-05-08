@@ -1,6 +1,6 @@
 # armdroid
 
-**Robot arm manipulation platform — SO-ARM100, MuJoCo simulation, SAC+HER RL, and PDDL planning.**
+**Robot arm manipulation platform — MakerWorld 6-DoF arm + ESP32, MuJoCo simulation, SAC+HER RL, and PDDL planning.**
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen)]()
 [![Coverage](https://img.shields.io/badge/coverage-98.8%25-brightgreen)]()
@@ -11,10 +11,12 @@
 
 ## What is armdroid
 
-armdroid is a hierarchical robot arm training and control platform targeting the SO-ARM100 6-DoF
-arm on a CUDA-enabled desktop. It trains manipulation policies entirely in MuJoCo simulation using
-Soft Actor-Critic with Hindsight Experience Replay (SAC+HER), then transfers to the physical arm
-over USB serial.
+armdroid is a hierarchical robot arm training and control platform targeting a MakerWorld 6-DoF
+arm controlled over a custom JSON-over-UART protocol running on an ESP32 microcontroller
+(see [`firmware/arm_esp32/`](firmware/arm_esp32/README.md) and the
+[wire protocol specification](firmware/arm_esp32/PROTOCOL.md)). It trains manipulation policies
+entirely in MuJoCo simulation using Soft Actor-Critic with Hindsight Experience Replay (SAC+HER),
+then transfers to the physical arm over USB serial.
 
 armdroid grew out of the [MouseDroidAGI](https://github.com/ianshank/MouseDroidAGI) autonomous
 rover project. The world-model, reward, memory, curiosity, and safety modules are shared across
@@ -38,7 +40,7 @@ Full C4 diagrams (context, container, and RL controller component) live in
 | Layer 0 — Perception | `src/armdroid/perception/` | RealSense D435i depth processing, YOLO11 object detection, PnP 6-DoF pose estimation, vision-to-PDDL symbolic state extraction |
 | Layer 1 — Symbolic Planning | `src/armdroid/planning/` | PDDL domain + problem generation, Pyperplan BFS/A* search, adaptive replanner with optional Claude API LLM backend |
 | Layer 2 — RL Control | `src/armdroid/control/` | SAC+HER goal-conditioned policy (Stable-Baselines3), grasp/place/transit action primitives, trajectory interpolation |
-| Layer 3 — Hardware | `src/armdroid/hardware/` | Async SO-ARM100 USB serial driver, in-memory mock driver for simulation and testing |
+| Layer 3 — Hardware | `src/armdroid/hardware/` | Async MakerWorld 6-DoF arm ESP32 JSON-over-UART driver ([`firmware/arm_esp32/`](firmware/arm_esp32/README.md)), in-memory mock driver for simulation and testing |
 
 All inter-layer boundaries are `@runtime_checkable Protocol` interfaces. `factory.py` is the
 single dependency-injection wiring point.
@@ -51,7 +53,7 @@ single dependency-injection wiring point.
 |-----------|-------------|
 | CPU / OS | x86_64, Windows 10/11 (Linux also supported) |
 | GPU | CUDA-capable GPU; RTX 5060 Ti tested and tuned |
-| Robot arm | SO-ARM100 (6-DoF), USB serial connection |
+| Robot arm | MakerWorld 6-DoF arm, ESP32 JSON-over-UART (see [firmware/arm_esp32/](firmware/arm_esp32/README.md)) |
 | Depth camera | Intel RealSense D435i (optional; mock available) |
 | RAM | 16 GB minimum; 32 GB recommended for large replay buffers |
 | Storage | ~2 GB for MuJoCo assets, YOLO weights, and checkpoints |
@@ -94,7 +96,7 @@ pip install -e ".[dev]"
 ### Optional extras
 
 ```bash
-# Real SO-ARM100 serial driver (pyserial)
+# Real arm driver (ESP32 JSON-over-UART via pyserial)
 pip install -e ".[hardware]"
 
 # Intel RealSense D435i depth camera (pyrealsense2)
@@ -215,7 +217,7 @@ python -m armdroid --config config/tower_of_hanoi.yaml rollout
 # 5-disk solve, override from CLI
 python -m armdroid --config config/tower_of_hanoi.yaml rollout --num-disks 5
 
-# Real SO-ARM100 (override mock_hardware flag)
+# Real arm driver (ESP32 JSON-over-UART; override mock_hardware flag)
 ARMDROID_MOCK_HARDWARE=false \
 python -m armdroid --config config/tower_of_hanoi.yaml rollout
 ```
@@ -310,7 +312,7 @@ src/armdroid/
 
   hardware/
     mock_arm_driver.py     # In-memory mock — no USB required, used in all unit tests
-    so_arm100_driver.py    # Real SO-ARM100 async serial driver (pyserial)
+    esp32_json_driver.py   # MakerWorld 6-DoF arm driver (JSON-over-UART / ESP32 + pyserial)
 
   perception/
     depth_processor.py     # RealSense D435i depth frame processing + hole-filling
@@ -359,8 +361,10 @@ tests/
 
 ## Roadmap / Next steps
 
-1. **Real hardware integration** — test `SoArm100Driver` on the physical SO-ARM100, calibrate
+1. **Real hardware integration** — test `Esp32JsonDriver` on the physical arm, calibrate
    joint limits and home position, validate emergency stop.
+   See [`firmware/arm_esp32/README.md`](firmware/arm_esp32/README.md) for flashing instructions
+   and [`firmware/arm_esp32/PROTOCOL.md`](firmware/arm_esp32/PROTOCOL.md) for the wire protocol.
 
 2. **RealSense D435i integration** — connect `depth_processor.py` against a live camera stream,
    tune `default_focal_length`, `depth_min_m`, and `depth_max_m` from real camera intrinsics.
@@ -369,7 +373,7 @@ tests/
    fine-tune YOLO11, update `arm_perception.yolo_model_path` in config.
 
 4. **MuJoCo scene assets** — author proper MJCF scene XML files (`sim/tower_of_hanoi.xml` and
-   `sim/laundry_sorting.xml`) with correct SO-ARM100 geometry and collision meshes.
+   `sim/laundry_sorting.xml`) with correct MakerWorld 6-DoF arm geometry and collision meshes.
 
 5. **Training runs** — run SAC+HER curriculum on sim (1-disk → 2-disk → 3-disk → 5-disk),
    instrument with Weights & Biases, track success rate and episode length.

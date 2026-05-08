@@ -224,8 +224,13 @@ void PumpSerial() {
     int c = Serial.read();
     if (c < 0) break;
     if (c == '\n') {
-      g_rx_buf[g_rx_len] = '\0';
-      ProcessLine(g_rx_buf, g_rx_len);
+      // Only dispatch when the line fits in the buffer.  When g_rx_len was
+      // set to cfg::kMaxLineBytes+1 (the overflow sentinel), writing
+      // g_rx_buf[g_rx_len] would be an out-of-bounds store.
+      if (g_rx_len <= cfg::kMaxLineBytes) {
+        g_rx_buf[g_rx_len] = '\0';
+        ProcessLine(g_rx_buf, g_rx_len);
+      }
       g_rx_len = 0;
     } else if (c == '\r') {
       // ignore — let \n do the framing

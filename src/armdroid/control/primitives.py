@@ -67,6 +67,13 @@ class ActionPrimitives:
     async def transit(self, target_pose: NDArray[np.float64]) -> bool:
         """Move arm to target joint pose without grasping.
 
+        On the modern path (``cfg.gripper_joint_index is not None``), the
+        move is dispatched via :meth:`send_joint_positions` with the
+        configured ``transit_duration_s`` so the firmware interpolates
+        smoothly. On the legacy path (6-DoF, no gripper joint),
+        ``send_joint_command`` is used to preserve the historical
+        instantaneous semantics.
+
         Args:
             target_pose: Target joint angles, shape ``(dof,)``.
 
@@ -75,7 +82,13 @@ class ActionPrimitives:
         """
         _log.debug("primitive_transit", target=target_pose.tolist())
         try:
-            await self._driver.send_joint_command(target_pose)
+            if self._cfg.gripper_joint_index is not None:
+                await self._driver.send_joint_positions(
+                    tuple(float(v) for v in target_pose),
+                    duration_s=self._cfg.transit_duration_s,
+                )
+            else:
+                await self._driver.send_joint_command(target_pose)
         except Exception:
             _log.error("transit_failed", exc_info=True)
             return False
@@ -84,10 +97,11 @@ class ActionPrimitives:
     async def grasp(self, pre_grasp_pose: NDArray[np.float64]) -> float:
         """Execute grasp primitive — approach pose, then close gripper.
 
-        When ``cfg.gripper_joint_index is not None`` the gripper close is
-        baked into the joint vector by writing ``1.0`` to the gripper
-        joint via the modern ``send_joint_positions`` API. Otherwise the
-        legacy ``close_gripper`` driver method is used.
+        When ``cfg.gripper_joint_index is not None`` both the approach move
+        and the gripper close use :meth:`send_joint_positions` (approach at
+        ``grasp_duration_s``, gripper close as a one-frame write at the
+        same duration). Otherwise the legacy ``close_gripper`` driver
+        method is used.
 
         Args:
             pre_grasp_pose: Joint angles for pre-grasp position.
@@ -96,16 +110,18 @@ class ActionPrimitives:
             Measured grip force (``0.0`` if grasp failed).
         """
         _log.debug("primitive_grasp", pre_grasp=pre_grasp_pose.tolist())
-        try:
-            await self._driver.send_joint_command(pre_grasp_pose)
-        except Exception:
-            _log.error("grasp_approach_failed", exc_info=True)
-            return 0.0
 
         if self._cfg.gripper_joint_index is not None:
-            # Gripper is an explicit protocol joint — close by writing the
-            # joint vector with the gripper at 1.0 (closed). The other
-            # joints are held at their just-commanded positions.
+            # Modern path — approach move with per-primitive duration.
+            try:
+                await self._driver.send_joint_positions(
+                    tuple(float(v) for v in pre_grasp_pose),
+                    duration_s=self._cfg.grasp_duration_s,
+                )
+            except Exception:
+                _log.error("grasp_approach_failed", exc_info=True)
+                return 0.0
+            # Gripper close — write the gripper joint to 1.0 (closed).
             try:
                 grip_joints = list(pre_grasp_pose.astype(np.float64))
                 grip_joints[self._cfg.gripper_joint_index] = 1.0
@@ -119,7 +135,12 @@ class ActionPrimitives:
             _log.info("grasp_complete", force=1.0, gripper_joint_close=True)
             return 1.0
 
-        # Legacy gripper path
+        # Legacy path — instantaneous send_joint_command + close_gripper.
+        try:
+            await self._driver.send_joint_command(pre_grasp_pose)
+        except Exception:
+            _log.error("grasp_approach_failed", exc_info=True)
+            return 0.0
         try:
             force = await self._driver.close_gripper()
         except Exception:
@@ -131,9 +152,10 @@ class ActionPrimitives:
     async def place(self, place_pose: NDArray[np.float64]) -> bool:
         """Execute place primitive — move to target pose, then open gripper.
 
-        When ``cfg.gripper_joint_index is not None`` the gripper open is
-        baked into the joint vector (gripper joint = ``0.0``) instead of
-        calling the legacy ``open_gripper`` driver method.
+        When ``cfg.gripper_joint_index is not None`` the approach move uses
+        ``send_joint_positions`` at ``place_duration_s``, and the gripper
+        open is baked into the joint vector (gripper joint = ``0.0``).
+        Otherwise the legacy ``open_gripper`` driver method is used.
 
         Args:
             place_pose: Joint angles for place position.
@@ -142,13 +164,18 @@ class ActionPrimitives:
             True if place completed successfully.
         """
         _log.debug("primitive_place", target=place_pose.tolist())
-        try:
-            await self._driver.send_joint_command(place_pose)
-        except Exception:
-            _log.error("place_approach_failed", exc_info=True)
-            return False
 
         if self._cfg.gripper_joint_index is not None:
+            # Modern path — approach move with per-primitive duration.
+            try:
+                await self._driver.send_joint_positions(
+                    tuple(float(v) for v in place_pose),
+                    duration_s=self._cfg.place_duration_s,
+                )
+            except Exception:
+                _log.error("place_approach_failed", exc_info=True)
+                return False
+            # Gripper open — write the gripper joint to 0.0 (open).
             try:
                 release_joints = list(place_pose.astype(np.float64))
                 release_joints[self._cfg.gripper_joint_index] = 0.0
@@ -162,7 +189,12 @@ class ActionPrimitives:
             _log.info("place_complete", gripper_joint_open=True)
             return True
 
-        # Legacy gripper path
+        # Legacy path — instantaneous send_joint_command + open_gripper.
+        try:
+            await self._driver.send_joint_command(place_pose)
+        except Exception:
+            _log.error("place_approach_failed", exc_info=True)
+            return False
         try:
             await self._driver.open_gripper()
         except Exception:

@@ -334,14 +334,22 @@ class ArmConfig(BaseModel):
     grasp_duration_s: float = Field(
         default=1.0,
         gt=0.0,
-        description="Duration over which the firmware interpolates a grasp "
-        "primitive's approach phase. Gripper close is instantaneous.",
+        description=(
+            "Duration over which the firmware interpolates the approach phase "
+            "of the grasp primitive on the modern (gripper-as-joint) path. "
+            "Gripper open/close itself is a separate one-frame write dispatched "
+            "at the same duration via send_joint_positions."
+        ),
     )
     place_duration_s: float = Field(
         default=1.0,
         gt=0.0,
-        description="Duration over which the firmware interpolates a place "
-        "primitive's deposit phase. Gripper open is instantaneous.",
+        description=(
+            "Duration over which the firmware interpolates the approach phase "
+            "of the place/deposit primitive on the modern (gripper-as-joint) path. "
+            "Gripper open itself is a separate one-frame write dispatched "
+            "at the same duration via send_joint_positions."
+        ),
     )
     # Legacy top-level transport fields. Preferred location is
     # ``transport.*`` below; these stay for backwards compatibility.
@@ -563,6 +571,14 @@ class ArmPlanningConfig(BaseModel):
     planner_backend: Literal["pyperplan", "fast_downward"] = Field(
         "pyperplan",
         description="PDDL solver backend",
+    )
+    pyperplan_search: Literal["bfs", "astar", "wastar", "gbf"] = Field(
+        "bfs",
+        description=(
+            "Pyperplan search algorithm. 'bfs' guarantees shortest plan; "
+            "'astar'/'wastar'/'gbf' use heuristic search (hadd) and are "
+            "faster on larger problems."
+        ),
     )
     llm_replanner_enabled: bool = Field(
         False,

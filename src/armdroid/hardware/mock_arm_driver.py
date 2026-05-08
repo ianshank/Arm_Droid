@@ -112,6 +112,7 @@ class MockArmDriver:
     ) -> None:
         """Validate and stage an interpolated move."""
         self._require_connected()
+        # Lock-free checks: shape, finiteness, per-joint range, duration.
         self._validate_command(positions, duration_s)
 
         async with self._lock:
@@ -121,6 +122,21 @@ class MockArmDriver:
 
             now = time.monotonic()
             current = self._interpolate_unlocked(now)
+
+            # Velocity feasibility — evaluated under the lock so the start
+            # pose is the *actual* interpolated position at the moment the
+            # command is issued, not the previous segment target. A chained
+            # command sent mid-motion therefore cannot circumvent the limit.
+            for idx, (s, t) in enumerate(zip(current, positions, strict=True)):
+                required_speed = abs(t - s) / duration_s
+                limit = self._cfg.joint_limits[idx].max_velocity_rad_s
+                if required_speed > limit:
+                    msg = (
+                        f"joint[{idx}] would need {required_speed:.3f} rad/s, "
+                        f"limit is {limit:.3f} rad/s"
+                    )
+                    raise ArmCommandRejected(msg)
+
             self._segment_start = current
             self._segment_target = positions
             self._segment_duration_s = duration_s
@@ -295,18 +311,9 @@ class MockArmDriver:
             if not (limits.min_rad <= value <= limits.max_rad):
                 msg = f"joint[{idx}]={value} outside [{limits.min_rad}, {limits.max_rad}]"
                 raise ArmCommandRejected(msg)
-        # Velocity feasibility — reject moves that would exceed any joint's
-        # max velocity. Compared against the *previous* segment_target so
-        # the user cannot circumvent the limit by chaining commands.
-        for idx, (start, target) in enumerate(zip(self._segment_target, positions, strict=True)):
-            required_speed = abs(target - start) / duration_s
-            limit = self._cfg.joint_limits[idx].max_velocity_rad_s
-            if required_speed > limit:
-                msg = (
-                    f"joint[{idx}] would need {required_speed:.3f} rad/s, "
-                    f"limit is {limit:.3f} rad/s"
-                )
-                raise ArmCommandRejected(msg)
+        # NOTE: velocity feasibility is checked *inside the lock* in
+        # send_joint_positions against the interpolated start position so
+        # chained mid-motion commands are evaluated correctly.
 
     async def _set_state_instantly(self, positions: tuple[float, ...]) -> None:
         """Snap the simulated arm to ``positions`` with no interpolation.
