@@ -12,8 +12,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from armdroid.config.schema import ArmPlanningConfig
+from armdroid.domain.state import PlanStep, SymbolicState
 from armdroid.planning.replanner import Replanner, ReplanningExhaustedError
-from armdroid.protocols import PlanStep, SymbolicState
 
 _FIXED_PLAN = [PlanStep(action="move", args=["disk_1", "peg_A", "peg_C"])]
 

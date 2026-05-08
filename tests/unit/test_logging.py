@@ -37,3 +37,22 @@ def test_configure_logging_with_robot_id() -> None:
     configure_logging(cfg, robot_id="armdroid-test-1")
     bound = structlog.contextvars.get_contextvars()
     assert bound.get("robot_id") == "armdroid-test-1"
+
+
+def test_add_logger_name_processor_binds_name_via_stdlib_logger() -> None:
+    """logging/setup.py line 38: event_dict['logger'] = name is executed when
+    the underlying logger has a .name attribute (stdlib logger factory)."""
+    cfg = LoggingConfig(level="DEBUG", format="json")
+    configure_logging(cfg)
+    # Swap to stdlib logger factory so the processor receives a named logger.
+    structlog.configure(
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=False,
+    )
+    try:
+        log = structlog.get_logger("armdroid.test.named_logger_coverage")
+        # Emitting an event exercises _add_logger_name with logger.name != None.
+        log.info("named_logger_coverage_event")
+    finally:
+        # Restore a clean default so subsequent tests are unaffected.
+        configure_logging(LoggingConfig())

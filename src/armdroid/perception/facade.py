@@ -11,12 +11,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from armdroid.domain.state import DetectedObject, SymbolicState
 from armdroid.logging.setup import get_logger
 from armdroid.perception.depth_processor import DepthProcessor
 from armdroid.perception.object_detector import ObjectDetector, ObjectDetectorProtocol
 from armdroid.perception.pose_estimator import PoseEstimator
 from armdroid.perception.state_extractor import StateExtractor
-from armdroid.protocols import DetectedObject, SymbolicState
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray

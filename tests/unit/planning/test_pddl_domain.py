@@ -89,3 +89,23 @@ class TestGenerateProblem:
         problem = generate_problem(cfg)
         assert "(smaller disk_1 disk_2)" in problem
         assert "(smaller disk_1 peg_a)" in problem
+
+
+class TestNormalisePredicate:
+    """Tests for ``_predicate_to_pddl_atom`` covering all three input forms."""
+
+    def test_already_pddl_form_is_returned_unchanged(self) -> None:
+        from armdroid.planning.pddl_domain import _predicate_to_pddl_atom
+
+        pred = "(on disk_1 peg_a)"
+        assert _predicate_to_pddl_atom(pred) == pred
+
+    def test_functional_form_is_converted(self) -> None:
+        from armdroid.planning.pddl_domain import _predicate_to_pddl_atom
+
+        assert _predicate_to_pddl_atom("on(disk_1, peg_a)") == "(on disk_1 peg_a)"
+
+    def test_space_separated_form_is_converted(self) -> None:
+        from armdroid.planning.pddl_domain import _predicate_to_pddl_atom
+
+        assert _predicate_to_pddl_atom("on disk_1 peg_a") == "(on disk_1 peg_a)"

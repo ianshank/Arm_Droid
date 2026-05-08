@@ -16,9 +16,9 @@ from pathlib import Path
 import numpy as np
 
 from armdroid.config.schema import ArmSettings, load_settings
-from armdroid.factory import build_arm_orchestrator
+from armdroid.domain.state import SymbolicState
 from armdroid.logging.setup import configure_logging, get_logger
-from armdroid.protocols import SymbolicState
+from armdroid.orchestration.factory import build_arm_orchestrator
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:

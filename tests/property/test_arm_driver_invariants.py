@@ -26,12 +26,9 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from armdroid.config.schema import ArmConfig, ArmServoConfig, JointLimits
+from armdroid.domain.errors import ArmCommandRejected, ArmDriverError
+from armdroid.domain.state import ArmState
 from armdroid.hardware.mock_arm_driver import MockArmDriver
-from armdroid.protocols import (
-    ArmCommandRejected,
-    ArmDriverError,
-    ArmState,
-)
 
 _GENEROUS_LIMITS: Final = JointLimits(
     min_rad=-math.pi,

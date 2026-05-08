@@ -165,7 +165,7 @@ class TestFactoryAcceptsExplicitDriver:
     """Regression: build_arm_controller still accepts an explicit driver."""
 
     def test_explicit_driver_passed_through(self) -> None:
-        from armdroid.factory import build_arm_controller, build_arm_driver
+        from armdroid.orchestration.factory import build_arm_controller, build_arm_driver
 
         cfg = ArmSettings(mock_hardware=True)
         drv = build_arm_driver(cfg)

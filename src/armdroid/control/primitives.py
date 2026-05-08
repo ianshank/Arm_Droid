@@ -29,7 +29,7 @@ from armdroid.logging.setup import get_logger
 
 if TYPE_CHECKING:
     from armdroid.config.schema import ArmConfig
-    from armdroid.protocols import ArmDriverProtocol
+    from armdroid.domain.protocols import ArmDriverProtocol
 
 _log = get_logger(__name__)
 

@@ -18,7 +18,7 @@ from armdroid.logging.setup import get_logger
 if TYPE_CHECKING:
     from armdroid.control.primitives import ActionPrimitives
     from armdroid.control.sac_agent import SACAgent
-    from armdroid.protocols import ArmEnvironmentProtocol
+    from armdroid.domain.protocols import ArmEnvironmentProtocol
 
 _log = get_logger(__name__)
 

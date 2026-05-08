@@ -2,60 +2,84 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["main", "refactor/**", "feat/**", "fix/**"]
   pull_request:
-    branches: [main]
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
+    name: Lint & format
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dev deps
+          python-version: "3.11"
+          cache: pip
+      - name: Install dev extras
         run: pip install -e ".[dev]"
-      - name: Ruff check
-        run: ruff check src/ tests/
+      - name: Ruff lint
+        run: python -m ruff check src/ tests/
       - name: Ruff format check
-        run: ruff format --check src/ tests/
+        run: python -m ruff format src/ tests/ --check
 
   typecheck:
+    name: Mypy strict
     runs-on: ubuntu-latest
-    needs: lint
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install deps
+          python-version: "3.11"
+          cache: pip
+      - name: Install dev extras
         run: pip install -e ".[dev]"
-      - name: Mypy strict
-        run: mypy --strict src/armdroid/
+      - name: Mypy
+        run: python -m mypy --strict src/
 
   test:
+    name: Tests (${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    needs: lint
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
         python-version: ["3.11", "3.12"]
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install deps
+          cache: pip
+      - name: Install dev extras
         run: pip install -e ".[dev]"
-      - name: Run tests
-        env:
-          ARMDROID_MOCK_HARDWARE: "true"
-        run: pytest -q tests/unit tests/property tests/contract --cov=src/armdroid --cov-fail-under=85 -m "not gpu"
+      - name: Run tests (exclude slow/hardware/gpu)
+        # Single-line invocation: backslash line continuations are not
+        # portable to PowerShell on windows-latest runners.
+        run: python -m pytest -m "not slow and not hardware and not gpu" --cov=armdroid --cov-fail-under=85 -q
+      - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: .coverage
+
+  test-full:
+    name: Full suite (Ubuntu / Python 3.11)
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dev extras
+        run: pip install -e ".[dev]"
+      - name: Run full test suite (exclude hardware-only tests)
+        run: python -m pytest -m "not hardware" --cov=armdroid --cov-fail-under=85 -q
+

@@ -6,6 +6,7 @@ breakage during the ESP32-arm integration. They cover:
 * Schema construction with no overlays.
 * Factory DI graph: building an orchestrator with mock hardware succeeds
   and exposes all five subsystem properties.
+* Root-package public API re-exports and built-in driver registry entries.
 * Protocol conformance: the existing ``MockArmDriver`` and
   ``Esp32JsonDriver`` satisfy the ``ArmDriverProtocol``.
 * Named poll constants present and correctly typed in ``Esp32JsonDriver``.
@@ -20,9 +21,9 @@ from __future__ import annotations
 import pytest
 
 from armdroid.config.schema import ArmSettings, load_settings
-from armdroid.factory import build_arm_orchestrator
+from armdroid.domain.protocols import ArmDriverProtocol
 from armdroid.hardware.mock_arm_driver import MockArmDriver
-from armdroid.protocols import ArmDriverProtocol
+from armdroid.orchestration.factory import build_arm_orchestrator
 
 pytestmark = pytest.mark.regression
 
@@ -36,7 +37,7 @@ class TestSchemaRegression:
         # *shape* of the config (dof, home length match) rather than on the
         # mock_hardware default.
         cfg = ArmSettings()
-        assert cfg.arm.dof == 6  # current-baseline DoF; bumps to 7 in commit 7
+        assert cfg.arm.dof == 6  # current baseline; 7-DoF stays deferred pending validation
         assert len(cfg.arm.home_position) == cfg.arm.dof
         assert isinstance(cfg.mock_hardware, bool)
 
@@ -59,6 +60,24 @@ class TestFactoryRegression:
         assert orch.driver is not None
 
 
+class TestPublicSurfaceRegression:
+    """The stable public API and built-in registry surface stay importable."""
+
+    def test_root_package_reexports_public_api(self) -> None:
+        import armdroid
+        import armdroid.api as api
+
+        assert armdroid.ArmOrchestrator is api.ArmOrchestrator
+        assert armdroid.build_arm_orchestrator is api.build_arm_orchestrator
+
+    def test_driver_registry_exposes_expected_built_ins(self) -> None:
+        from armdroid.hardware.registry import available_drivers
+
+        names = available_drivers()
+        assert "esp32" in names
+        assert "mock" in names
+
+
 class TestProtocolRegression:
     """Both drivers satisfy the existing protocol surface."""
 
@@ -68,13 +87,19 @@ class TestProtocolRegression:
         assert isinstance(driver, ArmDriverProtocol)
 
     def test_esp32_driver_satisfies_protocol(self) -> None:
-        from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+        # The ESP32 driver requires the optional ``[hardware]`` extra (pyserial)
+        # to instantiate. CI's default ``[dev]`` install omits that extra, so
+        # skip cleanly when pyserial is not importable rather than asserting
+        # against environments that legitimately can't construct the driver.
+        pytest.importorskip("serial", reason="pyserial not installed; install with .[hardware]")
+        from armdroid.hardware.esp32 import Esp32JsonDriver
 
         cfg = ArmSettings(mock_hardware=True)
         driver = Esp32JsonDriver(cfg.arm)
         assert isinstance(driver, ArmDriverProtocol)
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 class TestNamedConstantsRegression:
     """Named poll-interval constants must remain present and correctly typed."""
 

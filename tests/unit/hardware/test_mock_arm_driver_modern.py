@@ -25,13 +25,10 @@ from armdroid.config.schema import (
     ArmServoConfig,
     JointLimits,
 )
+from armdroid.domain.errors import ArmCommandRejected, ArmDriverError
+from armdroid.domain.protocols import ArmDriverProtocol
+from armdroid.domain.state import ArmState
 from armdroid.hardware.mock_arm_driver import MockArmDriver
-from armdroid.protocols import (
-    ArmCommandRejected,
-    ArmDriverError,
-    ArmDriverProtocol,
-    ArmState,
-)
 
 _GENEROUS_LIMITS: Final = JointLimits(
     min_rad=-math.pi,

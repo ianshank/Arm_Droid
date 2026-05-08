@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from armdroid.protocols import PlanStep, SymbolicState
+    from armdroid.domain.state import PlanStep, SymbolicState
 
 
 @runtime_checkable

@@ -24,8 +24,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.typing import NDArray
 
+from armdroid.domain.errors import ArmCommandRejected, ArmDriverError
+from armdroid.domain.state import ArmState
 from armdroid.logging.setup import get_logger
-from armdroid.protocols import ArmCommandRejected, ArmDriverError, ArmState
 
 if TYPE_CHECKING:
     from armdroid.config.schema import ArmConfig

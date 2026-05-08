@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 
 from armdroid.config.schema import ArmPlanningConfig, ArmTaskConfig
+from armdroid.domain.state import DetectedObject, SymbolicState
 from armdroid.perception.state_extractor import StateExtractor
 from armdroid.planning.pddl_domain import optimal_move_count
 from armdroid.planning.symbolic_planner import SymbolicPlanner
-from armdroid.protocols import DetectedObject, SymbolicState
 
 
 def _make_disk(disk_id: str, peg_x: float, z: float) -> DetectedObject:

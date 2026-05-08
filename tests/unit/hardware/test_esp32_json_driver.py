@@ -30,11 +30,8 @@ from armdroid.config.schema import (
     ArmTransportConfig,
     JointLimits,
 )
-from armdroid.protocols import (
-    ArmCommandRejected,
-    ArmDriverError,
-    ArmDriverProtocol,
-)
+from armdroid.domain.errors import ArmCommandRejected, ArmDriverError
+from armdroid.domain.protocols import ArmDriverProtocol
 from tests.helpers.fake_serial import FakeSerial as _FakeSerial
 
 _GENEROUS_LIMITS: Final = JointLimits(
@@ -66,18 +63,18 @@ def _make_config(**overrides: object) -> ArmConfig:
 
 @pytest.fixture
 def fake_serial_module(monkeypatch: pytest.MonkeyPatch) -> type[_FakeSerial]:
-    """Install ``_FakeSerial`` as ``armdroid.hardware.esp32_json_driver._serial_module.Serial``."""
-    from armdroid.hardware import esp32_json_driver
+    """Install ``_FakeSerial`` as the serial module used by the ESP32 driver."""
+    from armdroid.hardware.esp32 import driver as _esp32_driver_mod
 
     fake_module = type(sys)("serial")
     fake_module.Serial = _FakeSerial  # type: ignore[attr-defined]
-    monkeypatch.setattr(esp32_json_driver, "_serial_module", fake_module)
+    monkeypatch.setattr(_esp32_driver_mod, "_serial_module", fake_module)
     return _FakeSerial
 
 
 @pytest_asyncio.fixture
 async def driver(fake_serial_module: type[_FakeSerial]) -> Any:
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(_make_config())
     await drv.connect()
@@ -94,7 +91,7 @@ async def driver(fake_serial_module: type[_FakeSerial]) -> Any:
 
 @pytest.mark.asyncio
 async def test_satisfies_protocol(fake_serial_module: type[_FakeSerial]) -> None:
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(_make_config())
     assert isinstance(drv, ArmDriverProtocol)
@@ -104,7 +101,7 @@ async def test_satisfies_protocol(fake_serial_module: type[_FakeSerial]) -> None
 async def test_connect_drains_and_pings(
     fake_serial_module: type[_FakeSerial],
 ) -> None:
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(_make_config())
     await drv.connect()
@@ -136,7 +133,7 @@ async def test_firmware_nak_surfaces_as_command_rejected(
     cfg = _make_config(
         joint_limits=[JointLimits(min_rad=-10.0, max_rad=10.0, max_velocity_rad_s=20.0)] * 6,
     )
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(cfg)
     await drv.connect()
@@ -162,7 +159,7 @@ async def test_estop_blocks_motion_then_clear_resumes(driver: Any) -> None:
 async def test_state_frames_update_cache(
     fake_serial_module: type[_FakeSerial],
 ) -> None:
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(_make_config())
     await drv.connect()
@@ -182,7 +179,7 @@ async def test_state_frames_update_cache(
 async def test_malformed_lines_are_dropped(
     fake_serial_module: type[_FakeSerial],
 ) -> None:
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(_make_config())
     await drv.connect()
@@ -203,7 +200,7 @@ async def test_malformed_lines_are_dropped(
 async def test_command_timeout_raises_driver_error(
     fake_serial_module: type[_FakeSerial],
 ) -> None:
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     cfg = _make_config(
         transport=ArmTransportConfig(
@@ -238,7 +235,7 @@ async def test_command_timeout_raises_driver_error(
 async def test_disconnect_cancels_pending(
     fake_serial_module: type[_FakeSerial],
 ) -> None:
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     cfg = _make_config(
         transport=ArmTransportConfig(
@@ -275,7 +272,7 @@ async def test_legacy_send_joint_command_silently_clips(
     """Legacy adapter clips out-of-range angles silently per joint."""
     cfg = _make_config()
     cfg.joint_limits[0] = JointLimits(min_rad=-0.5, max_rad=0.5, max_velocity_rad_s=10.0)
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(cfg)
     await drv.connect()
@@ -294,7 +291,7 @@ async def test_legacy_send_joint_command_silently_clips(
 async def test_legacy_lifecycle_aliases(
     fake_serial_module: type[_FakeSerial],
 ) -> None:
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(_make_config())
     await drv.start()
@@ -315,7 +312,7 @@ async def test_estop_requires_connected(
     fake_serial_module: type[_FakeSerial],
 ) -> None:
     """emergency_stop on a disconnected driver raises ArmDriverError."""
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(_make_config())
     with pytest.raises(ArmDriverError):
@@ -329,7 +326,7 @@ async def test_estop_serialised_with_send(
     """emergency_stop issued while a send_joint_positions is in flight
     goes through the send lock — both complete without raising.
     """
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     cfg = _make_config(
         transport=ArmTransportConfig(
@@ -360,7 +357,7 @@ async def test_keepalive_pings_when_idle(
     fake_serial_module: type[_FakeSerial],
 ) -> None:
     """With a very short keepalive_interval_s the driver pings the fake-fw."""
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     cfg = _make_config(
         transport=ArmTransportConfig(
@@ -393,7 +390,7 @@ async def test_encode_returns_tuple_with_req_id(
     fake_serial_module: type[_FakeSerial],
 ) -> None:
     """_encode returns (wire_line, req_id) and increments _next_id."""
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(_make_config())
     start_id = drv._next_id  # type: ignore[attr-defined]
@@ -417,8 +414,8 @@ async def test_encode_max_line_bytes_boundary(
     The firmware's PumpSerial counts content bytes (newline is not stored),
     so the host check must exclude the trailing '\\n' from the byte count.
     """
-    from armdroid.hardware import esp32_json_driver as _drv_mod
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
+    from armdroid.hardware.esp32 import driver as _drv_mod
 
     # Freeze time so the ``"ts"`` field has a stable string width across the
     # three _encode() calls below; otherwise float-formatting drift makes the
@@ -501,9 +498,197 @@ async def test_write_blocking_disconnected_raises(
     fake_serial_module: type[_FakeSerial],
 ) -> None:
     """_write_blocking on a disconnected driver raises ArmDriverError."""
-    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+    from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(_make_config())
     # _port is None when not connected
     with pytest.raises(ArmDriverError, match="not connected"):
         drv._write_blocking(b"test\n")  # type: ignore[attr-defined]
+
+
+# --------------------------------------------------------------------- #
+# Coverage gap tests — error / edge paths
+# --------------------------------------------------------------------- #
+
+
+def test_init_raises_when_serial_module_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Lines 96-100: ArmDriverError raised when pyserial is not installed."""
+    from armdroid.hardware.esp32 import Esp32JsonDriver
+    from armdroid.hardware.esp32 import driver as _esp32_driver_mod
+
+    monkeypatch.setattr(_esp32_driver_mod, "_serial_module", None)
+    with pytest.raises(ArmDriverError, match="pyserial not installed"):
+        Esp32JsonDriver(_make_config())
+
+
+@pytest.mark.asyncio
+async def test_connect_drain_failure_tears_down_and_reraises(
+    fake_serial_module: type[_FakeSerial],
+) -> None:
+    """Lines 154-156: teardown is called when drain ping raises; exception propagates."""
+    from unittest.mock import AsyncMock, patch
+
+    from armdroid.hardware.esp32 import Esp32JsonDriver
+
+    drv = Esp32JsonDriver(_make_config())
+    with (
+        patch.object(
+            drv,
+            "_send_and_await_ack",
+            AsyncMock(side_effect=ArmDriverError("drain_failed")),
+        ),
+        pytest.raises(ArmDriverError, match="drain_failed"),
+    ):
+        await drv.connect()
+    assert not drv.is_connected
+
+
+@pytest.mark.asyncio
+async def test_read_state_raises_when_no_state_arrives(
+    fake_serial_module: type[_FakeSerial],
+) -> None:
+    """Lines 217-218: ArmDriverError when firmware acks get_state but state
+    frame never arrives within first_state_wait_s."""
+    from armdroid.hardware.esp32 import Esp32JsonDriver
+
+    cfg = _make_config(
+        transport=ArmTransportConfig(
+            protocol="serial",
+            serial_port="/dev/null",
+            serial_baud=115_200,
+            connect_timeout_s=1.0,
+            command_timeout_s=0.3,
+            heartbeat_hz=10.0,
+            drain_pings_on_connect=0,
+            first_state_wait_s=0.04,
+        ),
+    )
+    drv = Esp32JsonDriver(cfg)
+    await drv.connect()
+    try:
+        # Replace get_state handler: ACK the command but never emit a state frame.
+        fake = drv._port  # type: ignore[attr-defined]
+        original_handle = fake._handle_host_line
+
+        def _ack_only_get_state(line: bytes) -> None:
+            try:
+                msg = json.loads(line.decode("ascii").strip())
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return original_handle(line)
+            if msg.get("cmd") == "get_state":
+                fake._enqueue({"t": "ack", "id": msg.get("id")})
+            else:
+                original_handle(line)
+
+        fake._handle_host_line = _ack_only_get_state  # type: ignore[method-assign]
+        assert (
+            drv._latest_state is None
+        )  # sanity: no state frame sent during connect  # type: ignore[attr-defined]
+        with pytest.raises(ArmDriverError, match="No state frame"):
+            await drv.read_state()
+    finally:
+        await drv.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_resolve_pending_missing_id_is_tolerated(driver: Any) -> None:
+    """Lines 317-320: ack with no id field logs warning and is not an error."""
+    # Should not raise; driver should remain fully functional.
+    driver._dispatch_line(b'{"t": "ack"}\n')  # type: ignore[attr-defined]
+    await driver.send_joint_positions((0.0,) * 6, duration_s=1.0)
+
+
+@pytest.mark.asyncio
+async def test_resolve_pending_orphan_reply_is_tolerated(driver: Any) -> None:
+    """Lines 328-330: ack for an unknown req_id logs debug and is not an error."""
+    driver._dispatch_line(b'{"t": "ack", "id": 999999}\n')  # type: ignore[attr-defined]
+    await driver.send_joint_positions((0.0,) * 6, duration_s=1.0)
+
+
+@pytest.mark.asyncio
+async def test_resolve_pending_non_rejected_nak_sets_driver_error(driver: Any) -> None:
+    """Lines 346-347: nak with an unrecognised error code raises ArmDriverError
+    on the pending future (not ArmCommandRejected)."""
+    from armdroid.hardware.esp32.framing import _PendingReply
+
+    loop = asyncio.get_running_loop()
+    future: asyncio.Future[None] = loop.create_future()
+    req_id = 777
+    driver._pending[req_id] = _PendingReply(future=future, cmd_name="test_cmd")  # type: ignore[attr-defined]
+    driver._dispatch_line(  # type: ignore[attr-defined]
+        json.dumps({"t": "nak", "id": req_id, "err": "hardware_fault", "msg": "oops"}).encode()
+        + b"\n"
+    )
+    await asyncio.sleep(0)
+    assert future.done()
+    with pytest.raises(ArmDriverError, match="hardware_fault"):
+        future.result()
+
+
+@pytest.mark.asyncio
+async def test_handle_state_bad_joint_count_is_tolerated(driver: Any) -> None:
+    """Line 512: _handle_state with wrong joint count logs warning; driver stays up."""
+    bad_state = json.dumps({"t": "state", "q": [0.0, 0.0], "qd": [0.0, 0.0]}).encode() + b"\n"
+    driver._dispatch_line(bad_state)  # type: ignore[attr-defined]
+    assert driver.is_connected
+
+
+@pytest.mark.asyncio
+async def test_send_and_await_ack_write_failure_raises_driver_error(driver: Any) -> None:
+    """Lines 407-409: OSError in _write_blocking surfaces as ArmDriverError."""
+    from unittest.mock import patch
+
+    with (
+        patch.object(driver, "_write_blocking", side_effect=OSError("port closed")),
+        pytest.raises(ArmDriverError, match="Serial write failed"),
+    ):
+        await driver.send_joint_positions((0.0,) * 6, duration_s=1.0)
+
+
+@pytest.mark.asyncio
+async def test_keepalive_failure_logs_warning_driver_stays_connected(
+    fake_serial_module: type[_FakeSerial],
+) -> None:
+    """Line 459: keepalive ArmDriverError is caught, logged, and driver remains live."""
+    from unittest.mock import AsyncMock, patch
+
+    from armdroid.hardware.esp32 import Esp32JsonDriver
+
+    cfg = _make_config(
+        transport=ArmTransportConfig(
+            protocol="serial",
+            serial_port="/dev/null",
+            serial_baud=115_200,
+            connect_timeout_s=1.0,
+            command_timeout_s=0.5,
+            heartbeat_hz=10.0,
+            drain_pings_on_connect=1,
+            keepalive_interval_s=0.05,
+        ),
+    )
+    drv = Esp32JsonDriver(cfg)
+    await drv.connect()
+    try:
+        with patch.object(
+            drv,
+            "_send_and_await_ack",
+            AsyncMock(side_effect=ArmDriverError("fake_keepalive_fail")),
+        ):
+            await asyncio.sleep(0.20)
+        assert drv.is_connected
+    finally:
+        await drv.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_disconnect_when_already_disconnected_is_noop(
+    fake_serial_module: type[_FakeSerial],
+) -> None:
+    """disconnect() on an already-disconnected driver is idempotent."""
+    from armdroid.hardware.esp32 import Esp32JsonDriver
+
+    drv = Esp32JsonDriver(_make_config())
+    await drv.disconnect()  # must not raise
+    assert not drv.is_connected
