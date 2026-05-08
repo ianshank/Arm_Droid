@@ -324,6 +324,25 @@ class ArmConfig(BaseModel):
         "pose back to home_position. Used by primitives.home() and on "
         "MockArmDriver.connect().",
     )
+    transit_duration_s: float = Field(
+        default=2.0,
+        gt=0.0,
+        description="Duration over which the firmware interpolates a transit "
+        "primitive (free-space joint move). Drives "
+        "ActionPrimitives.transit() in the modern motion path.",
+    )
+    grasp_duration_s: float = Field(
+        default=1.0,
+        gt=0.0,
+        description="Duration over which the firmware interpolates a grasp "
+        "primitive's approach phase. Gripper close is instantaneous.",
+    )
+    place_duration_s: float = Field(
+        default=1.0,
+        gt=0.0,
+        description="Duration over which the firmware interpolates a place "
+        "primitive's deposit phase. Gripper open is instantaneous.",
+    )
     # Legacy top-level transport fields. Preferred location is
     # ``transport.*`` below; these stay for backwards compatibility.
     serial_port: str = Field("COM3", description="Serial port for arm controller (legacy)")
@@ -408,6 +427,18 @@ class ArmConfig(BaseModel):
         if "home_position" not in data:
             data["home_position"] = [0.0] * dof_int
         return data
+
+    @property
+    def gripper_joint_index(self) -> int | None:
+        """Index of the gripper joint in the joint vector, or ``None``.
+
+        Returns the index of the gripper joint when this configuration
+        models the gripper as an explicit protocol joint (typically
+        ``dof - 1`` when ``dof >= 7``). When ``dof <= 6`` the gripper is
+        external to the joint protocol and primitives use the legacy
+        ``open_gripper`` / ``close_gripper`` driver methods instead.
+        """
+        return self.dof - 1 if self.dof >= 7 else None
 
     @model_validator(mode="after")
     def home_matches_dof(self) -> Self:
