@@ -12,6 +12,9 @@
 // native test environment.  Guard it so `pio test -e native` works.
 #ifndef UNIT_TEST
 #include <Arduino.h>
+#else
+#include <cstddef>
+#include <cstdint>
 #endif  // UNIT_TEST
 
 namespace armdroid::firmware::config {
