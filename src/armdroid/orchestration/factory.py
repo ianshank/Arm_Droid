@@ -24,10 +24,8 @@ import numpy as np
 from armdroid.control.controller import ArmController
 from armdroid.control.primitives import ActionPrimitives
 from armdroid.control.sac_agent import SACAgent
-from armdroid.environments.laundry_sorting import LaundrySortingEnv
-from armdroid.environments.tower_of_hanoi import TowerOfHanoiEnv
-from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
-from armdroid.hardware.mock_arm_driver import MockArmDriver
+from armdroid.environments.registry import get_environment
+from armdroid.hardware.registry import get_driver
 from armdroid.logging.setup import get_logger
 from armdroid.orchestration.orchestrator import ArmOrchestrator
 from armdroid.perception.facade import ArmPerception
@@ -55,16 +53,9 @@ def build_arm_driver(cfg: ArmSettings) -> ArmDriverProtocol:
     Returns:
         Driver conforming to :class:`ArmDriverProtocol`.
     """
-    if cfg.mock_hardware:
-        _log.info("arm_driver_mock_built")
-        return MockArmDriver(cfg.arm)
-
-    _log.info(
-        "arm_driver_real_built",
-        port=cfg.arm.transport.serial_port,
-        baud=cfg.arm.transport.serial_baud,
-    )
-    return Esp32JsonDriver(cfg.arm)
+    kind = "mock" if cfg.mock_hardware else "esp32"
+    _log.info("arm_driver_built", kind=kind)
+    return get_driver(kind)(cfg.arm)  # type: ignore[call-arg]
 
 
 def build_arm_planner(cfg: ArmSettings) -> ArmPlannerProtocol:
@@ -90,13 +81,9 @@ def build_arm_environment(cfg: ArmSettings) -> ArmEnvironmentProtocol:
         Environment conforming to :class:`ArmEnvironmentProtocol`.
     """
     dof = cfg.arm.dof
-
-    if cfg.arm_task.task_type == "laundry_sorting":
-        _log.info("arm_env_laundry_built")
-        return LaundrySortingEnv(cfg.arm_task, cfg.arm_training, dof=dof)
-
-    _log.info("arm_env_hanoi_built", num_disks=cfg.arm_task.num_disks)
-    return TowerOfHanoiEnv(cfg.arm_task, cfg.arm_training, dof=dof)
+    task_type = cfg.arm_task.task_type
+    _log.info("arm_env_built", task_type=task_type)
+    return get_environment(task_type)(cfg.arm_task, cfg.arm_training, dof=dof)  # type: ignore[call-arg]
 
 
 def build_arm_controller(

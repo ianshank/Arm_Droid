@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+
+from armdroid._registry import RegistryError
 from armdroid.config.schema import ArmSettings, ArmTaskConfig
 from armdroid.control.controller import ArmController
 from armdroid.factory import (
@@ -114,3 +117,19 @@ class TestBuildArmOrchestrator:
         ctrl = orch.controller
         assert isinstance(ctrl, ArmController)
         assert orch.driver is ctrl.primitives.driver
+
+
+class TestRegistryDispatch:
+    """Phase 2b: factory uses registry, unknown kinds raise RegistryError."""
+
+    def test_unknown_driver_kind_raises(self) -> None:
+        from armdroid.hardware.registry import get_driver
+
+        with pytest.raises(RegistryError, match="unknown driver"):
+            get_driver("nonexistent_driver")
+
+    def test_unknown_environment_kind_raises(self) -> None:
+        from armdroid.environments.registry import get_environment
+
+        with pytest.raises(RegistryError, match="unknown environment"):
+            get_environment("pick_place")
