@@ -181,55 +181,118 @@ class PlanStep:
 
 @runtime_checkable
 class ArmDriverProtocol(Protocol):
-    """Interface for robot arm hardware drivers (SO-ARM100, mock)."""
+    """Interface for robot arm hardware drivers (mock, ESP32-JSON).
 
-    async def get_joint_states(self) -> NDArray[np.float64]:
-        """Read current joint angles.
+    Two surfaces are exposed:
+
+    * **Modern** lifecycle (``connect`` / ``disconnect`` / ``is_connected``),
+      latched-e-stop (``emergency_stop`` / ``clear_emergency_stop``), and
+      interpolated motion (``send_joint_positions``, ``read_state``). New
+      code should target this surface.
+    * **Legacy** adapters (``start`` / ``stop`` / ``send_joint_command`` /
+      ``get_joint_states`` / ``open_gripper`` / ``close_gripper`` /
+      ``home``) preserved so existing controllers and tests run unchanged.
+    """
+
+    # ---- Modern lifecycle ------------------------------------------------
+
+    async def connect(self) -> None:
+        """Open the transport. Idempotent.
+
+        Raises:
+            ArmDriverError: when the transport cannot be opened.
+        """
+        ...
+
+    async def disconnect(self) -> None:
+        """Close the transport and release resources. Idempotent."""
+        ...
+
+    @property
+    def is_connected(self) -> bool:
+        """Whether the transport is currently open."""
+        ...
+
+    # ---- Modern motion ---------------------------------------------------
+
+    async def send_joint_positions(
+        self,
+        positions: tuple[float, ...],
+        duration_s: float,
+    ) -> None:
+        """Command an interpolated move to ``positions`` over ``duration_s``.
+
+        Args:
+            positions: Target joint values. Length must equal :attr:`dof`.
+                Units: radians for rotational joints, normalised ``[0, 1]``
+                for the gripper joint (when present).
+            duration_s: Time over which the firmware (or mock) interpolates
+                from the current pose to ``positions``. Must be positive.
+
+        Raises:
+            ArmCommandRejected: bad shape, NaN/inf, joint-limit violation,
+                velocity-limit violation, or e-stop latched.
+            ArmDriverError: transport-layer failure.
+        """
+        ...
+
+    async def read_state(self) -> ArmState:
+        """Return the latest cached arm telemetry.
 
         Returns:
-            Joint angles in radians, shape ``(dof,)``.
+            :class:`ArmState` snapshot. Implementations should cache the
+            most recent firmware heartbeat and return it without blocking.
         """
+        ...
+
+    # ---- Modern safety ---------------------------------------------------
+
+    async def emergency_stop(self) -> None:
+        """Latch firmware (or mock) into emergency stop.
+
+        All subsequent motion commands are rejected with
+        :class:`ArmCommandRejected` until :meth:`clear_emergency_stop` is
+        called. Must succeed even if the transport is degraded.
+        """
+        ...
+
+    async def clear_emergency_stop(self) -> None:
+        """Release the e-stop latch. The arm remains stationary."""
+        ...
+
+    # ---- Legacy adapters (preserved for backwards compatibility) ---------
+
+    async def get_joint_states(self) -> NDArray[np.float64]:
+        """Read current joint angles as a numpy array (legacy)."""
         ...
 
     async def send_joint_command(self, target_angles: NDArray[np.float64]) -> None:
-        """Command arm to target joint angles.
-
-        Args:
-            target_angles: Target joint angles in radians, shape ``(dof,)``.
-        """
+        """Command target joint angles (legacy; no duration control)."""
         ...
 
     async def close_gripper(self) -> float:
-        """Close gripper and return grip force.
-
-        Returns:
-            Measured grip force in Newtons.
-        """
+        """Close the gripper (legacy). Returns the grip force in Newtons."""
         ...
 
     async def open_gripper(self) -> None:
-        """Open gripper fully."""
-        ...
-
-    async def emergency_stop(self) -> None:
-        """Immediately halt all arm motion."""
+        """Open the gripper fully (legacy)."""
         ...
 
     async def home(self) -> None:
-        """Move arm to home position."""
+        """Move arm to home position (legacy)."""
         ...
 
     async def start(self) -> None:
-        """Initialise arm driver connection."""
+        """Open the transport (legacy alias for :meth:`connect`)."""
         ...
 
     async def stop(self) -> None:
-        """Shut down arm driver connection."""
+        """Close the transport (legacy alias for :meth:`disconnect`)."""
         ...
 
     @property
     def dof(self) -> int:
-        """Degrees of freedom."""
+        """Degrees of freedom (joint vector length)."""
         ...
 
 
