@@ -62,9 +62,7 @@ def hil_settings(hil_port: str) -> ArmSettings:
     base = ArmSettings(mock_hardware=False)
     # Build a fresh config tree via Pydantic's model_copy so we never
     # mutate shared model instances (which can bleed between tests).
-    patched_transport = base.arm.transport.model_copy(
-        update={"serial_port": hil_port}
-    )
+    patched_transport = base.arm.transport.model_copy(update={"serial_port": hil_port})
     patched_arm = base.arm.model_copy(update={"transport": patched_transport})
     return base.model_copy(update={"arm": patched_arm})
 
