@@ -24,19 +24,19 @@ import numpy as np
 from armdroid.control.controller import ArmController
 from armdroid.control.primitives import ActionPrimitives
 from armdroid.control.sac_agent import SACAgent
-from armdroid.environments.registry import get_environment
-from armdroid.hardware.registry import get_driver
-from armdroid.logging.setup import get_logger
-from armdroid.orchestration.orchestrator import ArmOrchestrator
-from armdroid.perception.facade import ArmPerception
-from armdroid.planning.symbolic_planner import SymbolicPlanner
-from armdroid.protocols import (
+from armdroid.domain.protocols import (
     ArmControllerProtocol,
     ArmDriverProtocol,
     ArmEnvironmentProtocol,
     ArmPerceptionProtocol,
     ArmPlannerProtocol,
 )
+from armdroid.environments.registry import get_environment
+from armdroid.hardware.registry import get_driver
+from armdroid.logging.setup import get_logger
+from armdroid.orchestration.orchestrator import ArmOrchestrator
+from armdroid.perception.facade import ArmPerception
+from armdroid.planning.symbolic_planner import SymbolicPlanner
 
 if TYPE_CHECKING:
     from armdroid.config.schema import ArmSettings

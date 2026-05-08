@@ -41,15 +41,15 @@ from typing import TYPE_CHECKING, Any, Final
 import numpy as np
 from numpy.typing import NDArray
 
+from armdroid.domain.errors import (
+    ArmCommandRejected,
+    ArmDriverError,
+)
+from armdroid.domain.state import ArmState
 from armdroid.hardware.esp32.framing import _PendingReply, decode_frame
 from armdroid.hardware.esp32.portfinder import open_port_blocking, resolve_port
 from armdroid.hardware.esp32.validator import validate_joint_positions, velocity_anchor
 from armdroid.logging.setup import get_logger
-from armdroid.protocols import (
-    ArmCommandRejected,
-    ArmDriverError,
-    ArmState,
-)
 
 try:
     import serial as _serial_module

@@ -8,7 +8,7 @@ from armdroid.logging.setup import get_logger
 from armdroid.planning.llm_replanners.base import LLMReplannerProtocol
 
 if TYPE_CHECKING:
-    from armdroid.protocols import PlanStep, SymbolicState
+    from armdroid.domain.state import PlanStep, SymbolicState
 
 _log = get_logger(__name__)
 

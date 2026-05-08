@@ -14,8 +14,8 @@ from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 import numpy as np
 from numpy.typing import NDArray
 
+from armdroid.domain.state import DetectedObject
 from armdroid.logging.setup import get_logger
-from armdroid.protocols import DetectedObject
 
 if TYPE_CHECKING:
     from armdroid.config.schema import ArmPerceptionConfig

@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from armdroid._registry import Registry
-from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+from armdroid.hardware.esp32 import Esp32JsonDriver
 from armdroid.hardware.mock_arm_driver import MockArmDriver
 
 if TYPE_CHECKING:

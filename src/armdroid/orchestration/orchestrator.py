@@ -26,15 +26,14 @@ from numpy.typing import NDArray
 from armdroid.logging.setup import get_logger
 
 if TYPE_CHECKING:
-    from armdroid.protocols import (
+    from armdroid.domain.protocols import (
         ArmControllerProtocol,
         ArmDriverProtocol,
         ArmEnvironmentProtocol,
         ArmPerceptionProtocol,
         ArmPlannerProtocol,
-        PlanStep,
-        SymbolicState,
     )
+    from armdroid.domain.state import PlanStep, SymbolicState
 
 _log = get_logger(__name__)
 

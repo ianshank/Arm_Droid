@@ -8,8 +8,8 @@ import json
 import time
 from typing import TYPE_CHECKING, Any
 
+from armdroid.domain.errors import ArmDriverError
 from armdroid.logging.setup import get_logger
-from armdroid.protocols import ArmDriverError
 
 if TYPE_CHECKING:
     from armdroid.config.schema import ArmConfig

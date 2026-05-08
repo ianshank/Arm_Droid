@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """Backwards-compatibility re-export for the legacy ``armdroid.factory`` path.
 
 The canonical home is :mod:`armdroid.orchestration.factory`. New code should
@@ -7,6 +8,15 @@ removal in v0.4.0.
 """
 
 from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "Importing from armdroid.factory is deprecated and will be removed in "
+    "v0.4.0. Import from armdroid or armdroid.orchestration instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from armdroid.orchestration.factory import (
     build_arm_controller,

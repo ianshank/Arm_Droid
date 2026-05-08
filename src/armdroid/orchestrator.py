@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """Backwards-compatibility re-export for the legacy ``armdroid.orchestrator`` path.
 
 The canonical home is :mod:`armdroid.orchestration.orchestrator`. New code
@@ -11,6 +12,15 @@ later phase without notice.
 """
 
 from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "Importing from armdroid.orchestrator is deprecated and will be removed in "
+    "v0.4.0. Import from armdroid or armdroid.orchestration instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from armdroid.orchestration.orchestrator import ArmOrchestrator, _step_args_to_target
 

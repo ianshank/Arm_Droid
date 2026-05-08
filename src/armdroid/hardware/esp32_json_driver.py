@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """Backwards-compat shim for armdroid.hardware.esp32_json_driver.
 
 Re-exports from :mod:`armdroid.hardware.esp32`. This module is preserved as a
@@ -8,6 +9,15 @@ The canonical implementation lives in :mod:`armdroid.hardware.esp32.driver`.
 """
 
 from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "Importing from armdroid.hardware.esp32_json_driver is deprecated and will "
+    "be removed in v0.4.0. Import from armdroid.hardware.esp32 instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from armdroid.hardware.esp32.driver import (
     _FIRST_STATE_POLL_INTERVAL_S as _FIRST_STATE_POLL_INTERVAL_S,

@@ -5,7 +5,8 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
-from armdroid.protocols import ArmCommandRejected, ArmState
+from armdroid.domain.errors import ArmCommandRejected
+from armdroid.domain.state import ArmState
 
 if TYPE_CHECKING:
     from armdroid.config.schema.arm import JointLimits

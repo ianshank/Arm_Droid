@@ -10,8 +10,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from armdroid.domain.state import SymbolicState
 from armdroid.logging.setup import get_logger
-from armdroid.protocols import SymbolicState
 
 if TYPE_CHECKING:
     from armdroid.config.schema import ArmTaskConfig

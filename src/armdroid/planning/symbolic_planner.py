@@ -10,9 +10,9 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from armdroid.domain.state import PlanStep, SymbolicState
 from armdroid.logging.setup import get_logger
 from armdroid.planning.pddl_domain import generate_domain, generate_problem
-from armdroid.protocols import PlanStep, SymbolicState
 
 if TYPE_CHECKING:
     from armdroid.config.schema import ArmPlanningConfig, ArmTaskConfig
