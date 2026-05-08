@@ -1,5 +1,7 @@
 # Changelog
 
+<!-- markdownlint-disable MD024 -->
+
 All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
@@ -7,128 +9,95 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
-### Fixed (PR #1 review remediation and gap analysis)
-
-- **Named poll constants** — replaced inline magic literals in
-  `Esp32JsonDriver` with `Final[float]` module-level constants:
-  `_KEEPALIVE_POLL_FLOOR_S = 0.05` and `_FIRST_STATE_POLL_INTERVAL_S = 0.01`.
-- **Shared fake-serial harness** — new `tests/helpers/fake_serial.py` module
-  provides three canonical stand-ins (`FakeSerial`, `PingOnlyFakeSerial`,
-  `SilentFakeSerial`) eliminating the three previously-duplicated private
-  state-machine classes across `test_esp32_json_driver.py`,
-  `test_arm_driver_contract.py`, and `test_esp32_autodetect.py`.
-- **CI now runs contract tests** — `ci.yml` test step extended from
-  `tests/unit tests/property` to `tests/unit tests/property tests/contract`.
-- **Coverage exclusion narrowed** — `pyproject.toml` `[tool.coverage.run]
-  omit` no longer blanket-excludes `esp32_json_driver.py`; truly unreachable
-  paths within that file carry inline `# pragma: no cover` annotations.
-- **Firmware CI step name** — `firmware-ci.yml` step renamed from
-  "Run native joint-interpolator tests" to "Run native firmware unit tests
-  (interpolator + serial framing)" to accurately describe the test scope.
-- **Stale empty directory removed** — `testsunitscripts/` artifact at repo
-  root deleted.
-
 ### Added
 
-- **ESP32-JSON arm transport** (`Esp32JsonDriver`) — newline-delimited JSON
-  over UART speaking the wire protocol in `firmware/arm_esp32/PROTOCOL.md`.
-  Background reader task demuxes state/ack/nak/evt frames; per-command
-  futures keyed by request id; e-stop acquires the send lock so it is
-  serialised with other writes.
-- **Auto-port discovery** — `cfg.arm.transport.serial_port == "auto"`
-  enumerates USB serial ports via `serial.tools.list_ports`, optionally
-  filtered by `usb_vid_pid_hints` and `exclude_ports`, and probes each in
-  parallel for the firmware boot signature.
-- **ESP32 firmware tree** under `firmware/arm_esp32/` — PlatformIO project
-  (`esp32dev` Arduino target + `native` Unity test env), JSON-over-UART
-  controller (50 Hz interpolator, 10 Hz heartbeat, 1 s+ host-silence
-  watchdog auto-latches e-stop), wire-protocol spec, README with wiring
-  diagram and troubleshooting.
-- **Firmware codegen** (`scripts/gen_firmware_config.py`) — reads
-  `ArmSettings` and emits `firmware/arm_esp32/src/config_generated.h`. CI
-  job (`firmware-ci.yml::codegen-check`) runs `--check` to fail merges
-  that change YAML without regenerating the header.
-- **Structured config sub-models** — `JointLimits` (per-joint min/max +
-  velocity), `ArmServoConfig` (PWM pin + pulse calibration),
-  `ArmTransportConfig` (port, baud, timeouts, line cap, autodetect),
-  `ArmFirmwareConfig` (interpolator hz, watchdog, version). All new
-  fields have defaults; `ArmConfig` autosizes per-joint lists when `dof`
-  is overridden so legacy tests still work.
-- **Modern `ArmDriverProtocol` surface** — `connect`, `disconnect`,
-  `is_connected`, `read_state -> ArmState`, `send_joint_positions`,
-  `clear_emergency_stop`. Legacy methods preserved as backwards-compat
-  adapters.
-- **`ArmState`, `ArmDriverError`, `ArmCommandRejected`** value-types and
-  exceptions in `armdroid.protocols`.
-- **`flash_arm_esp32.sh`** — convenience wrapper around
-  `pio run -t upload` with `ARMDROID_ARM__TRANSPORT__SERIAL_PORT` env-var
-  port discovery.
-- **`firmware-ci.yml`** — three jobs: codegen drift check, native PIO
-  Unity tests for the C++ interpolator, esp32dev compile-only build.
+- **ESP32 MakerWorld platform support** — newline-delimited JSON-over-UART
+  transport, auto-port discovery, PlatformIO firmware tree, firmware
+  codegen (`scripts/gen_firmware_config.py`), and a dedicated
+  `firmware-ci.yml` workflow for codegen drift, native tests, and ESP32
+  builds.
+- **Structured hardware + config primitives** — richer `ArmConfig`
+  sub-models (`JointLimits`, servo calibration, transport, firmware), a
+  modern `ArmDriverProtocol` (`connect`, `disconnect`, `read_state`,
+  `send_joint_positions`, `clear_emergency_stop`), and the supporting
+  `ArmState` / `ArmDriverError` / `ArmCommandRejected` domain types.
+- **Enterprise foundation (v0.2)** — stable `armdroid.api` public surface
+  re-exported from `armdroid`, pure `armdroid.domain` modules, typed
+  `Registry[T]` infrastructure, subsystem registries + PEP 621 entry-point
+  groups, a migration guide, and ADRs documenting the layering,
+  registry-pattern, and shim strategy.
+- **Compatibility bridge** — `armdroid.compat.LegacyArmDriverAdapter` plus
+  shim modules for moved imports such as `armdroid.protocols`,
+  `armdroid.factory`, `armdroid.orchestrator`, and
+  `armdroid.hardware.esp32_json_driver`, all emitting
+  `DeprecationWarning` while preserving legacy callers through the
+  migration window.
+- **Developer workflow hardening** — `Makefile`, `.pre-commit-config.yaml`,
+  refreshed GitHub Actions matrix, Dependabot configuration, shared
+  fake-serial test helpers, and regression coverage around the new public
+  surface.
 
 ### Changed
 
-- **`MockArmDriver` rewritten** to implement the extended protocol with
-  deterministic linear interpolation, latched e-stop, asyncio-lock-guarded
-  segment state, and per-joint velocity validation. Legacy methods
-  preserved (`send_joint_command` / `home` are instantaneous and clip
-  silently per joint, matching the historical SO-ARM100 mock UX).
-- **`build_arm_driver` real-hardware path** now constructs
-  `Esp32JsonDriver` instead of `SoArm100Driver`. Mock-hardware path
-  unchanged.
+- **`MockArmDriver`** now implements the extended protocol with
+  deterministic interpolation, latched e-stop behaviour, lock-guarded
+  segment state, and legacy method semantics preserved for existing
+  callers.
+- **Package layout** moved from the flat v0.1 tree to explicit layered
+  packages: `api`, `domain`, `config`, `orchestration`, `compat`, and
+  subsystem modules with canonical import paths.
+- **ESP32 driver implementation** was decomposed into
+  `armdroid.hardware.esp32.driver`, `framing`, `portfinder`, and
+  `validator`; `esp32_json_driver.py` remains as a compatibility shim.
+- **Composition wiring** now resolves drivers and environments through
+  typed factory aliases from registries, removing the remaining
+  `# type: ignore[call-arg]` escapes from factory dispatch.
+- **Regression and documentation surfaces** now track the v0.2 layout:
+  refreshed C4 diagrams, README, migration guide, and regression tests for
+  public API and compatibility guarantees.
+
+### Fixed
+
+- **Named polling constants** replaced inline timing literals in the ESP32
+  driver so polling behaviour is explicit and regression-testable.
+- **Coverage and logging gap analysis** added explicit tests for ESP32
+  driver error paths, port autodetect edge cases, PDDL normalisation,
+  symbolic-planner fallback, perception pose-estimation dispatch,
+  structured logger naming, and Anthropic replanner retry/cache branches.
+- **Pre-PR validation gate** now passes cleanly with `ruff`,
+  `mypy --strict`, and `pytest --cov`, validating this branch at
+  530 passing tests, 6 skipped, and 98% total coverage.
 
 ### Removed
 
 - **`SoArm100Driver`** — replaced wholesale by `Esp32JsonDriver`. The
   SO-ARM100 hardware target is out; the MakerWorld ESP32 arm is in.
+- **Monolithic ESP32 driver as the canonical edit surface** — new driver
+  work should target the split `armdroid.hardware.esp32` package instead
+  of the legacy shim module.
 
 ### Deferred to a follow-up
 
-- **Default `dof` bump from 6 → 7** is gated on authoring 7-DoF MuJoCo
-  scene XMLs (`sim/tower_of_hanoi.xml`, `sim/laundry_sorting.xml`).
-  The infrastructure is in place: `ArmConfig.gripper_joint_index`
-  returns ``dof - 1`` at `dof >= 7`, primitives switch to the gripper-as-joint
-  code path automatically, the firmware codegen handles arbitrary joint
-  counts, and the per-joint config (`joint_limits`, `servos`) auto-sizes
-  when `dof` changes. Operators who want 7-DoF today can set
-  `cfg.arm.dof = 7` in YAML and the primitives use the modern path; the
-  default stays at 6 to keep the existing test suite green until the
-  scene assets land.
-- **Env-side reward shaping refresh** — `BaseArmEnv` and the per-task
-  envs (`TowerOfHanoiEnv`, `LaundrySortingEnv`) read `dof` from config
-  and adapt observation / action spaces dynamically, but reward shaping
-  still treats the gripper as a separate concern. Folding the gripper
-  joint into the reward (e.g. penalising mid-task gripper actuation)
-  pairs with the dof-7 default switch.
+- **Default `dof` bump from 6 → 7** is still gated on proper MuJoCo scene
+  assets and sim-to-real validation. Operators can opt in via YAML today;
+  the default stays at 6 until the scene and regression story are ready.
+- **Env-side reward-shaping refresh** remains paired with the eventual
+  7-DoF default switch so gripper-as-joint behaviour is reflected in the
+  reward model as well as the control path.
 
 ### Documentation
 
-- **`docs/architecture/C4.md`** — Mermaid C4 diagrams (System Context,
-  Container, RL Controller component) and key design decisions.
-- **README** — full setup/configuration/usage/development/roadmap rewrite.
-- **Regression test layer** — `tests/regression/` baseline with
-  `pytest.mark.regression`; `tests/e2e/` placeholder.
-- **`.gitignore`** — `weights/`, `data/`, `datasets/`, `screenshots/`,
-  `*.log`, `logs/`, `docs/_build/`, `site/` ignored.
-- **Documentation** — full C4 architecture diagrams (System Context, Container,
-  RL Controller component) under `docs/architecture/C4.md` with Mermaid source.
-- **Regression test layer** — new `tests/regression/` directory with baseline
-  regressions covering schema construction, factory DI graph, and protocol
-  conformance. Marked `pytest.mark.regression`.
-- **End-to-end test layer** — new `tests/e2e/` directory placeholder for full
-  pipeline tests (planner → controller → driver → state read).
-- **Extended `.gitignore`** — `weights/`, `data/`, `datasets/`, `screenshots/`,
-  `*.log`, `logs/`, `docs/_build/`, `site/` now ignored to keep large training
-  artifacts and generated docs out of git.
-- **CI markers** — `regression` and `e2e` pytest markers registered in
-  `pyproject.toml`.
-
-### Changed
-
-- **README** — replaced placeholder content with a full setup, configuration,
-  usage, development, and roadmap guide. CUDA torch install via PyTorch's
-  index URL is now documented; Windows MuJoCo VC++ redistributable note
-  added.
+- **Architecture docs** — `docs/architecture/C4.md` now models the stable
+  public API, layered package layout, registry seams, and the v0.2
+  composition root.
+- **README** — refreshed to match the v0.2 package layout, local developer
+  workflow (`make`, `pre-commit`, CI), and post-foundation roadmap.
+- **Regression layer** — `tests/regression/` now guards compatibility,
+  public-surface imports, and baseline behavioural contracts alongside the
+  broader unit/property/contract suites.
+- **Ignore rules** — `.gitignore` now covers local hook cache and the large
+  generated artifacts associated with training, docs, logs, and firmware
+  builds.
 
 ## [0.1.0] — 2025-05-07
 

@@ -6,6 +6,7 @@ breakage during the ESP32-arm integration. They cover:
 * Schema construction with no overlays.
 * Factory DI graph: building an orchestrator with mock hardware succeeds
   and exposes all five subsystem properties.
+* Root-package public API re-exports and built-in driver registry entries.
 * Protocol conformance: the existing ``MockArmDriver`` and
   ``Esp32JsonDriver`` satisfy the ``ArmDriverProtocol``.
 * Named poll constants present and correctly typed in ``Esp32JsonDriver``.
@@ -36,7 +37,7 @@ class TestSchemaRegression:
         # *shape* of the config (dof, home length match) rather than on the
         # mock_hardware default.
         cfg = ArmSettings()
-        assert cfg.arm.dof == 6  # current-baseline DoF; bumps to 7 in commit 7
+        assert cfg.arm.dof == 6  # current baseline; 7-DoF stays deferred pending validation
         assert len(cfg.arm.home_position) == cfg.arm.dof
         assert isinstance(cfg.mock_hardware, bool)
 
@@ -57,6 +58,24 @@ class TestFactoryRegression:
         assert orch.controller is not None
         assert orch.environment is not None
         assert orch.driver is not None
+
+
+class TestPublicSurfaceRegression:
+    """The stable public API and built-in registry surface stay importable."""
+
+    def test_root_package_reexports_public_api(self) -> None:
+        import armdroid
+        import armdroid.api as api
+
+        assert armdroid.ArmOrchestrator is api.ArmOrchestrator
+        assert armdroid.build_arm_orchestrator is api.build_arm_orchestrator
+
+    def test_driver_registry_exposes_expected_built_ins(self) -> None:
+        from armdroid.hardware.registry import available_drivers
+
+        names = available_drivers()
+        assert "esp32" in names
+        assert "mock" in names
 
 
 class TestProtocolRegression:

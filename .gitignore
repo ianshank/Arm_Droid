@@ -51,6 +51,7 @@ coverage.xml
 dmypy.json
 .ruff_cache/
 .pytype/
+.pre-commit-cache/
 
 # IDEs
 .idea/
@@ -103,4 +104,3 @@ site/
 # PlatformIO build artifacts
 .pio/
 firmware/arm_esp32/.pio/
-site/
