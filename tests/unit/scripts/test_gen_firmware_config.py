@@ -79,6 +79,11 @@ class TestRenderHeader:
         assert "#pragma once" in out
         assert "namespace armdroid::firmware::config" in out
         assert out.endswith("}  // namespace armdroid::firmware::config\n")
+        # Arduino.h must be guarded so `pio test -e native` works without
+        # the embedded toolchain.
+        assert "#ifndef UNIT_TEST" in out
+        assert "#include <Arduino.h>" in out
+        assert "#endif  // UNIT_TEST" in out
 
     def test_joint_count_matches_dof(self, gen_module: object) -> None:
         cfg = ArmSettings()

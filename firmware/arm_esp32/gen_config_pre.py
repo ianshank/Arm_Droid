@@ -3,6 +3,13 @@
 Invoked by the ``extra_scripts = pre:gen_config_pre.py`` line in
 platformio.ini. We shell out to the canonical generator script so there
 is exactly one code path that knows how to render the header.
+
+Note on SCons execution context
+--------------------------------
+PlatformIO executes extra_scripts files via SCons ``exec()``, which means
+``__file__`` is **not** defined. We resolve the repo root from the SCons
+``env["PROJECT_DIR"]`` variable instead, which is always set by PlatformIO
+to the directory that contains ``platformio.ini``.
 """
 
 from __future__ import annotations
@@ -11,22 +18,30 @@ import subprocess
 import sys
 from pathlib import Path
 
-# The PlatformIO pre-build environment exposes `Import` for fetching the
-# project env, but we deliberately avoid using it — this script is a
-# zero-config side-car that just runs the canonical generator. Keeping it
-# simple lets us also call it from other build systems later.
+# ``Import`` and ``env`` are injected as builtins by the SCons/PlatformIO
+# execution environment.  We import env through the SCons builtins API so
+# that the module is also importable (and testable) outside of PlatformIO.
+try:
+    Import("env")  # type: ignore[name-defined]  # noqa: F821
+    _PROJECT_DIR = Path(env["PROJECT_DIR"]).resolve()  # type: ignore[name-defined]  # noqa: F821
+except NameError:
+    # Running outside PlatformIO (e.g. direct ``python gen_config_pre.py``).
+    # Fall back to the directory that contains this script.
+    _PROJECT_DIR = Path(__file__).resolve().parent
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+# firmware/arm_esp32/ -> firmware/ -> repo root
+REPO_ROOT = _PROJECT_DIR.parents[1]
 GENERATOR = REPO_ROOT / "scripts" / "gen_firmware_config.py"
 
 
 def main() -> int:
+    """Run the generator; return the process exit code."""
     if not GENERATOR.exists():
         sys.stderr.write(
             f"[gen_config_pre] generator not found at {GENERATOR}\n"
         )
         return 1
-    rc = subprocess.run(
+    rc = subprocess.run(  # noqa: S603
         [sys.executable, str(GENERATOR)],
         check=False,
         cwd=str(REPO_ROOT),
@@ -37,6 +52,10 @@ def main() -> int:
         )
     return rc
 
+
+# Entry point when invoked from PlatformIO's SCons context (extra_scripts).
+# PlatformIO executes the file body directly, so ``main()`` runs here.
+main()
 
 if __name__ == "__main__":  # pragma: no cover
     sys.exit(main())

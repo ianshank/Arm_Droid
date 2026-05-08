@@ -8,7 +8,11 @@
 
 #pragma once
 
+// Arduino.h is only available in the embedded toolchain, not in the
+// native test environment.  Guard it so `pio test -e native` works.
+#ifndef UNIT_TEST
 #include <Arduino.h>
+#endif  // UNIT_TEST
 
 namespace armdroid::firmware::config {
 

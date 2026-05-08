@@ -59,12 +59,14 @@ def hil_port() -> str:
 @pytest.fixture
 def hil_settings(hil_port: str) -> ArmSettings:
     """ArmSettings configured for real hardware on the discovered port."""
-    cfg = ArmSettings(mock_hardware=False)
-    # Configure transport.serial_port via environment so the driver picks
-    # it up via its normal config path. We mutate cfg here only because
-    # the discovered port is not known at config-load time.
-    cfg.arm.transport.serial_port = hil_port
-    return cfg
+    base = ArmSettings(mock_hardware=False)
+    # Build a fresh config tree via Pydantic's model_copy so we never
+    # mutate shared model instances (which can bleed between tests).
+    patched_transport = base.arm.transport.model_copy(
+        update={"serial_port": hil_port}
+    )
+    patched_arm = base.arm.model_copy(update={"transport": patched_transport})
+    return base.model_copy(update={"arm": patched_arm})
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:

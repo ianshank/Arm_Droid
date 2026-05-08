@@ -192,7 +192,7 @@ class _FakeSerial:
                 nak("bad_joint_count", f"got {len(q)}")
                 return
             for v in q:
-                if not isinstance(v, (int, float)):
+                if not isinstance(v, int | float):
                     nak("bad_shape", "non-numeric joint")
                     return
                 if not math.isfinite(v):

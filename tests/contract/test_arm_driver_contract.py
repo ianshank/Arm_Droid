@@ -179,7 +179,7 @@ class _ContractFakeSerial:
                 )
                 return
             for v in q:
-                if not isinstance(v, (int, float)) or not math.isfinite(v):
+                if not isinstance(v, int | float) or not math.isfinite(v):
                     self._enqueue(
                         {
                             "t": "nak",
