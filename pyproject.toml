@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "armdroid"
 version = "0.1.0"
-description = "Robot arm manipulation platform — SO-ARM100, MuJoCo, SAC+HER, PDDL planning"
+description = "Robot arm manipulation platform — MakerWorld ESP32 arm, MuJoCo, SAC+HER, PDDL planning"
 requires-python = ">=3.11"
 dependencies = [
     "torch>=2.4",
@@ -39,7 +39,7 @@ dev = [
     "pytest-timeout>=2.3",
     "pytest-xdist>=3.0",
     "hypothesis>=6.80",
-    "ruff==0.8.0",
+    "ruff==0.15.12",
     "mypy>=1.5",
     "types-PyYAML>=6.0",
 ]
@@ -85,7 +85,7 @@ disallow_subclassing_any = false
 
 [[tool.mypy.overrides]]
 module = ["armdroid.config.schema"]
-disable_error_code = ["arg-type"]
+disable_error_code = ["arg-type", "call-arg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -93,8 +93,11 @@ pythonpath = ["src", "."]
 asyncio_mode = "auto"
 markers = [
     "slow: marks tests as slow",
-    "hardware: marks tests requiring real hardware",
+    "hardware: marks tests requiring real hardware (ESP32 + arm wired up)",
     "gpu: marks tests requiring CUDA GPU",
+    "regression: marks regression tests guarding existing behaviour against future change",
+    "e2e: marks end-to-end pipeline tests (planner -> controller -> driver -> state)",
+    "contract: marks driver-protocol contract tests (parametrised over implementations)",
 ]
 addopts = "-v --tb=short"
 
@@ -103,7 +106,6 @@ source = ["src/armdroid"]
 omit = [
     "*/tests/*",
     "*/main.py",
-    "*/hardware/so_arm100_driver.py",
 ]
 
 [tool.coverage.report]

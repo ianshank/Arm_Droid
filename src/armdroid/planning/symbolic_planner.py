@@ -118,10 +118,15 @@ class SymbolicPlanner:
             PlanningError: If solver fails or returns no solution.
         """
         try:
-            import pyperplan
+            from pyperplan import planner as _pio_planner
         except ImportError:
             _log.warning("pyperplan_not_installed", fallback="recursive_solver")
             return self._solve_recursive()
+
+        search_name = self._planning_cfg.pyperplan_search
+        search_fn = _pio_planner.SEARCHES[search_name]
+        # BFS is blind; heuristic-guided algorithms need hadd.
+        heuristic_cls = None if search_name == "bfs" else _pio_planner.HEURISTICS["hadd"]
 
         with tempfile.TemporaryDirectory() as tmpdir:
             domain_path = Path(tmpdir) / "domain.pddl"
@@ -129,13 +134,20 @@ class SymbolicPlanner:
             domain_path.write_text(domain_str)
             problem_path.write_text(problem_str)
 
-            solution = pyperplan.solve(str(domain_path), str(problem_path))
+            solution = _pio_planner.search_plan(
+                str(domain_path),
+                str(problem_path),
+                search_fn,
+                heuristic_cls,
+            )
 
             if solution is None:
                 msg = "Pyperplan returned no solution"
                 raise PlanningError(msg)
 
-            return self._parse_solution(solution)
+            # search_plan returns Operator objects; extract the name string
+            # which has the same parenthesised form as the old API's text lines.
+            return self._parse_solution([op.name for op in solution])
 
     def _parse_solution(self, solution: list[str]) -> list[PlanStep]:
         """Parse Pyperplan solution into PlanStep objects.
@@ -163,7 +175,9 @@ class SymbolicPlanner:
             Optimal move sequence with exactly 2^n - 1 moves.
         """
         n = self._task_cfg.num_disks
-        pegs = [f"peg_{chr(65 + i)}" for i in range(self._task_cfg.num_pegs)]
+        # Lowercase peg names match pyperplan's token normalisation so that
+        # the recursive fallback and the PDDL backend produce identical names.
+        pegs = [f"peg_{chr(97 + i)}" for i in range(self._task_cfg.num_pegs)]
         disks = [f"disk_{i + 1}" for i in range(n)]
 
         steps: list[PlanStep] = []

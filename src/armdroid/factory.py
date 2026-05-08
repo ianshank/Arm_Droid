@@ -26,8 +26,8 @@ from armdroid.control.primitives import ActionPrimitives
 from armdroid.control.sac_agent import SACAgent
 from armdroid.environments.laundry_sorting import LaundrySortingEnv
 from armdroid.environments.tower_of_hanoi import TowerOfHanoiEnv
+from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
 from armdroid.hardware.mock_arm_driver import MockArmDriver
-from armdroid.hardware.so_arm100_driver import SoArm100Driver
 from armdroid.logging.setup import get_logger
 from armdroid.orchestrator import ArmOrchestrator
 from armdroid.perception.facade import ArmPerception
@@ -59,8 +59,12 @@ def build_arm_driver(cfg: ArmSettings) -> ArmDriverProtocol:
         _log.info("arm_driver_mock_built")
         return MockArmDriver(cfg.arm)
 
-    _log.info("arm_driver_real_built", port=cfg.arm.serial_port)
-    return SoArm100Driver(cfg.arm)
+    _log.info(
+        "arm_driver_real_built",
+        port=cfg.arm.transport.serial_port,
+        baud=cfg.arm.transport.serial_baud,
+    )
+    return Esp32JsonDriver(cfg.arm)
 
 
 def build_arm_planner(cfg: ArmSettings) -> ArmPlannerProtocol:
