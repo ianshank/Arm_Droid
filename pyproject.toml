@@ -47,6 +47,28 @@ dev = [
 [project.scripts]
 armdroid = "armdroid.main:cli_entry"
 
+# Built-in plugin registrations. These mirror the registrations performed
+# at import time inside ``armdroid.<subsystem>.registry`` so that
+# ``importlib.metadata.entry_points`` reflects the same surface that
+# ``available_<kind>s()`` reports. Out-of-tree packages can declare
+# additional entries under the same group names.
+[project.entry-points."armdroid.drivers"]
+mock = "armdroid.hardware.mock_arm_driver:MockArmDriver"
+esp32 = "armdroid.hardware.esp32_json_driver:Esp32JsonDriver"
+
+[project.entry-points."armdroid.planners"]
+pyperplan = "armdroid.planning.symbolic_planner:SymbolicPlanner"
+
+[project.entry-points."armdroid.perception_backends"]
+default = "armdroid.perception.facade:ArmPerception"
+
+[project.entry-points."armdroid.environments"]
+tower_of_hanoi = "armdroid.environments.tower_of_hanoi:TowerOfHanoiEnv"
+laundry_sorting = "armdroid.environments.laundry_sorting:LaundrySortingEnv"
+
+[project.entry-points."armdroid.rl_agents"]
+sac = "armdroid.control.sac_agent:SACAgent"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/armdroid"]
 
@@ -106,6 +128,7 @@ source = ["src/armdroid"]
 omit = [
     "*/tests/*",
     "*/main.py",
+    "*/__main__.py",
 ]
 
 [tool.coverage.report]
