@@ -44,9 +44,16 @@ def _make_7dof_cfg() -> ArmConfig:
     )
 
 
-def _make_primitives_7dof() -> tuple[ActionPrimitives, MockArmDriver]:
+async def _make_primitives_7dof() -> tuple[ActionPrimitives, MockArmDriver]:
+    """Create 7-DoF primitives with an already-connected mock driver.
+
+    The modern ``send_joint_positions`` API requires an explicit ``connect()``
+    (unlike legacy auto-connecting methods). Tests call this helper via
+    ``await`` so the driver is live before any command is issued.
+    """
     cfg = _make_7dof_cfg()
     driver = MockArmDriver(cfg)
+    await driver.connect()
     return ActionPrimitives(cfg, driver), driver
 
 
@@ -71,26 +78,29 @@ class TestGraspWithJointGripper:
 
     @pytest.mark.asyncio
     async def test_grasp_sets_gripper_joint_to_one(self) -> None:
-        prims, driver = _make_primitives_7dof()
+        prims, driver = await _make_primitives_7dof()
         pose = np.array([0.1, 0.2, 0.3, 0.0, 0.0, 0.0, 0.0], dtype=np.float64)
         force = await prims.grasp(pose)
         assert force == 1.0
-        # The gripper joint should now be 1.0 in the driver's view.
-        # Read state via legacy adapter (auto-connects).
-        joints = await driver.get_joint_states()
-        # The mock interpolates over grasp_duration_s; consult internal
-        # state directly to verify the segment_target.
+        # The mock interpolates over grasp_duration_s — the real-time
+        # position has not yet reached the target. Inspect _segment_target
+        # (the commanded endpoint) directly; this is the ground truth for
+        # what was sent to the driver without needing to wait 1 s.
         assert driver._segment_target[6] == pytest.approx(1.0)
-        # Joints 0..5 should still be the pose values (modern API uses
-        # `send_joint_positions` for both transit and gripper close, so
-        # all joints get written).
-        np.testing.assert_allclose(joints[:6], pose[:6], atol=1e-6)
+        # Joints 0..5 should be commanded to the pre-grasp pose values
+        # (the gripper-close call keeps them identical, only joint 6 differs).
+        np.testing.assert_allclose(
+            np.array(driver._segment_target[:6]),
+            pose[:6],
+            atol=1e-6,
+        )
 
     @pytest.mark.asyncio
     async def test_grasp_uses_grasp_duration_s(self) -> None:
         cfg = _make_7dof_cfg()
         cfg = cfg.model_copy(update={"grasp_duration_s": 0.75})
         driver = MockArmDriver(cfg)
+        await driver.connect()
         prims = ActionPrimitives(cfg, driver)
         pose = np.zeros(7, dtype=np.float64)
         await prims.grasp(pose)
@@ -102,7 +112,7 @@ class TestPlaceWithJointGripper:
 
     @pytest.mark.asyncio
     async def test_place_sets_gripper_joint_to_zero(self) -> None:
-        prims, driver = _make_primitives_7dof()
+        prims, driver = await _make_primitives_7dof()
         # Pre-close the gripper so place's open is observable
         gripper_closed = np.array([0.1, 0.2, 0.3, 0.0, 0.0, 0.0, 0.0], dtype=np.float64)
         await prims.grasp(gripper_closed)
@@ -118,6 +128,7 @@ class TestPlaceWithJointGripper:
         cfg = _make_7dof_cfg()
         cfg = cfg.model_copy(update={"place_duration_s": 0.5})
         driver = MockArmDriver(cfg)
+        await driver.connect()
         prims = ActionPrimitives(cfg, driver)
         pose = np.zeros(7, dtype=np.float64)
         await prims.place(pose)
@@ -141,3 +152,30 @@ class TestPerPrimitiveDurations:
             ArmConfig(grasp_duration_s=0.0)
         with pytest.raises(ValidationError):
             ArmConfig(place_duration_s=-1.0)
+
+
+class TestTransitWithJointGripper:
+    """Transit on a 7-DoF arm routes through send_joint_positions."""
+
+    @pytest.mark.asyncio
+    async def test_transit_uses_send_joint_positions_on_modern_path(self) -> None:
+        """transit() on the modern path never calls send_joint_command."""
+        prims, driver = await _make_primitives_7dof()
+        target = np.array([0.1, 0.2, -0.1, 0.0, 0.0, 0.0, 0.0], dtype=np.float64)
+        result = await prims.transit(target)
+        assert result is True
+        # segment_target should reflect the transit target
+        assert driver._segment_target[0] == pytest.approx(0.1)
+        assert driver._segment_target[1] == pytest.approx(0.2)
+        assert driver._segment_target[2] == pytest.approx(-0.1)
+
+    @pytest.mark.asyncio
+    async def test_transit_uses_transit_duration_s(self) -> None:
+        cfg = _make_7dof_cfg()
+        cfg = cfg.model_copy(update={"transit_duration_s": 1.5})
+        driver = MockArmDriver(cfg)
+        await driver.connect()
+        prims = ActionPrimitives(cfg, driver)
+        target = np.zeros(7, dtype=np.float64)
+        await prims.transit(target)
+        assert driver._segment_duration_s == pytest.approx(1.5)

@@ -1,72 +1,77 @@
-"""Tests for adaptive replanner."""
+"""Tests for adaptive replanner.
+
+These are *unit* tests for the Replanner class itself.  The SymbolicPlanner
+dependency is mocked so the tests validate Replanner's own logic (attempt
+counting, exhaustion, LLM fallback) without depending on pyperplan.
+"""
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
 
-from armdroid.config.schema import ArmPlanningConfig, ArmTaskConfig
+from armdroid.config.schema import ArmPlanningConfig
 from armdroid.planning.replanner import Replanner, ReplanningExhaustedError
-from armdroid.planning.symbolic_planner import SymbolicPlanner
 from armdroid.protocols import PlanStep, SymbolicState
 
-
-def _make_state(predicates: set[str] | None = None) -> SymbolicState:
-    return SymbolicState(
-        predicates=frozenset(predicates or {"on(disk_1, peg_A)"}),
-        objects={"disk_1": "disk", "peg_A": "peg"},
-    )
+_FIXED_PLAN = [PlanStep(action="move", args=["disk_1", "peg_A", "peg_C"])]
 
 
-def _make_replanner(max_attempts: int = 3, llm_enabled: bool = False) -> Replanner:
+def _make_state() -> SymbolicState:
+    return SymbolicState(predicates=frozenset(), objects={})
+
+
+def _make_mock_planner(plan: list[PlanStep] | None = None) -> MagicMock:
+    """Return a mock ArmPlannerProtocol that returns a fixed plan."""
+    mock = MagicMock()
+    mock.plan.return_value = plan if plan is not None else _FIXED_PLAN
+    mock.replan.return_value = plan if plan is not None else _FIXED_PLAN
+    return mock
+
+
+def _make_replanner(
+    max_attempts: int = 3,
+    llm_enabled: bool = False,
+    planner: MagicMock | None = None,
+) -> Replanner:
     planning_cfg = ArmPlanningConfig(
         max_replan_attempts=max_attempts,
         llm_replanner_enabled=llm_enabled,
     )
-    task_cfg = ArmTaskConfig(num_disks=2, num_pegs=3)
-    planner = SymbolicPlanner(planning_cfg, task_cfg)
-    return Replanner(planning_cfg, planner)
+    return Replanner(planning_cfg, planner or _make_mock_planner())
 
 
 class TestReplanner:
-    """Tests for Replanner."""
+    """Unit tests for Replanner (planner is mocked)."""
 
     def test_replan_returns_steps(self) -> None:
         replanner = _make_replanner()
-        initial = _make_state()
-        goal = _make_state({"on(disk_1, peg_C)"})
-        steps = replanner.replan(initial, goal, "grasp failed")
+        steps = replanner.replan(_make_state(), _make_state(), "grasp failed")
         assert len(steps) > 0
         assert all(isinstance(s, PlanStep) for s in steps)
 
     def test_replan_exhausted_raises(self) -> None:
         replanner = _make_replanner(max_attempts=1)
-        state = _make_state()
-        goal = _make_state({"on(disk_1, peg_C)"})
-        replanner.replan(state, goal, "error 1")  # attempt 1 OK
+        replanner.replan(_make_state(), _make_state(), "error 1")  # attempt 1 OK
         with pytest.raises(ReplanningExhaustedError):
-            replanner.replan(state, goal, "error 2")  # attempt 2 > max
+            replanner.replan(_make_state(), _make_state(), "error 2")  # attempt 2 > max
 
     def test_reset_clears_attempts(self) -> None:
         replanner = _make_replanner(max_attempts=1)
-        state = _make_state()
-        goal = _make_state({"on(disk_1, peg_C)"})
-        replanner.replan(state, goal, "error 1")
+        replanner.replan(_make_state(), _make_state(), "error 1")
         replanner.reset()
-        # After reset, should work again
-        steps = replanner.replan(state, goal, "error 2")
+        # After reset the counter is at zero — next replan should succeed.
+        steps = replanner.replan(_make_state(), _make_state(), "error 2")
         assert len(steps) > 0
 
     def test_llm_path_falls_back_to_symbolic(self) -> None:
         replanner = _make_replanner(llm_enabled=True)
-        state = _make_state()
-        goal = _make_state({"on(disk_1, peg_C)"})
-        steps = replanner.replan(state, goal, "error")
+        steps = replanner.replan(_make_state(), _make_state(), "error")
         assert len(steps) > 0
 
     def test_attempt_counter_increments(self) -> None:
         replanner = _make_replanner(max_attempts=5)
-        state = _make_state()
-        goal = _make_state({"on(disk_1, peg_C)"})
         for i in range(3):
-            replanner.replan(state, goal, f"error {i}")
+            replanner.replan(_make_state(), _make_state(), f"error {i}")
         assert replanner._attempt_count == 3

@@ -308,6 +308,17 @@ class TestContractValidation:
         finally:
             await drv.disconnect()
 
+    @pytest.mark.asyncio
+    async def test_velocity_limit_violation_rejected(self, driver_factory: Any) -> None:
+        """1 rad in 0.05 s = 20 rad/s; _GENEROUS_LIMITS caps at 10 rad/s."""
+        drv = driver_factory
+        await drv.connect()
+        try:
+            with pytest.raises(ArmCommandRejected, match="rad/s"):
+                await drv.send_joint_positions((1.0,) * 6, duration_s=0.05)
+        finally:
+            await drv.disconnect()
+
 
 class TestContractEstop:
     @pytest.mark.asyncio

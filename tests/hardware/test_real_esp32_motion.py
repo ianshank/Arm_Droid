@@ -8,6 +8,7 @@ and as a watchdog auto-latch (host falls silent).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 
 import pytest
 
@@ -80,6 +81,13 @@ async def test_watchdog_auto_latches_when_host_silent(
     drv = Esp32JsonDriver(hil_settings.arm)
     await drv.connect()
     try:
+        # Cancel the keepalive loop so it does not issue pings during the
+        # watchdog silence window — the test deliberately holds the wire
+        # idle to trigger the firmware auto-latch.
+        if drv._keepalive_task is not None:  # type: ignore[attr-defined]
+            drv._keepalive_task.cancel()  # type: ignore[attr-defined]
+            with contextlib.suppress(asyncio.CancelledError):
+                await drv._keepalive_task  # type: ignore[attr-defined]
         # Wait longer than the watchdog timeout — firmware should latch
         wait_s = hil_settings.arm.firmware.watchdog_timeout_s + 0.5
         await asyncio.sleep(wait_s)

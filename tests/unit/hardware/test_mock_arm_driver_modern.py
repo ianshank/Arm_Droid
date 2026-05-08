@@ -194,6 +194,41 @@ class TestInterpolation:
         state = await driver.read_state()
         assert state.joint_positions[0] == pytest.approx(0.5, abs=1e-6)
 
+    @pytest.mark.asyncio
+    async def test_velocity_check_uses_interpolated_start(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Velocity is checked against the *interpolated* position at command
+        time, not the previous segment target.  A chained command that would
+        be safe from the prior *target* but too fast from the current
+        *interpolated* position must be rejected.
+
+        Setup: start from 0.0, issue a slow 2 s move to 0.2 rad.  After
+        1 s the arm is at 0.1 rad.  Now issue a second move of 0.9 rad
+        (to 1.0) in 0.05 s: that requires 0.9 / 0.05 = 18 rad/s, well above
+        the 10 rad/s limit, even though the target gap (1.0 - 0.2 = 0.8)
+        would only require 16 rad/s from the *target*.
+        """
+        fake_now = [1000.0]
+        monkeypatch.setattr(
+            "armdroid.hardware.mock_arm_driver.time.monotonic",
+            lambda: fake_now[0],
+        )
+        cfg = _make_cfg()  # max_velocity_rad_s = 10.0
+        driver = MockArmDriver(cfg)
+        await driver.connect()
+
+        # First command: 0 -> 0.2 over 2 s (0.1 rad/s — well within limit)
+        await driver.send_joint_positions((0.2,) + (0.0,) * 5, duration_s=2.0)
+
+        # Advance to half-way: interpolated j0 = 0.1 rad
+        fake_now[0] += 1.0
+
+        # Second command: current 0.1 -> 1.0 in 0.05 s = 18 rad/s > 10.0 limit
+        with pytest.raises(ArmCommandRejected, match="rad/s"):
+            await driver.send_joint_positions((1.0,) + (0.0,) * 5, duration_s=0.05)
+
 
 class TestEmergencyStop:
     """Latch freezes the arm and rejects subsequent motion commands."""

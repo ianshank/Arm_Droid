@@ -38,7 +38,9 @@ class StateExtractor:
         """
         self._task_cfg = task_cfg
         self._peg_positions = np.array(task_cfg.peg_positions, dtype=np.float64)
-        self._peg_names = [f"peg_{chr(65 + i)}" for i in range(task_cfg.num_pegs)]
+        # Lower-case letters (peg_a, peg_b, …) match pyperplan's token
+        # normalisation so plan steps use the same names as the predicates.
+        self._peg_names = [f"peg_{chr(97 + i)}" for i in range(task_cfg.num_pegs)]
         _log.info(
             "state_extractor_init",
             num_pegs=task_cfg.num_pegs,

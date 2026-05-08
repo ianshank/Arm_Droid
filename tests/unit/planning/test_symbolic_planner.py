@@ -51,7 +51,7 @@ class TestRecursiveSolver:
     def test_moves_reference_correct_pegs(self) -> None:
         planner = _make_planner(num_disks=3)
         steps = planner._solve_recursive()
-        peg_names = {"peg_A", "peg_B", "peg_C"}
+        peg_names = {"peg_a", "peg_b", "peg_c"}
         for step in steps:
             assert step.args[1] in peg_names  # source peg
             assert step.args[2] in peg_names  # target peg
@@ -77,36 +77,67 @@ class TestSymbolicPlannerPlan:
         assert len(steps) > 0
 
 
+def _make_mock_planner_module(
+    return_value: list[MagicMock] | None = None,
+    side_effect: Exception | None = None,
+) -> MagicMock:
+    """Build a mock for the ``pyperplan.planner`` sub-module.
+
+    The production code does ``from pyperplan import planner as _pio_planner``
+    (a lazy import inside ``_solve_pddl``).  Patching via ``sys.modules``
+    intercepts that import without touching module-level state.
+    """
+    mock_planner = MagicMock()
+    mock_planner.SEARCHES = {"bfs": MagicMock(), "astar": MagicMock()}
+    mock_planner.HEURISTICS = {"hadd": MagicMock()}
+    if side_effect is not None:
+        mock_planner.search_plan.side_effect = side_effect
+    else:
+        mock_planner.search_plan.return_value = return_value
+
+    mock_pkg = MagicMock()
+    mock_pkg.planner = mock_planner
+    return mock_pkg, mock_planner  # type: ignore[return-value]
+
+
+def _make_operator(name: str) -> MagicMock:
+    """Return a mock pyperplan ``Operator`` with the given name string."""
+    op = MagicMock()
+    op.name = name
+    return op
+
+
 class TestPyperplanIntegration:
-    """Test _solve_pddl and _parse_solution with mocked pyperplan."""
+    """Test _solve_pddl and _parse_solution with mocked pyperplan.
+
+    The production code does ``from pyperplan import planner as _pio_planner``
+    inside ``_solve_pddl`` (lazy import).  We intercept it via
+    ``patch.dict("sys.modules", ...)`` so the mock takes effect regardless of
+    whether pyperplan is installed in the test environment.
+    """
 
     def test_solve_pddl_with_mocked_pyperplan(self) -> None:
         planner = _make_planner(num_disks=2)
 
-        mock_pyperplan = MagicMock()
-        mock_pyperplan.solve.return_value = [
-            "(move disk_1 peg_A peg_C)",
-            "(move disk_2 peg_A peg_B)",
+        ops = [
+            _make_operator("(move disk_1 peg_a peg_c)"),
+            _make_operator("(move disk_2 peg_a peg_b)"),
         ]
-
-        with patch.dict("sys.modules", {"pyperplan": mock_pyperplan}):
+        mock_pkg, mock_planner = _make_mock_planner_module(return_value=ops)
+        with patch.dict("sys.modules", {"pyperplan": mock_pkg, "pyperplan.planner": mock_planner}):
             steps = planner._solve_pddl("(domain)", "(problem)")
 
         assert len(steps) == 2
         assert steps[0].action == "move"
-        assert steps[0].args == ["disk_1", "peg_A", "peg_C"]
-        assert steps[1].args == ["disk_2", "peg_A", "peg_B"]
+        assert steps[0].args == ["disk_1", "peg_a", "peg_c"]
+        assert steps[1].args == ["disk_2", "peg_a", "peg_b"]
 
     def test_solve_pddl_pyperplan_returns_none(self) -> None:
-        from unittest.mock import MagicMock, patch
-
         planner = _make_planner(num_disks=2)
 
-        mock_pyperplan = MagicMock()
-        mock_pyperplan.solve.return_value = None
-
+        mock_pkg, mock_planner = _make_mock_planner_module(return_value=None)
         with (
-            patch.dict("sys.modules", {"pyperplan": mock_pyperplan}),
+            patch.dict("sys.modules", {"pyperplan": mock_pkg, "pyperplan.planner": mock_planner}),
             pytest.raises(PlanningError, match="no solution"),
         ):
             planner._solve_pddl("(domain)", "(problem)")
@@ -114,27 +145,20 @@ class TestPyperplanIntegration:
     def test_plan_uses_pyperplan_when_available(self) -> None:
         planner = _make_planner(num_disks=2)
 
-        mock_pyperplan = MagicMock()
-        mock_pyperplan.solve.return_value = [
-            "(move disk_1 peg_A peg_B)",
-        ]
-
-        with patch.dict("sys.modules", {"pyperplan": mock_pyperplan}):
+        ops = [_make_operator("(move disk_1 peg_a peg_b)")]
+        mock_pkg, mock_planner = _make_mock_planner_module(return_value=ops)
+        with patch.dict("sys.modules", {"pyperplan": mock_pkg, "pyperplan.planner": mock_planner}):
             steps = planner.plan(_make_initial_state(), _make_goal_state())
 
         assert len(steps) == 1
-        mock_pyperplan.solve.assert_called_once()
+        mock_planner.search_plan.assert_called_once()
 
     def test_plan_wraps_pyperplan_exception(self) -> None:
-        from unittest.mock import MagicMock, patch
-
         planner = _make_planner(num_disks=2)
 
-        mock_pyperplan = MagicMock()
-        mock_pyperplan.solve.side_effect = RuntimeError("solver crash")
-
+        mock_pkg, mock_planner = _make_mock_planner_module(side_effect=RuntimeError("solver crash"))
         with (
-            patch.dict("sys.modules", {"pyperplan": mock_pyperplan}),
+            patch.dict("sys.modules", {"pyperplan": mock_pkg, "pyperplan.planner": mock_planner}),
             pytest.raises(PlanningError, match="Planning failed"),
         ):
             planner.plan(_make_initial_state(), _make_goal_state())

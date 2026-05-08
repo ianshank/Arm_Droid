@@ -445,3 +445,119 @@ async def test_legacy_lifecycle_aliases(
     assert drv.is_connected
     await drv.stop()
     assert not drv.is_connected
+
+
+@pytest.mark.asyncio
+async def test_velocity_limit_rejection(driver: Any) -> None:
+    """1 rad in 0.05 s = 20 rad/s, above the 10 rad/s generous limit."""
+    with pytest.raises(ArmCommandRejected, match="rad/s"):
+        await driver.send_joint_positions((1.0,) * 6, duration_s=0.05)
+
+
+@pytest.mark.asyncio
+async def test_estop_requires_connected(
+    fake_serial_module: type[_FakeSerial],
+) -> None:
+    """emergency_stop on a disconnected driver raises ArmDriverError."""
+    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+
+    drv = Esp32JsonDriver(_make_config())
+    with pytest.raises(ArmDriverError):
+        await drv.emergency_stop()
+
+
+@pytest.mark.asyncio
+async def test_estop_serialised_with_send(
+    fake_serial_module: type[_FakeSerial],
+) -> None:
+    """emergency_stop issued while a send_joint_positions is in flight
+    goes through the send lock — both complete without raising.
+    """
+    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+
+    cfg = _make_config(
+        transport=ArmTransportConfig(
+            protocol="serial",
+            serial_port="/dev/null",
+            serial_baud=115_200,
+            connect_timeout_s=1.0,
+            command_timeout_s=1.0,
+            heartbeat_hz=10.0,
+            drain_pings_on_connect=1,
+        ),
+    )
+    drv = Esp32JsonDriver(cfg)
+    await drv.connect()
+    try:
+        send_task = asyncio.create_task(drv.send_joint_positions((0.1,) * 6, duration_s=1.0))
+        estop_task = asyncio.create_task(drv.emergency_stop())
+        await asyncio.gather(send_task, estop_task, return_exceptions=True)
+        # After e-stop the arm rejects motion
+        with pytest.raises(ArmCommandRejected):
+            await drv.send_joint_positions((0.0,) * 6, duration_s=1.0)
+    finally:
+        await drv.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_keepalive_pings_when_idle(
+    fake_serial_module: type[_FakeSerial],
+) -> None:
+    """With a very short keepalive_interval_s the driver pings the fake-fw."""
+    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+
+    cfg = _make_config(
+        transport=ArmTransportConfig(
+            protocol="serial",
+            serial_port="/dev/null",
+            serial_baud=115_200,
+            connect_timeout_s=1.0,
+            command_timeout_s=0.5,
+            heartbeat_hz=10.0,
+            drain_pings_on_connect=1,
+            keepalive_interval_s=0.05,
+        ),
+    )
+    drv = Esp32JsonDriver(cfg)
+    await drv.connect()
+    try:
+        ping_count_before = drv._next_id  # type: ignore[attr-defined]
+        # Wait 3x the keepalive interval — at least one ping should fire.
+        await asyncio.sleep(0.18)
+        ping_count_after = drv._next_id  # type: ignore[attr-defined]
+        assert ping_count_after > ping_count_before, (
+            "Expected at least one keepalive ping to be sent"
+        )
+    finally:
+        await drv.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_encode_returns_tuple_with_req_id(
+    fake_serial_module: type[_FakeSerial],
+) -> None:
+    """_encode returns (wire_line, req_id) and increments _next_id."""
+    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+
+    drv = Esp32JsonDriver(_make_config())
+    start_id = drv._next_id  # type: ignore[attr-defined]
+    line, req_id = drv._encode("ping", {})  # type: ignore[attr-defined]
+    assert req_id == start_id
+    assert drv._next_id == start_id + 1  # type: ignore[attr-defined]
+    assert line.endswith("\n")
+    parsed = json.loads(line.strip())
+    assert parsed["id"] == req_id
+    assert parsed["cmd"] == "ping"
+
+
+@pytest.mark.asyncio
+async def test_write_blocking_disconnected_raises(
+    fake_serial_module: type[_FakeSerial],
+) -> None:
+    """_write_blocking on a disconnected driver raises ArmDriverError."""
+    from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+
+    drv = Esp32JsonDriver(_make_config())
+    # _port is None when not connected
+    with pytest.raises(ArmDriverError, match="not connected"):
+        drv._write_blocking(b"test\n")  # type: ignore[attr-defined]

@@ -42,7 +42,7 @@ class TestPerceptionToPlanningPipeline:
         extractor = StateExtractor(task_cfg)
         state = extractor.extract(detections)
 
-        assert "on(disk_3, peg_A)" in state.predicates
+        assert "on(disk_3, peg_a)" in state.predicates
         assert "clear(disk_1)" in state.predicates
 
         # Step 2: Plan
@@ -84,7 +84,7 @@ class TestPerceptionToPlanningPipeline:
         steps = planner.plan(state, state)
 
         valid_disks = {f"disk_{i}" for i in range(1, 4)}
-        valid_pegs = {"peg_A", "peg_B", "peg_C"}
+        valid_pegs = {"peg_a", "peg_b", "peg_c"}
         valid_objects = valid_disks | valid_pegs
 
         for step in steps:

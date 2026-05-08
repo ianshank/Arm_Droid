@@ -58,9 +58,9 @@ class TestGenerateProblem:
         assert "disk_1" in problem
         assert "disk_2" in problem
         assert "disk_3" in problem
-        assert "peg_A" in problem
-        assert "peg_B" in problem
-        assert "peg_C" in problem
+        assert "peg_a" in problem
+        assert "peg_b" in problem
+        assert "peg_c" in problem
         assert ":domain tower-of-hanoi" in problem
 
     def test_5_disk_problem(self) -> None:
@@ -76,16 +76,16 @@ class TestGenerateProblem:
         cfg = ArmTaskConfig(num_disks=3, num_pegs=3)
         problem = generate_problem(cfg)
         assert ":init" in problem
-        assert "(on disk_3 peg_A)" in problem  # Bottom disk on first peg
+        assert "(on disk_3 peg_a)" in problem  # Bottom disk on first peg
 
     def test_problem_contains_goal(self) -> None:
         cfg = ArmTaskConfig(num_disks=3, num_pegs=3)
         problem = generate_problem(cfg)
         assert ":goal" in problem
-        assert "(on disk_3 peg_C)" in problem  # All disks on last peg
+        assert "(on disk_3 peg_c)" in problem  # All disks on last peg
 
     def test_problem_has_smaller_predicates(self) -> None:
         cfg = ArmTaskConfig(num_disks=3, num_pegs=3)
         problem = generate_problem(cfg)
         assert "(smaller disk_1 disk_2)" in problem
-        assert "(smaller disk_1 peg_A)" in problem
+        assert "(smaller disk_1 peg_a)" in problem

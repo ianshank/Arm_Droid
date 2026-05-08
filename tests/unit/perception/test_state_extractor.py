@@ -40,7 +40,7 @@ class TestStateExtractor:
         ]
         state = extractor.extract(detections)
 
-        assert "on(disk_3, peg_A)" in state.predicates
+        assert "on(disk_3, peg_a)" in state.predicates
         assert "on(disk_2, disk_3)" in state.predicates
         assert "on(disk_1, disk_2)" in state.predicates
         assert "clear(disk_1)" in state.predicates
@@ -53,8 +53,8 @@ class TestStateExtractor:
         ]
         state = extractor.extract(detections)
 
-        assert "on(disk_1, peg_C)" in state.predicates
-        assert "on(disk_2, peg_A)" in state.predicates
+        assert "on(disk_1, peg_c)" in state.predicates
+        assert "on(disk_2, peg_a)" in state.predicates
         assert "clear(disk_1)" in state.predicates
         assert "clear(disk_2)" in state.predicates
 
@@ -65,23 +65,23 @@ class TestStateExtractor:
         ]
         state = extractor.extract(detections)
 
-        assert "clear(peg_B)" in state.predicates
-        assert "clear(peg_C)" in state.predicates
+        assert "clear(peg_b)" in state.predicates
+        assert "clear(peg_c)" in state.predicates
 
     def test_no_disks_all_pegs_clear(self) -> None:
         extractor = _make_extractor()
         state = extractor.extract([])
 
-        assert "clear(peg_A)" in state.predicates
-        assert "clear(peg_B)" in state.predicates
-        assert "clear(peg_C)" in state.predicates
+        assert "clear(peg_a)" in state.predicates
+        assert "clear(peg_b)" in state.predicates
+        assert "clear(peg_c)" in state.predicates
 
     def test_objects_contain_disk_and_peg_types(self) -> None:
         extractor = _make_extractor()
         detections = [_make_disk("disk_1", x=0.20, z=0.1)]
         state = extractor.extract(detections)
 
-        assert state.objects["peg_A"] == "peg"
+        assert state.objects["peg_a"] == "peg"
         assert state.objects["disk_1"] == "disk"
 
     def test_non_disk_detections_ignored(self) -> None:
