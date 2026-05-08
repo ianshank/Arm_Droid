@@ -71,6 +71,16 @@ if TYPE_CHECKING:
 
 _log = get_logger(__name__)
 
+# Polling floor for the keepalive background task. Must be small enough
+# to react to silence within a heartbeat window but large enough that we
+# don't busy-loop. Not user-tunable because it's an implementation detail
+# of the asyncio scheduling, not a hardware characteristic.
+_KEEPALIVE_POLL_FLOOR_S: Final[float] = 0.05
+
+# Resolution of the "wait for first state frame" polling loop inside
+# read_state(). Sub-tick so the driver is responsive even on slow hosts.
+_FIRST_STATE_POLL_INTERVAL_S: Final[float] = 0.01
+
 
 @dataclass(slots=True)
 class _PendingReply:
@@ -204,7 +214,7 @@ class Esp32JsonDriver:
         if self._latest_state is None:
             await self._send_and_await_ack(cmd="get_state", payload={})
             wait_s = self._cfg.transport.first_state_wait_s
-            poll_interval = 0.01
+            poll_interval = _FIRST_STATE_POLL_INTERVAL_S
             steps = max(1, int(wait_s / poll_interval))
             for _ in range(steps):
                 if self._latest_state is not None:
@@ -598,7 +608,7 @@ class Esp32JsonDriver:
         """
         interval = self._cfg.transport.keepalive_interval_s
         # Poll at ¼ of the interval so we never slip by a full period.
-        poll_s = max(0.05, interval / 4.0)
+        poll_s = max(_KEEPALIVE_POLL_FLOOR_S, interval / 4.0)
         try:
             while True:
                 await asyncio.sleep(poll_s)

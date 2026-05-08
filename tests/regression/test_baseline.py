@@ -6,8 +6,10 @@ breakage during the ESP32-arm integration. They cover:
 * Schema construction with no overlays.
 * Factory DI graph: building an orchestrator with mock hardware succeeds
   and exposes all five subsystem properties.
-* Protocol conformance: the existing ``MockArmDriver`` still satisfies
-  the (currently 6-DoF) ``ArmDriverProtocol``.
+* Protocol conformance: the existing ``MockArmDriver`` and
+  ``Esp32JsonDriver`` satisfy the ``ArmDriverProtocol``.
+* Named poll constants present and correctly typed in ``Esp32JsonDriver``.
+* Shared test-harness helpers remain importable.
 * Optimal Tower of Hanoi plan length stays at ``2**n - 1``.
 
 Marked ``regression`` so they can be filtered into a dedicated CI stage.
@@ -58,9 +60,57 @@ class TestFactoryRegression:
 
 
 class TestProtocolRegression:
-    """The mock driver still satisfies the existing protocol surface."""
+    """Both drivers satisfy the existing protocol surface."""
 
     def test_mock_driver_satisfies_protocol(self) -> None:
         cfg = ArmSettings(mock_hardware=True)
         driver = MockArmDriver(cfg.arm)
         assert isinstance(driver, ArmDriverProtocol)
+
+    def test_esp32_driver_satisfies_protocol(self) -> None:
+        from armdroid.hardware.esp32_json_driver import Esp32JsonDriver
+
+        cfg = ArmSettings(mock_hardware=True)
+        driver = Esp32JsonDriver(cfg.arm)
+        assert isinstance(driver, ArmDriverProtocol)
+
+
+class TestNamedConstantsRegression:
+    """Named poll-interval constants must remain present and correctly typed."""
+
+    def test_keepalive_poll_floor_is_float(self) -> None:
+        from armdroid.hardware import esp32_json_driver
+
+        assert hasattr(esp32_json_driver, "_KEEPALIVE_POLL_FLOOR_S")
+        assert isinstance(esp32_json_driver._KEEPALIVE_POLL_FLOOR_S, float)
+        assert esp32_json_driver._KEEPALIVE_POLL_FLOOR_S > 0
+
+    def test_first_state_poll_interval_is_float(self) -> None:
+        from armdroid.hardware import esp32_json_driver
+
+        assert hasattr(esp32_json_driver, "_FIRST_STATE_POLL_INTERVAL_S")
+        assert isinstance(esp32_json_driver._FIRST_STATE_POLL_INTERVAL_S, float)
+        assert esp32_json_driver._FIRST_STATE_POLL_INTERVAL_S > 0
+
+
+class TestTestHarnessRegression:
+    """Shared test-harness helpers must remain importable and structurally correct."""
+
+    def test_fake_serial_helpers_importable(self) -> None:
+        from tests.helpers.fake_serial import (
+            FakeSerial,
+            PingOnlyFakeSerial,
+            SilentFakeSerial,
+        )
+
+        # SilentFakeSerial subclasses PingOnlyFakeSerial
+        assert issubclass(SilentFakeSerial, PingOnlyFakeSerial)
+        # FakeSerial is independent (not a base of PingOnlyFakeSerial)
+        assert not issubclass(PingOnlyFakeSerial, FakeSerial)
+
+    def test_fake_serial_dof_parameter(self) -> None:
+        from tests.helpers.fake_serial import FakeSerial
+
+        fs = FakeSerial(port="/dev/null", baudrate=115200, timeout=1.0, write_timeout=1.0, dof=4)
+        assert fs._dof == 4
+        assert len(fs._joints) == 4

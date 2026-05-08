@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed (PR #1 review remediation and gap analysis)
+
+- **Named poll constants** — replaced inline magic literals in
+  `Esp32JsonDriver` with `Final[float]` module-level constants:
+  `_KEEPALIVE_POLL_FLOOR_S = 0.05` and `_FIRST_STATE_POLL_INTERVAL_S = 0.01`.
+- **Shared fake-serial harness** — new `tests/helpers/fake_serial.py` module
+  provides three canonical stand-ins (`FakeSerial`, `PingOnlyFakeSerial`,
+  `SilentFakeSerial`) eliminating the three previously-duplicated private
+  state-machine classes across `test_esp32_json_driver.py`,
+  `test_arm_driver_contract.py`, and `test_esp32_autodetect.py`.
+- **CI now runs contract tests** — `ci.yml` test step extended from
+  `tests/unit tests/property` to `tests/unit tests/property tests/contract`.
+- **Coverage exclusion narrowed** — `pyproject.toml` `[tool.coverage.run]
+  omit` no longer blanket-excludes `esp32_json_driver.py`; truly unreachable
+  paths within that file carry inline `# pragma: no cover` annotations.
+- **Firmware CI step name** — `firmware-ci.yml` step renamed from
+  "Run native joint-interpolator tests" to "Run native firmware unit tests
+  (interpolator + serial framing)" to accurately describe the test scope.
+- **Stale empty directory removed** — `testsunitscripts/` artifact at repo
+  root deleted.
+
 ### Added
 
 - **ESP32-JSON arm transport** (`Esp32JsonDriver`) — newline-delimited JSON

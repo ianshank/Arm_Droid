@@ -52,7 +52,7 @@ jobs:
             ~/.platformio/.cache
             ~/.platformio/packages
           key: ${{ runner.os }}-pio-native-${{ hashFiles('firmware/arm_esp32/platformio.ini') }}
-      - name: Run native joint-interpolator tests
+      - name: Run native firmware unit tests (interpolator + serial framing)
         working-directory: firmware/arm_esp32
         run: pio test -e native -v
 

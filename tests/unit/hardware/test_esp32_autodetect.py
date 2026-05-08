@@ -12,12 +12,8 @@ Cover ``cfg.arm.transport.serial_port == "auto"``:
 
 from __future__ import annotations
 
-import json
 import math
 import sys
-import threading
-import time
-from collections import deque
 from typing import Any, Final
 
 import pytest
@@ -29,6 +25,8 @@ from armdroid.config.schema import (
     JointLimits,
 )
 from armdroid.protocols import ArmDriverError
+from tests.helpers.fake_serial import PingOnlyFakeSerial as _RespondingFakeSerial
+from tests.helpers.fake_serial import SilentFakeSerial as _SilentFakeSerial
 
 _GENEROUS_LIMITS: Final = JointLimits(
     min_rad=-math.pi,
@@ -63,65 +61,6 @@ class _FakePortInfo:
     def __init__(self, device: str, hwid: str = "") -> None:
         self.device = device
         self.hwid = hwid
-
-
-class _RespondingFakeSerial:
-    """Fake serial port that responds to a ping with an ack."""
-
-    def __init__(
-        self,
-        *,
-        port: str,
-        baudrate: int,
-        timeout: float,
-        write_timeout: float,
-    ) -> None:
-        self._rx: deque[bytes] = deque()
-        self._lock = threading.Lock()
-        self._tx_buffer = bytearray()
-        self._timeout = timeout
-        # Auto-emit a boot event
-        self._enqueue({"t": "evt", "kind": "boot", "ver": "fake-1.0"})
-
-    def readline(self) -> bytes:
-        deadline = time.monotonic() + self._timeout
-        while True:
-            with self._lock:
-                if self._rx:
-                    return self._rx.popleft()
-            if time.monotonic() >= deadline:
-                return b""
-            time.sleep(0.005)
-
-    def write(self, data: bytes) -> None:
-        with self._lock:
-            self._tx_buffer.extend(data)
-            while b"\n" in self._tx_buffer:
-                line, _, rest = self._tx_buffer.partition(b"\n")
-                self._tx_buffer = bytearray(rest)
-                try:
-                    msg = json.loads(line.decode("ascii").strip())
-                except (UnicodeDecodeError, json.JSONDecodeError):
-                    continue
-                if msg.get("t") == "cmd" and msg.get("cmd") == "ping":
-                    self._enqueue({"t": "ack", "id": msg.get("id")})
-
-    def flush(self) -> None:
-        return None
-
-    def close(self) -> None:
-        return None
-
-    def _enqueue(self, msg: dict[str, Any]) -> None:
-        self._rx.append((json.dumps(msg) + "\n").encode("ascii"))
-
-
-class _SilentFakeSerial(_RespondingFakeSerial):
-    """Fake serial port that opens but never responds."""
-
-    def write(self, data: bytes) -> None:
-        # discard — never enqueue an ack
-        return None
 
 
 def _install_fake_serial(

@@ -235,8 +235,8 @@ python -m armdroid --mock-hardware --config config/tower_of_hanoi.yaml rollout
 ### Run tests
 
 ```bash
-# Full test suite with coverage
-pytest tests/ -v --cov=armdroid --cov-report=term-missing
+# Full test suite with coverage (unit + property + contract)
+pytest tests/unit tests/property tests/contract -v --cov=src/armdroid --cov-report=term-missing
 
 # Unit tests only (fast)
 pytest tests/unit/ -v
@@ -285,7 +285,7 @@ The GitHub Actions pipeline runs five stages:
 |-------|---------|--------|
 | Lint (`ruff check` + `ruff format --check`) | ubuntu-latest, windows-latest | 3.11, 3.12 |
 | Type check (`mypy --strict`) | ubuntu-latest | 3.11 |
-| Test + Coverage (`pytest --cov --cov-fail-under=85`) | ubuntu-latest, windows-latest | 3.11, 3.12 |
+| Test + Coverage (`pytest tests/unit tests/property tests/contract --cov --cov-fail-under=85`) | ubuntu-latest, windows-latest | 3.11, 3.12 |
 | Security (`pip-audit --strict`) | ubuntu-latest | 3.11 |
 | Docker (validate `Dockerfile` + `docker-compose`) | ubuntu-latest | — |
 
@@ -353,8 +353,13 @@ weights/
 
 tests/
   unit/                    # Per-module unit tests (98.8% coverage)
-  integration/             # Cross-layer integration tests
+  contract/                # Driver contract tests (all ArmDriverProtocol implementors)
   property/                # Hypothesis property-based tests
+  regression/              # Baseline regression guard (schema, factory, protocol)
+  integration/             # Cross-layer integration tests
+  hardware/                # Hardware-in-the-loop tests (pytest.mark.hardware)
+  e2e/                     # End-to-end pipeline tests (planner → driver → state)
+  helpers/                 # Shared test harness (FakeSerial, PingOnlyFakeSerial, …)
 ```
 
 ---
@@ -374,6 +379,8 @@ tests/
 
 4. **MuJoCo scene assets** — author proper MJCF scene XML files (`sim/tower_of_hanoi.xml` and
    `sim/laundry_sorting.xml`) with correct MakerWorld 6-DoF arm geometry and collision meshes.
+   Required before enabling the default `dof = 7` (currently deferred; set `cfg.arm.dof = 7` in
+   YAML to opt in today).
 
 5. **Training runs** — run SAC+HER curriculum on sim (1-disk → 2-disk → 3-disk → 5-disk),
    instrument with Weights & Biases, track success rate and episode length.
@@ -395,6 +402,9 @@ tests/
 10. **Laundry sorting** — extend the curriculum from Tower of Hanoi to the laundry sorting task:
     train garment detection classes, validate `LaundrySortingEnv`, and define the transfer
     curriculum stages.
+
+11. **7-DoF default** — bump `ArmConfig.dof` default from 6 → 7 once MuJoCo scene XML assets
+    land; update `test_baseline.py` assertion accordingly.
 
 ---
 

@@ -58,4 +58,4 @@ jobs:
       - name: Run tests
         env:
           ARMDROID_MOCK_HARDWARE: "true"
-        run: pytest -q tests/unit tests/property --cov=src/armdroid --cov-fail-under=85 -m "not gpu"
+        run: pytest -q tests/unit tests/property tests/contract --cov=src/armdroid --cov-fail-under=85 -m "not gpu"

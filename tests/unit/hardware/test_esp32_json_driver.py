@@ -1,8 +1,8 @@
 """Tests for :class:`Esp32JsonDriver` using an in-process fake firmware.
 
-The fake (``_FakeSerial``) implements the read/write surface of
-``serial.Serial`` and runs a tiny state machine that mirrors what the
-real ESP32 firmware does:
+The fake (:class:`~tests.helpers.fake_serial.FakeSerial`) implements the
+read/write surface of ``serial.Serial`` and runs a tiny state machine that
+mirrors what the real ESP32 firmware does:
 
 * parses incoming JSON lines
 * validates shape, joint count, range, e-stop latch
@@ -19,9 +19,6 @@ import asyncio
 import json
 import math
 import sys
-import threading
-import time
-from collections import deque
 from typing import Any, Final
 
 import pytest
@@ -38,6 +35,7 @@ from armdroid.protocols import (
     ArmDriverError,
     ArmDriverProtocol,
 )
+from tests.helpers.fake_serial import FakeSerial as _FakeSerial
 
 _GENEROUS_LIMITS: Final = JointLimits(
     min_rad=-math.pi,
@@ -64,148 +62,6 @@ def _make_config(**overrides: object) -> ArmConfig:
     }
     base.update(overrides)
     return ArmConfig.model_validate(base)
-
-
-# --------------------------------------------------------------------- #
-# Fake firmware — speaks PROTOCOL.md at the byte level.
-# --------------------------------------------------------------------- #
-
-
-class _FakeSerial:
-    """Minimal stand-in for ``serial.Serial`` driving an in-process fw."""
-
-    def __init__(
-        self,
-        *,
-        port: str,
-        baudrate: int,
-        timeout: float,
-        write_timeout: float,
-    ) -> None:
-        self._rx: deque[bytes] = deque()
-        self._lock = threading.Lock()
-        self._estop = False
-        self._joints = [0.0] * 6
-        self._velocities = [0.0] * 6
-        self._is_moving = False
-        self._seq = 0
-        self._rx_timeout = timeout
-        self._tx_buffer = bytearray()
-        self.inject_raw_lines: list[bytes] = []
-        self._enqueue({"t": "evt", "kind": "boot", "ver": "fake-1.0"})
-
-    def readline(self) -> bytes:
-        deadline = time.monotonic() + self._rx_timeout
-        while True:
-            with self._lock:
-                if self.inject_raw_lines:
-                    return self.inject_raw_lines.pop(0)
-                if self._rx:
-                    return self._rx.popleft()
-            if time.monotonic() >= deadline:
-                return b""
-            time.sleep(0.005)
-
-    def write(self, data: bytes) -> None:
-        with self._lock:
-            self._tx_buffer.extend(data)
-            while b"\n" in self._tx_buffer:
-                line, _, rest = self._tx_buffer.partition(b"\n")
-                self._tx_buffer = bytearray(rest)
-                self._handle_host_line(bytes(line))
-
-    def flush(self) -> None:
-        return None
-
-    def close(self) -> None:
-        return None
-
-    def _enqueue(self, msg: dict[str, Any]) -> None:
-        self._rx.append((json.dumps(msg) + "\n").encode("ascii"))
-
-    def emit_state_now(self) -> None:
-        with self._lock:
-            self._seq += 1
-            self._enqueue(
-                {
-                    "t": "state",
-                    "seq": self._seq,
-                    "ts": time.monotonic(),
-                    "q": list(self._joints),
-                    "qd": list(self._velocities),
-                    "mv": self._is_moving,
-                    "es": self._estop,
-                }
-            )
-
-    def _handle_host_line(self, line: bytes) -> None:
-        try:
-            text = line.decode("ascii").strip()
-            if not text:
-                return
-            msg = json.loads(text)
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            return
-        if msg.get("t") != "cmd":
-            return
-        req_id = msg.get("id")
-        cmd = msg.get("cmd")
-
-        def nak(err: str, human: str = "") -> None:
-            self._enqueue({"t": "nak", "id": req_id, "err": err, "msg": human})
-
-        def ack() -> None:
-            self._enqueue({"t": "ack", "id": req_id})
-
-        if cmd == "ping":
-            ack()
-        elif cmd == "get_state":
-            ack()
-            self._seq += 1
-            self._enqueue(
-                {
-                    "t": "state",
-                    "seq": self._seq,
-                    "ts": time.monotonic(),
-                    "q": list(self._joints),
-                    "qd": list(self._velocities),
-                    "mv": self._is_moving,
-                    "es": self._estop,
-                }
-            )
-        elif cmd == "estop":
-            self._estop = True
-            self._is_moving = False
-            ack()
-        elif cmd == "clear_estop":
-            self._estop = False
-            ack()
-        elif cmd == "set_joints":
-            if self._estop:
-                nak("estop_latched", "cannot move during e-stop")
-                return
-            q = msg.get("q")
-            if not isinstance(q, list):
-                nak("bad_shape", "q missing or not list")
-                return
-            if len(q) != 6:
-                nak("bad_joint_count", f"got {len(q)}")
-                return
-            for v in q:
-                if not isinstance(v, int | float):
-                    nak("bad_shape", "non-numeric joint")
-                    return
-                if not math.isfinite(v):
-                    nak("out_of_range", "non-finite joint")
-                    return
-                if abs(v) > math.pi + 1e-6:
-                    nak("out_of_range", "joint exceeds firmware limit")
-                    return
-            self._joints = [float(v) for v in q]
-            self._is_moving = True
-            ack()
-        else:
-            nak("unknown_cmd", f"cmd={cmd}")
 
 
 @pytest.fixture
@@ -525,9 +381,9 @@ async def test_keepalive_pings_when_idle(
         # Wait 3x the keepalive interval — at least one ping should fire.
         await asyncio.sleep(0.18)
         ping_count_after = drv._next_id  # type: ignore[attr-defined]
-        assert ping_count_after > ping_count_before, (
-            "Expected at least one keepalive ping to be sent"
-        )
+        assert (
+            ping_count_after > ping_count_before
+        ), "Expected at least one keepalive ping to be sent"
     finally:
         await drv.disconnect()
 

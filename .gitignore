@@ -99,3 +99,8 @@ logs/
 # Documentation build output
 docs/_build/
 site/
+
+# PlatformIO build artifacts
+.pio/
+firmware/arm_esp32/.pio/
+site/

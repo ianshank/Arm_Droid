@@ -17,12 +17,8 @@ its factory to the ``DRIVER_FACTORIES`` list — no test changes needed.
 from __future__ import annotations
 
 import asyncio
-import json
 import math
 import sys
-import threading
-import time
-from collections import deque
 from collections.abc import Callable
 from typing import Any, Final
 
@@ -39,6 +35,7 @@ from armdroid.protocols import (
     ArmCommandRejected,
     ArmDriverProtocol,
 )
+from tests.helpers.fake_serial import FakeSerial as _ContractFakeSerial
 
 pytestmark = pytest.mark.contract
 
@@ -65,145 +62,6 @@ def _cfg() -> ArmConfig:
             drain_pings_on_connect=1,
         ),
     )
-
-
-# --------------------------------------------------------------------- #
-# Fake serial firmware shared with the parametrised ESP32 driver factory.
-# --------------------------------------------------------------------- #
-
-
-class _ContractFakeSerial:
-    """Minimal _FakeSerial — accepts and replies to the contract test cmds."""
-
-    def __init__(
-        self,
-        *,
-        port: str,
-        baudrate: int,
-        timeout: float,
-        write_timeout: float,
-    ) -> None:
-        self._rx: deque[bytes] = deque()
-        self._lock = threading.Lock()
-        self._estop = False
-        self._joints = [0.0] * 6
-        self._velocities = [0.0] * 6
-        self._is_moving = False
-        self._seq = 0
-        self._rx_timeout = timeout
-        self._tx_buffer = bytearray()
-        self._enqueue({"t": "evt", "kind": "boot", "ver": "fake-1.0"})
-
-    def readline(self) -> bytes:
-        deadline = time.monotonic() + self._rx_timeout
-        while True:
-            with self._lock:
-                if self._rx:
-                    return self._rx.popleft()
-            if time.monotonic() >= deadline:
-                return b""
-            time.sleep(0.005)
-
-    def write(self, data: bytes) -> None:
-        with self._lock:
-            self._tx_buffer.extend(data)
-            while b"\n" in self._tx_buffer:
-                line, _, rest = self._tx_buffer.partition(b"\n")
-                self._tx_buffer = bytearray(rest)
-                self._handle(bytes(line))
-
-    def flush(self) -> None:
-        return None
-
-    def close(self) -> None:
-        return None
-
-    def _enqueue(self, msg: dict[str, Any]) -> None:
-        self._rx.append((json.dumps(msg) + "\n").encode("ascii"))
-
-    def _handle(self, line: bytes) -> None:
-        try:
-            text = line.decode("ascii").strip()
-            if not text:
-                return
-            msg = json.loads(text)
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            return
-        if msg.get("t") != "cmd":
-            return
-        req_id = msg.get("id")
-        cmd = msg.get("cmd")
-        if cmd == "ping":
-            self._enqueue({"t": "ack", "id": req_id})
-        elif cmd == "get_state":
-            self._enqueue({"t": "ack", "id": req_id})
-            self._seq += 1
-            self._enqueue(
-                {
-                    "t": "state",
-                    "seq": self._seq,
-                    "ts": time.monotonic(),
-                    "q": list(self._joints),
-                    "qd": list(self._velocities),
-                    "mv": self._is_moving,
-                    "es": self._estop,
-                }
-            )
-        elif cmd == "estop":
-            self._estop = True
-            self._is_moving = False
-            self._enqueue({"t": "ack", "id": req_id})
-        elif cmd == "clear_estop":
-            self._estop = False
-            self._enqueue({"t": "ack", "id": req_id})
-        elif cmd == "set_joints":
-            if self._estop:
-                self._enqueue(
-                    {
-                        "t": "nak",
-                        "id": req_id,
-                        "err": "estop_latched",
-                        "msg": "",
-                    }
-                )
-                return
-            q = msg.get("q")
-            if not isinstance(q, list) or len(q) != 6:
-                self._enqueue(
-                    {
-                        "t": "nak",
-                        "id": req_id,
-                        "err": "bad_joint_count",
-                        "msg": "",
-                    }
-                )
-                return
-            for v in q:
-                if not isinstance(v, int | float) or not math.isfinite(v):
-                    self._enqueue(
-                        {
-                            "t": "nak",
-                            "id": req_id,
-                            "err": "out_of_range",
-                            "msg": "",
-                        }
-                    )
-                    return
-                if abs(v) > math.pi + 1e-6:
-                    self._enqueue(
-                        {
-                            "t": "nak",
-                            "id": req_id,
-                            "err": "out_of_range",
-                            "msg": "",
-                        }
-                    )
-                    return
-            self._joints = [float(v) for v in q]
-            self._is_moving = True
-            self._enqueue({"t": "ack", "id": req_id})
-        else:
-            self._enqueue({"t": "nak", "id": req_id, "err": "unknown_cmd", "msg": ""})
 
 
 def _install_contract_fake(monkeypatch: pytest.MonkeyPatch) -> None:
