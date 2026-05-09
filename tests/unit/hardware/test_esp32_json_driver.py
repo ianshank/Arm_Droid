@@ -699,25 +699,10 @@ async def test_disconnect_when_already_disconnected_is_noop(
 # --------------------------------------------------------------------- #
 
 
-class _RecordingTelemetry:
-    """Stub TelemetryProvider that records start_span call names."""
-
-    def __init__(self) -> None:
-        self.spans: list[str] = []
-
-    def start_span(self, name: str, **_attrs: Any) -> Any:
-        from contextlib import contextmanager
-
-        self.spans.append(name)
-
-        @contextmanager  # type: ignore[arg-type]
-        def _ctx() -> Any:
-            yield
-
-        return _ctx()
-
-    def record_event(self, name: str, **_attrs: Any) -> None:
-        pass
+# _RecordingTelemetry promoted to tests/helpers/recording_telemetry.py so
+# every suite asserting on span emission shares one fake. Aliased here to
+# keep the rest of this file's imports stable.
+from tests.helpers.recording_telemetry import RecordingTelemetry as _RecordingTelemetry
 
 
 @pytest.mark.asyncio
