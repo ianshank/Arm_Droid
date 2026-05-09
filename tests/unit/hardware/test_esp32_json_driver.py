@@ -692,3 +692,75 @@ async def test_disconnect_when_already_disconnected_is_noop(
     drv = Esp32JsonDriver(_make_config())
     await drv.disconnect()  # must not raise
     assert not drv.is_connected
+
+
+# --------------------------------------------------------------------- #
+# Telemetry span integration
+# --------------------------------------------------------------------- #
+
+
+class _RecordingTelemetry:
+    """Stub TelemetryProvider that records start_span call names."""
+
+    def __init__(self) -> None:
+        self.spans: list[str] = []
+
+    def start_span(self, name: str, **_attrs: Any) -> Any:
+        from contextlib import contextmanager
+
+        self.spans.append(name)
+
+        @contextmanager  # type: ignore[arg-type]
+        def _ctx() -> Any:
+            yield
+
+        return _ctx()
+
+    def record_event(self, name: str, **_attrs: Any) -> None:
+        pass
+
+
+@pytest.mark.asyncio
+async def test_connect_disconnect_emit_spans(
+    fake_serial_module: type[_FakeSerial],
+) -> None:
+    """connect() and disconnect() each invoke start_span with the expected name."""
+    from armdroid.hardware.esp32 import Esp32JsonDriver
+    from armdroid.telemetry import (
+        SPAN_DRIVER_CONNECT,
+        SPAN_DRIVER_DISCONNECT,
+        configure_telemetry,
+    )
+
+    tel = _RecordingTelemetry()
+    configure_telemetry(tel)  # type: ignore[arg-type]
+    try:
+        drv = Esp32JsonDriver(_make_config())
+        await drv.connect()
+        await drv.disconnect()
+    finally:
+        configure_telemetry(None)
+
+    assert SPAN_DRIVER_CONNECT in tel.spans
+    assert SPAN_DRIVER_DISCONNECT in tel.spans
+
+
+@pytest.mark.asyncio
+async def test_send_joint_positions_emits_span(
+    fake_serial_module: type[_FakeSerial],
+) -> None:
+    """send_joint_positions() invokes start_span with SPAN_DRIVER_SEND."""
+    from armdroid.hardware.esp32 import Esp32JsonDriver
+    from armdroid.telemetry import SPAN_DRIVER_SEND, configure_telemetry
+
+    tel = _RecordingTelemetry()
+    configure_telemetry(tel)  # type: ignore[arg-type]
+    try:
+        drv = Esp32JsonDriver(_make_config())
+        await drv.connect()
+        await drv.send_joint_positions((0.0,) * 6, duration_s=1.0)
+        await drv.disconnect()
+    finally:
+        configure_telemetry(None)
+
+    assert SPAN_DRIVER_SEND in tel.spans

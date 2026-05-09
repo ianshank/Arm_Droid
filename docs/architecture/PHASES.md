@@ -65,13 +65,16 @@ multi-GPU vectorized envs.
 
 ## Axis 6 — Telemetry & observability (Foundation)
 
-Current: structlog JSON logging.
+Current: structlog JSON logging + **telemetry seam implemented** (Phase 0.3).
 
-Foundation seam: `armdroid.telemetry` package — no-op by default; OTel
-provider wires up under `armdroid[telemetry]` extras.
+Foundation seam: `armdroid.telemetry` package — no-op by default (`NullTelemetry`
+with `contextlib.nullcontext`); `OtelTelemetry` backend available under
+`armdroid[telemetry]` (`opentelemetry-api/sdk>=1.27`).
+`Esp32JsonDriver.connect`, `disconnect`, and `send_joint_positions` are all
+instrumented.  See [`src/armdroid/telemetry/`](../../src/armdroid/telemetry/).
 
-Future: Prometheus metrics endpoint, OTel traces (driver send, planner
-solve, env step), structured event sinks (Kafka / Loki).
+Future: Prometheus metrics endpoint, OTel traces (planner solve, env step),
+structured event sinks (Kafka / Loki).
 
 ## Axis 7 — Control plane / API surface (Stretch)
 

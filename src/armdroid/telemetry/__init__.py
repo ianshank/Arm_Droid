@@ -1,0 +1,171 @@
+"""Telemetry seam for armdroid — no-op default, optional OTel provider.
+
+This package provides a minimal instrumentation contract
+(:class:`TelemetryProvider`) that all driver, planner, and environment
+implementations can consume without taking a hard dependency on any
+specific observability backend.
+
+Default behaviour
+-----------------
+:func:`get_telemetry` returns a :class:`NullTelemetry` instance.  All
+``start_span`` calls return :func:`contextlib.nullcontext` and all
+``record_event`` calls are no-ops.  The import footprint is zero — just
+the standard library.
+
+Using the OTel backend
+----------------------
+Install the ``armdroid[telemetry]`` extra and wire up the provider at
+application startup::
+
+    from armdroid.telemetry import configure_telemetry
+    from armdroid.telemetry.otel import OtelTelemetry
+
+    configure_telemetry(OtelTelemetry())
+
+Adding spans to a new subsystem
+--------------------------------
+Import the pre-defined span name constants so names are never hardcoded
+at call sites::
+
+    from armdroid.telemetry import get_telemetry, SPAN_DRIVER_CONNECT
+
+    with get_telemetry().start_span(SPAN_DRIVER_CONNECT, port=port_path):
+        ...  # operation to instrument
+"""
+
+from __future__ import annotations
+
+from contextlib import AbstractContextManager, nullcontext
+from typing import Any, Protocol, runtime_checkable
+
+# ---------------------------------------------------------------------------
+# Span name constants
+# ---------------------------------------------------------------------------
+
+#: Span that covers the full ``Esp32JsonDriver.connect()`` call.
+SPAN_DRIVER_CONNECT: str = "armdroid.driver.connect"
+
+#: Span that covers the full ``Esp32JsonDriver.disconnect()`` call.
+SPAN_DRIVER_DISCONNECT: str = "armdroid.driver.disconnect"
+
+#: Span that covers ``Esp32JsonDriver.send_joint_positions()`` including
+#: local validation and the firmware ack round-trip.
+SPAN_DRIVER_SEND: str = "armdroid.driver.send_joint_positions"
+
+
+# ---------------------------------------------------------------------------
+# TelemetryProvider protocol
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class TelemetryProvider(Protocol):
+    """Minimal telemetry contract for armdroid subsystems.
+
+    Implementors must provide:
+
+    * :meth:`start_span` — context manager that delimits a named
+      operation.  The context manager is entered immediately; attributes
+      are attached to the span at creation time.
+    * :meth:`record_event` — record a point-in-time event within the
+      current span (or globally if no span is active).
+    """
+
+    def start_span(
+        self,
+        name: str,
+        **attrs: Any,
+    ) -> AbstractContextManager[None]:
+        """Return a context manager that delimits a named span.
+
+        Args:
+            name: Span name.  Use the pre-defined ``SPAN_*`` constants
+                so names are consistent across implementations.
+            **attrs: Arbitrary key-value attributes attached to the span.
+
+        Returns:
+            An ``AbstractContextManager[None]`` whose ``__enter__`` marks
+            span start and ``__exit__`` marks span end.
+        """
+        ...
+
+    def record_event(self, name: str, **attrs: Any) -> None:
+        """Record a named point-in-time event.
+
+        Args:
+            name: Event name.
+            **attrs: Arbitrary key-value attributes.
+        """
+        ...
+
+
+# ---------------------------------------------------------------------------
+# NullTelemetry — zero-overhead default
+# ---------------------------------------------------------------------------
+
+
+class NullTelemetry:
+    """No-op telemetry provider.  Zero overhead; does nothing."""
+
+    def start_span(
+        self,
+        name: str,
+        **attrs: Any,
+    ) -> AbstractContextManager[None]:
+        """Return :func:`contextlib.nullcontext` — zero overhead."""
+        return nullcontext()
+
+    def record_event(self, name: str, **attrs: Any) -> None:
+        """No-op."""
+
+
+# ---------------------------------------------------------------------------
+# Module-level provider registry
+# ---------------------------------------------------------------------------
+
+_provider: TelemetryProvider = NullTelemetry()
+
+
+def configure_telemetry(provider: TelemetryProvider | None) -> None:
+    """Set the module-level telemetry provider.
+
+    Call this once at application startup (e.g. in ``armdroid.main``)
+    after constructing the desired backend.  Passing ``None`` resets the
+    provider back to :class:`NullTelemetry`.
+
+    Args:
+        provider: The backend to install, or ``None`` to restore the
+            no-op default.
+
+    Example::
+
+        from armdroid.telemetry import configure_telemetry
+        from armdroid.telemetry.otel import OtelTelemetry
+
+        configure_telemetry(OtelTelemetry())
+    """
+    global _provider
+    _provider = provider if provider is not None else NullTelemetry()
+
+
+def get_telemetry() -> TelemetryProvider:
+    """Return the currently configured telemetry provider.
+
+    Callers should not cache the return value across calls — the provider
+    may be replaced at runtime during tests or reconfiguration.
+
+    Returns:
+        The active :class:`TelemetryProvider` (default: :class:`NullTelemetry`).
+    """
+    return _provider
+
+
+__all__ = [
+    "SPAN_DRIVER_CONNECT",
+    "SPAN_DRIVER_DISCONNECT",
+    "SPAN_DRIVER_SEND",
+    "NullTelemetry",
+    "TelemetryProvider",
+    "configure_telemetry",
+    "get_telemetry",
+]

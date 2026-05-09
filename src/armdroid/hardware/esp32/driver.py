@@ -50,6 +50,12 @@ from armdroid.hardware.esp32.framing import _PendingReply, decode_frame
 from armdroid.hardware.esp32.portfinder import open_port_blocking, resolve_port
 from armdroid.hardware.esp32.validator import validate_joint_positions, velocity_anchor
 from armdroid.logging.setup import get_logger
+from armdroid.telemetry import (
+    SPAN_DRIVER_CONNECT,
+    SPAN_DRIVER_DISCONNECT,
+    SPAN_DRIVER_SEND,
+    get_telemetry,
+)
 
 try:
     import serial as _serial_module
@@ -139,34 +145,40 @@ class Esp32JsonDriver:
         """Open the transport. Idempotent."""
         if self._connected:
             return
-        port_path = await resolve_port(self._cfg, _serial_module, _list_ports_module)
-        port = await asyncio.to_thread(open_port_blocking, port_path, self._cfg, _serial_module)
-        self._port = port
-        self._last_send_monotonic = time.monotonic()
-        self._reader_task = asyncio.create_task(self._reader_loop(), name="esp32_json_reader")
-        self._keepalive_task = asyncio.create_task(
-            self._keepalive_loop(), name="esp32_json_keepalive"
-        )
-        self._connected = True
-        try:
-            for _ in range(self._cfg.transport.drain_pings_on_connect):
-                await self._send_and_await_ack(cmd="ping", payload={})
-        except Exception:
-            await self._teardown()
-            raise
-
-        _log.info(
-            "esp32_json_driver_connected",
-            port=port_path,
+        with get_telemetry().start_span(
+            SPAN_DRIVER_CONNECT,
             baud=self._cfg.transport.serial_baud,
-        )
+        ):
+            port_path = await resolve_port(self._cfg, _serial_module, _list_ports_module)
+            get_telemetry().record_event("port_resolved", port=port_path)
+            port = await asyncio.to_thread(open_port_blocking, port_path, self._cfg, _serial_module)
+            self._port = port
+            self._last_send_monotonic = time.monotonic()
+            self._reader_task = asyncio.create_task(self._reader_loop(), name="esp32_json_reader")
+            self._keepalive_task = asyncio.create_task(
+                self._keepalive_loop(), name="esp32_json_keepalive"
+            )
+            self._connected = True
+            try:
+                for _ in range(self._cfg.transport.drain_pings_on_connect):
+                    await self._send_and_await_ack(cmd="ping", payload={})
+            except Exception:
+                await self._teardown()
+                raise
+
+            _log.info(
+                "esp32_json_driver_connected",
+                port=port_path,
+                baud=self._cfg.transport.serial_baud,
+            )
 
     async def disconnect(self) -> None:
         """Close the transport. Idempotent."""
         if not self._connected:
             return
-        await self._teardown()
-        _log.info("esp32_json_driver_disconnected")
+        with get_telemetry().start_span(SPAN_DRIVER_DISCONNECT):
+            await self._teardown()
+            _log.info("esp32_json_driver_disconnected")
 
     @property
     def is_connected(self) -> bool:
@@ -184,14 +196,19 @@ class Esp32JsonDriver:
     ) -> None:
         """Validate locally, encode, write, await ack."""
         self._require_connected()
-        self._validate_command(positions, duration_s)
-        await self._send_and_await_ack(
-            cmd="set_joints",
-            payload={
-                "q": list(positions),
-                "dur_ms": round(duration_s * 1000.0),
-            },
-        )
+        with get_telemetry().start_span(
+            SPAN_DRIVER_SEND,
+            dof=self._dof,
+            duration_s=duration_s,
+        ):
+            self._validate_command(positions, duration_s)
+            await self._send_and_await_ack(
+                cmd="set_joints",
+                payload={
+                    "q": list(positions),
+                    "dur_ms": round(duration_s * 1000.0),
+                },
+            )
         # Update after a successful ack so the velocity check has a
         # reliable anchor for the next command.
         self._last_commanded_target = positions
