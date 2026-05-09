@@ -24,6 +24,14 @@ this file remains skip-clean without the optional extra installed.
 
 from __future__ import annotations
 
+# Built-in envs that PR-A can safely exercise without optional extras.
+# PR-B (this commit) extends with "so_arm_reach_isaac" gated on
+# importlib.util.find_spec("isaaclab") — peer-review S-5: find_spec
+# checks installation without import side-effects (raw try/except
+# import would trigger AppLauncher singleton in some Isaac Lab
+# configs).
+import importlib.util as _importlib_util
+
 import numpy as np
 import pytest
 from hypothesis import HealthCheck, given, settings
@@ -33,10 +41,10 @@ from armdroid.config.schema import ArmTaskConfig, ArmTrainingConfig
 from armdroid.domain.protocols import ArmEnvironmentProtocol
 from armdroid.environments.registry import get_environment
 
-# Built-in envs that PR-A can safely exercise without optional extras.
-# PR-B widens this tuple to include "so_arm_reach_isaac" alongside its
-# pytest.importorskip("isaaclab") gate.
 _BUILTIN_ENVS = ("tower_of_hanoi", "laundry_sorting")
+_HAS_ISAAC = _importlib_util.find_spec("isaaclab") is not None
+if _HAS_ISAAC:
+    _BUILTIN_ENVS = (*_BUILTIN_ENVS, "so_arm_reach_isaac")
 
 
 def _env_for(name: str, dof: int = 6) -> ArmEnvironmentProtocol:

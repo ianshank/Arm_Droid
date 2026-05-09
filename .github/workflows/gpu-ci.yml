@@ -1,0 +1,74 @@
+name: GPU CI (Isaac Sim)
+
+# PR-B B.18 — gates Isaac Sim integration validation.
+# Triggers:
+#   * workflow_dispatch — manual run from any branch
+#   * pull_request push that touches Isaac code paths (default
+#     types: opened, synchronize, reopened — paths filter applies)
+#   * pull_request labelled "gpu" — explicit opt-in for arbitrary PRs
+#
+# Peer-review hole-finder fix: ``paths`` is ignored under
+# ``types: [labeled]``. We use TWO trigger blocks: one for path-based
+# auto-runs (default types), one for label-based explicit opt-in.
+#
+# Runs on ubuntu-latest. The pure-Python isaac-extra unit tests
+# (gripper math, tensor adapter, configs) cover the import surface +
+# logic without a GPU. The full GPU smoke suite under tests/isaac/
+# requires a CUDA GPU + NVIDIA driver >=535 and runs locally only
+# (ARMDROID_ISAAC_RUN=1 pytest tests/isaac). See ADR-0005.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/armdroid/environments/isaac/**'
+      - 'src/armdroid/environments/_tensor_adapter.py'
+      - 'src/armdroid/hardware/isaac_sim/**'
+      - 'src/armdroid/control/rsl_rl_agent.py'
+      - 'src/armdroid/config/schema/sim_isaac.py'
+      - 'pyproject.toml'
+      - '.github/workflows/gpu-ci.yml'
+
+jobs:
+  isaac-extras:
+    name: Isaac extras compile + pure-Python tests
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'pull_request'
+          && (contains(github.event.pull_request.labels.*.name, 'gpu')
+              || github.event.action != 'labeled'))
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install [dev,isaac] extras (NVIDIA index for isaaclab)
+        env:
+          PIP_EXTRA_INDEX_URL: https://pypi.nvidia.com
+        run: pip install -e ".[dev,isaac]"
+
+      - name: Verify Isaac extra import surface (no GPU)
+        run: |
+          python -c "from armdroid.hardware.isaac_sim import gripper, IsaacSimDriver, build_so_arm100_articulation_cfg"
+          python -c "from armdroid.config.schema.sim_isaac import ArmSimIsaacConfig, _default_sim_cfg"
+          python -c "from armdroid.environments._tensor_adapter import _TensorAdapter"
+          python -c "from armdroid.environments.isaac.reach import SoArmReachIsaacEnv"
+          python -c "from armdroid.environments.isaac.tasks import reach as _reach"
+          python -c "from armdroid.control.rsl_rl_agent import RslRlPpoAgent"
+
+      - name: Run pure-Python isaac-extra unit tests
+        run: |
+          python -m pytest \
+            tests/unit/hardware/isaac_sim/ \
+            tests/unit/environments/test_tensor_adapter.py \
+            tests/unit/test_config_isaac.py \
+            tests/unit/control/test_rsl_rl_ppo_config.py \
+            -v
+
+      - name: Note local smoke-test scope
+        run: |
+          echo "::notice::tests/isaac/* requires a CUDA GPU + NVIDIA driver >= 535 + Isaac Sim 5.1; run locally with ARMDROID_ISAAC_RUN=1 pytest tests/isaac"

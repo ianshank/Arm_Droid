@@ -30,6 +30,7 @@ from armdroid.domain.protocols import (
     ArmEnvironmentProtocol,
     ArmPerceptionProtocol,
     ArmPlannerProtocol,
+    ArmRLAgentProtocol,
 )
 from armdroid.environments.registry import get_environment
 from armdroid.hardware.registry import get_driver
@@ -107,17 +108,32 @@ def build_arm_controller(
         Controller conforming to :class:`ArmControllerProtocol`.
     """
     resolved_driver = driver if driver is not None else build_arm_driver(cfg)
-    # Dispatch via the registry so PR-B can register rsl_rl_ppo as a
-    # sibling without touching this code. SACAgent is registered under
-    # both ``"sac"`` and ``"sac_her"`` (the default). The registry's
-    # ``Callable[..., ArmRLAgentProtocol]`` factory type lets mypy verify
-    # this call without ``# type: ignore[call-arg]`` — Protocol classes
-    # don't constrain ``__init__`` directly, but factory-typed callables
-    # accept any args. (PR #10 review: peer-review C-Copilot.)
-    agent_factory = get_rl_agent(cfg.arm_training.algorithm)
-    agent = agent_factory(cfg.arm_training)
+    algo = cfg.arm_training.algorithm
+    if algo == "rsl_rl_ppo":
+        # PR-B B.13: instantiate RslRlPpoAgent directly with BOTH
+        # training_cfg AND arm_rsl_rl_ppo. The registry's
+        # ``Callable[..., ArmRLAgentProtocol]`` generic cannot
+        # accommodate dual-config without dropping YAML overlays via
+        # ``ArmSettings()`` re-read (peer-review C-1). The registry
+        # registration of ``rsl_rl_ppo`` is a placeholder for
+        # test_entry_point_mirror; direct factory dispatch is unsupported
+        # for that algorithm.
+        from armdroid.control.rsl_rl_agent import RslRlPpoAgent
+
+        agent: ArmRLAgentProtocol = RslRlPpoAgent(
+            ppo_cfg=cfg.arm_rsl_rl_ppo,
+            training_cfg=cfg.arm_training,
+        )
+    else:
+        # SACAgent path — the registry's
+        # ``Callable[..., ArmRLAgentProtocol]`` factory type lets mypy
+        # verify this call without ``# type: ignore[call-arg]``.
+        # SACAgent is registered under both ``"sac"`` and ``"sac_her"``
+        # (the default). PR #10 review C-Copilot.
+        agent_factory = get_rl_agent(algo)
+        agent = agent_factory(cfg.arm_training)
     primitives = ActionPrimitives(cfg.arm, resolved_driver)
-    _log.info("arm_controller_built", algorithm=cfg.arm_training.algorithm)
+    _log.info("arm_controller_built", algorithm=algo)
     return ArmController(agent, primitives)
 
 

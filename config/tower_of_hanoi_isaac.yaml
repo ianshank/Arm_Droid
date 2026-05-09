@@ -1,0 +1,38 @@
+# Isaac Sim 5.1 / Isaac Lab 2.3 backend overlay (PR-B B.19).
+#
+# Run with:
+#   pip install -e ".[dev,isaac]" --extra-index-url https://pypi.nvidia.com
+#   python -m armdroid --config config/tower_of_hanoi_isaac.yaml train
+#
+# Inherits config/default.yaml + config/tower_of_hanoi.yaml; overrides
+# only the keys needed to switch from the MuJoCo + ESP32 path to the
+# Isaac Sim + RSL-RL PPO path.
+
+# Driver: route through the registry-resolved IsaacSimDriver (PR-B B.4).
+arm_driver_kind: "isaac_sim"
+
+# Task: select the vendored MuammerBay reach env (PR-B B.11).
+arm_task:
+  task_type: "so_arm_reach_isaac"
+
+# Isaac Sim runtime config — every numeric is a Pydantic field on
+# ArmSimIsaacConfig (PR-B B.2). Defaults match upstream
+# MuammerBay/isaac_so_arm101 @ e4624dea075b00a36dbc66bebd531d191c92e8cd
+# pinned in assets/so_arm/so101/ATTRIBUTION.md.
+arm_sim_isaac:
+  num_envs: 1            # protocol path; single-env required by _TensorAdapter
+  headless: true         # no viewport during training; flip false for GUI debug
+  enable_cameras: false  # depth/RGB sensors slow training significantly
+
+# Algorithm: RSL-RL PPO (PR-B B.13). build_arm_controller branches on
+# this value and threads cfg.arm_rsl_rl_ppo through (peer-review C-1
+# resolution).
+arm_training:
+  algorithm: "rsl_rl_ppo"
+
+# RSL-RL PPO hyperparameters — Pydantic-validated; defaults from
+# upstream ReachPPORunnerCfg. Tune via env vars
+# ARMDROID_ARM_RSL_RL_PPO__<FIELD> for experiments.
+arm_rsl_rl_ppo:
+  num_iterations: 1000   # ~24K rollout steps per iteration → ~24M total
+  experiment_name: "tower_of_hanoi_so_arm_reach"

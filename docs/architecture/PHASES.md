@@ -44,23 +44,34 @@ protocol.
 Future backends (Planned): `fast-downward`, `pddlstream`, OpenAI replanner,
 local LLM replanner, hybrid task-and-motion planner.
 
-## Axis 4 — Multi-sim (Foundation in PR-A; Isaac integration lands in PR-B)
+## Axis 4 — Multi-sim (Foundation; PR-A scaffolding + PR-B Isaac runtime both shipped)
 
-Current: MuJoCo via gymnasium env wrappers + **Isaac Sim 5.1 / Isaac Lab 2.3
-scaffolding shipped in PR-A**: vendored SO-ARM101 simulation assets
-(URDF + MJCF + STL meshes under `assets/so_arm/so101/`), the
-`armdroid.config.paths` resolver, and the `arm_driver_kind` discriminator
-field that PR-B widens to include `"isaac_sim"` alongside the actual
-`IsaacSimDriver` registration.
+Current: MuJoCo via gymnasium env wrappers **AND Isaac Sim 5.1 / Isaac
+Lab 2.3 backend** behind the optional `armdroid[isaac]` extra. PR-B
+landed:
 
-Foundation seam: env registry + driver registry both serve as the
-multi-sim seam. The `arm_driver_kind` discriminator decouples sim
-selection from the legacy `mock_hardware` bool, and `ArmRLAgentProtocol`
-gives non-SAC agents (RSL-RL PPO is next) a uniform contract.
+* `IsaacSimDriver` (`ArmDriverProtocol`) — Isaac Lab's `Articulation`
+  wrapped with telemetry spans + lazy isaaclab imports + AppLauncher
+  singleton guard.
+* `SoArmReachIsaacEnv` (`ArmEnvironmentProtocol`) — wraps Isaac Lab's
+  `ManagerBasedRLEnv` via `_TensorAdapter`; `num_envs == 1` for the
+  protocol path, vectorised training bypasses via `_isaac_env`.
+* `RslRlPpoAgent` (`ArmRLAgentProtocol`) — RSL-RL `OnPolicyRunner`
+  wrapped with the SACAgent telemetry pattern. Instantiated by the
+  orchestrator's explicit `algorithm == "rsl_rl_ppo"` branch
+  (preserves YAML overlays — see ADR-0005).
+* Vendored MuammerBay/isaac_so_arm101 task code (BSD-3, pinned SHA
+  in `THIRD_PARTY_NOTICES.md`).
 
-Next: PR-B lands `IsaacSimDriver`, `SoArmReachIsaacEnv`,
-`RslRlPpoAgent`, and the `[isaac]` extra. PyBullet / Drake remain as
-future env-registry entries; their seam is the same.
+Foundation seam: env registry + driver registry + RL-agent registry
+all serve as the multi-sim / multi-backend seam. The `arm_driver_kind`
+discriminator decouples sim selection from the legacy `mock_hardware`
+bool. `ArmRLAgentProtocol` + `ArmTrainingConfig.algorithm` Literal
+provide a uniform contract for new agents.
+
+Next: PyBullet / Drake remain as future env-registry entries; their
+seam is the same. GR00T / foundation-model integration is the next
+stretch axis.
 
 ## Axis 5 — Distributed / accelerated training (Planned)
 
