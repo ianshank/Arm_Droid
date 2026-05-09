@@ -10,9 +10,17 @@ from pydantic import BaseModel, Field, model_validator
 class ArmTaskConfig(BaseModel):
     """Task-specific configuration for robot arm manipulation tasks."""
 
-    task_type: Literal["tower_of_hanoi", "laundry_sorting", "pick_place"] = Field(
+    task_type: Literal[
         "tower_of_hanoi",
-        description="Manipulation task type",
+        "laundry_sorting",
+        "pick_place",
+        "so_arm_reach_isaac",
+    ] = Field(
+        "tower_of_hanoi",
+        description=(
+            "Manipulation task type. ``so_arm_reach_isaac`` selects the "
+            "Isaac Lab reach env (PR-B; requires the [isaac] extra)."
+        ),
     )
     num_disks: int = Field(3, gt=0, le=10, description="Number of disks (Tower of Hanoi)")
     num_pegs: int = Field(3, gt=1, le=5, description="Number of pegs (Tower of Hanoi)")
