@@ -104,9 +104,7 @@ class TestFactoryDispatch:
         with warnings.catch_warnings(record=True) as captured:
             warnings.simplefilter("always")
             build_arm_driver(cfg)
-        deprecation_warnings = [
-            w for w in captured if issubclass(w.category, DeprecationWarning)
-        ]
+        deprecation_warnings = [w for w in captured if issubclass(w.category, DeprecationWarning)]
         assert len(deprecation_warnings) == 1
 
 

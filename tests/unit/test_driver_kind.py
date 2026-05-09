@@ -79,9 +79,7 @@ class TestDeprecation:
             resolve_driver_kind(cfg)
             resolve_driver_kind(cfg)
             resolve_driver_kind(cfg)
-        deprecation_warnings = [
-            w for w in captured if issubclass(w.category, DeprecationWarning)
-        ]
+        deprecation_warnings = [w for w in captured if issubclass(w.category, DeprecationWarning)]
         assert len(deprecation_warnings) == 1
         assert _DEPRECATION_MSG in str(deprecation_warnings[0].message)
 
@@ -94,18 +92,14 @@ class TestDeprecation:
         with warnings.catch_warnings(record=True) as captured:
             warnings.simplefilter("always")
             resolve_driver_kind(cfg)
-        assert not any(
-            issubclass(w.category, DeprecationWarning) for w in captured
-        )
+        assert not any(issubclass(w.category, DeprecationWarning) for w in captured)
 
     def test_explicit_kind_skips_deprecation(self) -> None:
         cfg = ArmSettings(arm_driver_kind="mock")
         with warnings.catch_warnings(record=True) as captured:
             warnings.simplefilter("always")
             resolve_driver_kind(cfg)
-        assert not any(
-            issubclass(w.category, DeprecationWarning) for w in captured
-        )
+        assert not any(issubclass(w.category, DeprecationWarning) for w in captured)
 
     def test_mock_false_with_no_explicit_kind_does_not_warn(self) -> None:
         # Default settings: mock_hardware defaults to False; no legacy
@@ -114,6 +108,4 @@ class TestDeprecation:
         with warnings.catch_warnings(record=True) as captured:
             warnings.simplefilter("always")
             resolve_driver_kind(cfg)
-        assert not any(
-            issubclass(w.category, DeprecationWarning) for w in captured
-        )
+        assert not any(issubclass(w.category, DeprecationWarning) for w in captured)
