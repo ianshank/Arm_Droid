@@ -6,7 +6,7 @@ logging:
 
 # Robot arm hardware
 arm:
-  urdf_path: "urdf/so_arm100.urdf"
+  urdf_path: "assets/so_arm/so101/urdf/so101_new_calib.urdf"
   dof: 6
   gripper_type: "parallel"
   max_joint_velocity_rads: 2.0
