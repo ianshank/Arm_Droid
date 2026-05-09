@@ -31,6 +31,38 @@ _ENVIRONMENTS.register("tower_of_hanoi", TowerOfHanoiEnv)
 _ENVIRONMENTS.register("laundry_sorting", LaundrySortingEnv)
 
 
+def _so_arm_reach_isaac_factory(*args: object, **kwargs: object) -> ArmEnvironmentProtocol:
+    """Lazy factory for SoArmReachIsaacEnv (PR-B B.11c).
+
+    Wrapping the import inside this function keeps the registry
+    importable on default installs without the [isaac] extra. The
+    actual import happens when ``get_environment("so_arm_reach_isaac")``
+    is *called* with config args — at which point ``SoArmReachIsaacEnv``
+    is the protocol-conformant wrapper that lazily boots gym /
+    isaaclab inside its first ``reset()`` / ``step()``.
+
+    Raises:
+        ArmDriverError: When the [isaac] extra is not installed
+            (isaaclab cannot be imported), with a hint pointing at the
+            install command + NVIDIA pip index URL.
+    """
+    try:
+        from armdroid.environments.isaac.reach import SoArmReachIsaacEnv
+    except ImportError as exc:
+        from armdroid.domain.errors import ArmDriverError
+
+        msg = (
+            f"so_arm_reach_isaac env requires the [isaac] extra: {exc}. "
+            'Install with `pip install -e ".[isaac]" '
+            "--extra-index-url https://pypi.nvidia.com`."
+        )
+        raise ArmDriverError(msg) from exc
+    return SoArmReachIsaacEnv(*args, **kwargs)  # type: ignore[arg-type]
+
+
+_ENVIRONMENTS.register("so_arm_reach_isaac", _so_arm_reach_isaac_factory)
+
+
 def register_environment(name: str, factory: EnvironmentFactory) -> None:
     """Register an environment class under ``name``."""
     _ENVIRONMENTS.register(name, factory)
