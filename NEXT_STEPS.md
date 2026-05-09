@@ -6,6 +6,14 @@ The full plan lives at
 [`C:\Users\iansh\.claude\plans\please-analyze-and-research-shiny-wozniak.md`](../.claude/plans/please-analyze-and-research-shiny-wozniak.md);
 this file is the executive summary.
 
+> **Background note:** the original research doc
+> `docs/research/isaac-omniverse-integration.md` was merged via PR #8
+> and subsequently reverted on `main` via PR #9. PR-A keeps the
+> reverted state (the file does not return). PR-B's implementation
+> stands on its own — `ArmSimIsaacConfig` is the spec for the gripper
+> conversion knobs and servo PD gains; the `_TensorAdapter` design
+> recorded below replaces the reverted §6.1 snippet.
+
 ## Immediate next PR — PR-B (Isaac integration behind `[isaac]` extra)
 
 PR-A landed every backwards-compatible refactor PR-B needs. PR-B drops
@@ -117,3 +125,9 @@ exceeds runner disk quota in practice, the workflow falls back to
 * **Did not** remove `mock_hardware` — that's v0.4.0.
 * **Did not** add ADR-0005. The plan drafts the content in §"ADR-0005
   draft"; PR-B writes it to `docs/architecture/ADR/ADR-0005-isaac-sim-backend.md`.
+* **Did not** restore `docs/research/isaac-omniverse-integration.md`
+  (reverted on `main` via PR #9). The R4 / R5 / R7 / R8 doc-level
+  fixes that this branch had applied to that file are no longer
+  visible in the diff; the implementation-level closures live in
+  PR-B's `gripper.py`, `articulation.py`, `driver.py`, and
+  `ArmSimIsaacConfig`.

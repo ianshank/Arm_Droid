@@ -13,8 +13,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 - **Isaac Sim / Isaac Lab integration scaffolding (PR-A, no runtime dep)** —
   groundwork for an opt-in NVIDIA Isaac Sim 5.1 / Isaac Lab 2.3 backend
-  behind a future `armdroid[isaac]` extra. Closes 8 reviewer-flagged
-  defects on PR #8 (R1–R8) and 7 pre-existing gaps (G1–G7) without
+  behind a future `armdroid[isaac]` extra. Closes 4 reviewer-flagged
+  code-side defects from PR #8 review (R1, R2, R3, R6 — the
+  doc-only R4 / R5 / R7 / R8 are moot after PR #9 reverted the
+  research doc on main) and 7 pre-existing gaps (G1–G7) without
   adding any runtime dependency or breaking existing YAMLs / env vars /
   CLI flags / tests.
   - **`armdroid.config.paths`** (G7) — single-source asset-path
@@ -79,12 +81,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
     tightened ruff per-file ignore list (`["D","ANN","C901","N","RUF012"]`)
     for vendored Isaac task code; `make test/test-all/coverage` exclude
     `isaac` so the default CI matrix never tries to load isaaclab.
-  - **R8 doc fixes** — `docs/research/isaac-omniverse-integration.md`
-    updated with Isaac 5.1 doc URLs (was 4.5), the plural
-    `set_joint_position_targets` API form (R4), and a strengthened
-    gripper-convention callout — armdroid normalises 0=open / 1=closed
-    while URDF radians are 0=closed / 1.74…=open, requiring rescale +
-    invert at the boundary (R5, R7).
+  - **R4 / R5 / R7 / R8 (doc-only fixes)** — applied on this branch
+    against `docs/research/isaac-omniverse-integration.md`, but the doc
+    itself was subsequently reverted on `main` via PR #9 before this
+    branch landed. The corresponding implementation-level closures
+    (plural `set_joint_position_targets`, gripper rescale-and-invert
+    in `gripper.py`, Isaac 5.1 ArticulationCfg) live in PR-B and are
+    enumerated in `NEXT_STEPS.md`.
 
 - **Telemetry seam — Axis 6 (Phase 0.3)** — `armdroid.telemetry` package
   with `TelemetryProvider` Protocol, zero-overhead `NullTelemetry` default
