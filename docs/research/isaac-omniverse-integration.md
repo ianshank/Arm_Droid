@@ -80,7 +80,19 @@ The URDF declares **6 movable joints** in this order (verified):
 | 3 | `elbow_flex`    | revolute | `[-1.69, 1.69]`          | elbow pitch (5° calibration offset) |
 | 4 | `wrist_flex`    | revolute | `[-1.65806, 1.65806]`    | wrist pitch |
 | 5 | `wrist_roll`    | revolute | `[-2.74385, 2.84121]`    | wrist roll (asymmetric range) |
-| 6 | `gripper`       | revolute | `[-0.174533, 1.74533]`   | jaw (`0`≈closed, `1.74…`≈open) |
+| 6 | `gripper`       | revolute | `[-0.174533, 1.74533]`   | jaw — URDF radians: `0`≈closed, `1.74…`≈open |
+
+> **Gripper convention conflict (R7).** The URDF maps `0` rad → closed and
+> `1.74…` rad → open. **armdroid normalises the gripper joint to `[0, 1]`
+> with `0` = open and `1` = closed** (verified `domain/state.py:21-22`,
+> `firmware/arm_esp32/PROTOCOL.md:40-41`). The Isaac driver must therefore
+> **both rescale AND invert** when crossing the URDF-radians ↔
+> armdroid-normalised boundary. The single source of truth for this
+> rescale-and-invert lives in
+> `src/armdroid/hardware/isaac_sim/gripper.py` (PR-B), parametrised on
+> `ArmSimIsaacConfig.{gripper_joint_radians_open,
+> gripper_joint_radians_closed, gripper_normalised_open,
+> gripper_normalised_closed}` so retuning is config-only.
 
 `effort=10`, `velocity=10` on every joint. This matches armdroid's
 `arm.dof: 6` and `home_position: [0, 0, 0, 0, 0, 0]`
@@ -252,10 +264,15 @@ Behaviourally:
 * `connect()` boots `AppLauncher` and loads `assets/so_arm/so101/usd/so101.usd`
   into a default stage; `disconnect()` shuts down the Kit app.
 * `send_joint_positions(positions, duration_s)` calls
-  `articulation.set_joint_position_target(positions)` after one
-  trapezoidal-profile interpolation step (same shape as the ESP32
+  `articulation.set_joint_position_targets(positions)` (R4 — Isaac 5.1
+  uses the **plural** form; the singular `set_joint_position_target`
+  does not exist on `omni.isaac.core.articulations.Articulation`) after
+  one trapezoidal-profile interpolation step. Same shape as the ESP32
   firmware-side interpolation, so the controller layer can't tell the
-  difference).
+  difference. The gripper component of `positions` is converted from
+  armdroid normalised `[0,1]` → URDF radians via
+  `armdroid.hardware.isaac_sim.gripper.normalised_to_radians` (the only
+  place that rescale-and-invert lives — see Section 3).
 * `read_state()` reads `articulation.get_joint_positions()` /
   `get_joint_velocities()` and packs them into the existing `ArmState`.
 * `emergency_stop()` zeros the joint targets and freezes the articulation.
@@ -396,7 +413,7 @@ keeping `ArmDriverProtocol` stable.
 | Concern | MuJoCo today | Isaac Sim addition |
 |---|---|---|
 | **Joint-position scale** | radians, matches URDF | radians, same model — no remap |
-| **Gripper convention** | armdroid normalises `[0,1]`; URDF is radians | adapter must map `radians → [0,1]` for `Esp32JsonDriver` (already true for MuJoCo) |
+| **Gripper convention** | armdroid normalises `[0,1]` with `0`=open, `1`=closed; URDF radians has `0`=closed, `1.74…`=open | adapter must **both rescale AND invert** at the boundary — single source of truth in `armdroid.hardware.isaac_sim.gripper` (PR-B), config-driven via `ArmSimIsaacConfig` |
 | **Servo PD gains** | not modelled (kinematic) | Isaac Lab uses implicit PD; tune to STS3215 datasheet (1.9 N·m stall, 60 RPM no-load at 7.4 V) |
 | **Camera intrinsics** | mock D435i | RTX renderer can publish ground-truth depth at D435i intrinsics — drop into existing `armdroid.perception` mock |
 | **Cycle latency** | 50 ms (firmware interp.) | match by setting `decimation=10` at 200 Hz physics |
@@ -470,8 +487,8 @@ existing user is forced onto Isaac unless they opt in.
 - Isaac Lab external project for SO-ARM100/101 (Le Lay & Bay) — <https://github.com/MuammerBay/isaac_so_arm101>
 - LycheeAI Hub tutorial series — <https://lycheeai-hub.com/project-so-arm101-x-isaac-sim-x-isaac-lab-tutorial-series>
 - NVIDIA Omniverse Livestream — Training a Robot from Scratch (URDF → OpenUSD) — <https://www.youtube.com/watch?v=_HMk7I-vSBQ>
-- Isaac Sim URDF Importer extension — <https://docs.isaacsim.omniverse.nvidia.com/4.5.0/robot_setup/ext_isaacsim_asset_importer_urdf.html>
-- Isaac Sim Tutorial: Import URDF — <https://docs.isaacsim.omniverse.nvidia.com/4.5.0/robot_setup/import_urdf.html>
+- Isaac Sim URDF Importer extension — <https://docs.isaacsim.omniverse.nvidia.com/latest/robot_setup/ext_isaacsim_asset_importer_urdf.html> (R8 fix — was 4.5.0; pin matches the 5.1 we ship)
+- Isaac Sim Tutorial: Import URDF — <https://docs.isaacsim.omniverse.nvidia.com/latest/robot_setup/import_urdf.html> (R8 fix)
 - Isaac Lab — Importing a New Asset — <https://isaac-sim.github.io/IsaacLab/main/source/how-to/import_new_asset.html>
 - Isaac Lab — Adding a New Robot — <https://isaac-sim.github.io/IsaacLab/main/source/tutorials/01_assets/add_new_robot.html>
 - Isaac Lab — Writing an Asset Configuration — <https://isaac-sim.github.io/IsaacLab/main/source/how-to/write_articulation_cfg.html>
