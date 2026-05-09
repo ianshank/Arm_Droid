@@ -13,6 +13,7 @@ from armdroid.config.schema.arm import ArmConfig
 from armdroid.config.schema.perception import ArmPerceptionConfig
 from armdroid.config.schema.planning import ArmPlanningConfig
 from armdroid.config.schema.sim import ArmSimConfig
+from armdroid.config.schema.sim_isaac import ArmSimIsaacConfig
 from armdroid.config.schema.task import ArmTaskConfig
 from armdroid.config.schema.training import ArmCurriculumConfig, ArmTrainingConfig
 
@@ -34,6 +35,7 @@ class ArmSettings(BaseSettings):
 
     arm: ArmConfig = Field(default_factory=ArmConfig)
     arm_sim: ArmSimConfig = Field(default_factory=ArmSimConfig)
+    arm_sim_isaac: ArmSimIsaacConfig = Field(default_factory=ArmSimIsaacConfig)
     arm_perception: ArmPerceptionConfig = Field(default_factory=ArmPerceptionConfig)
     arm_planning: ArmPlanningConfig = Field(default_factory=ArmPlanningConfig)
     arm_training: ArmTrainingConfig = Field(default_factory=ArmTrainingConfig)
