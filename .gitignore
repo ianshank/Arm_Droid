@@ -104,3 +104,15 @@ site/
 # PlatformIO build artifacts
 .pio/
 firmware/arm_esp32/.pio/
+
+# Isaac Sim / Isaac Lab build artifacts (PR-B opt-in [isaac] extra)
+# Vendored URDF/MJCF/STL assets under assets/so_arm/so101/ are tracked.
+# Generated USD files (URDF importer output) are build artefacts only.
+assets/**/usd/*.usd
+assets/**/usd/*.usda
+assets/**/usd/*.usdc
+.isaac_cache/
+.isaac_logs/
+isaac_sim_logs/
+# Local Kit-app shader / scene caches (Isaac Sim writes under cwd or $HOME)
+*.kit-cache/

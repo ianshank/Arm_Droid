@@ -44,14 +44,23 @@ protocol.
 Future backends (Planned): `fast-downward`, `pddlstream`, OpenAI replanner,
 local LLM replanner, hybrid task-and-motion planner.
 
-## Axis 4 — Multi-sim (Stretch)
+## Axis 4 — Multi-sim (Foundation in PR-A; Isaac integration lands in PR-B)
 
-Current: MuJoCo via gymnasium env wrappers.
+Current: MuJoCo via gymnasium env wrappers + **Isaac Sim 5.1 / Isaac Lab 2.3
+scaffolding shipped in PR-A**: vendored SO-ARM101 simulation assets
+(URDF + MJCF + STL meshes under `assets/so_arm/so101/`), the
+`armdroid.config.paths` resolver, and the `arm_driver_kind` discriminator
+field that PR-B widens to include `"isaac_sim"` alongside the actual
+`IsaacSimDriver` registration.
 
-Foundation seam: env registry doubles as sim seam (sim is just a different
-env source).
+Foundation seam: env registry + driver registry both serve as the
+multi-sim seam. The `arm_driver_kind` discriminator decouples sim
+selection from the legacy `mock_hardware` bool, and `ArmRLAgentProtocol`
+gives non-SAC agents (RSL-RL PPO is next) a uniform contract.
 
-Future: Isaac Sim, PyBullet, Drake — each surfaced as an env-registry entry.
+Next: PR-B lands `IsaacSimDriver`, `SoArmReachIsaacEnv`,
+`RslRlPpoAgent`, and the `[isaac]` extra. PyBullet / Drake remain as
+future env-registry entries; their seam is the same.
 
 ## Axis 5 — Distributed / accelerated training (Planned)
 
