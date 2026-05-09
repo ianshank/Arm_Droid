@@ -1,0 +1,80 @@
+# arm_ble.example.yaml — Example armdroid config for BLE GATT transport.
+#
+# Install the BLE extra before use:
+#   pip install -e ".[ble]"
+#
+# Copy this file, fill in your real values, and reference it with:
+#   python -m armdroid --config path/to/arm_ble.yaml
+#
+# The BLE device address can be set to "auto" to scan by name, or to a
+# specific MAC/UUID (platform-dependent format).
+
+arm:
+  dof: 6
+
+  transport:
+    protocol: ble
+    ble:
+      device_address: "auto"     # scan for device by name, or set a MAC
+      device_name: "ArmDroid"   # BLE advertised name to scan for
+      rx_char_uuid: "6e400002-b5a3-f393-e0a9-e50e24dcca9e"  # host→device
+      tx_char_uuid: "6e400003-b5a3-f393-e0a9-e50e24dcca9e"  # device→host
+      scan_timeout_s: 10.0
+    # HMAC-SHA256 auth — key read from ARMDROID_HMAC_KEY environment variable
+    auth:
+      key_env_var: ARMDROID_HMAC_KEY
+      required: true
+    serial_port: null
+    serial_baud: 115200
+    command_timeout_s: 2.0
+    heartbeat_hz: 5.0
+    drain_pings_on_connect: 1
+    keepalive_interval_s: 10.0
+
+  servos:
+    - pwm_pin: 13
+      pulse_min_us: 500
+      pulse_max_us: 2500
+    - pwm_pin: 12
+      pulse_min_us: 500
+      pulse_max_us: 2500
+    - pwm_pin: 14
+      pulse_min_us: 500
+      pulse_max_us: 2500
+    - pwm_pin: 27
+      pulse_min_us: 500
+      pulse_max_us: 2500
+    - pwm_pin: 26
+      pulse_min_us: 500
+      pulse_max_us: 2500
+    - pwm_pin: 25
+      pulse_min_us: 500
+      pulse_max_us: 2500
+
+  joint_limits:
+    - min_rad: -1.5708
+      max_rad: 1.5708
+      max_velocity_rad_s: 1.0
+    - min_rad: -1.5708
+      max_rad: 1.5708
+      max_velocity_rad_s: 1.0
+    - min_rad: -1.5708
+      max_rad: 1.5708
+      max_velocity_rad_s: 1.0
+    - min_rad: -1.5708
+      max_rad: 1.5708
+      max_velocity_rad_s: 1.0
+    - min_rad: -1.5708
+      max_rad: 1.5708
+      max_velocity_rad_s: 1.0
+    - min_rad: 0.0
+      max_rad: 1.0
+      max_velocity_rad_s: 2.0
+
+  home_position: [0.0, 0.0, 0.0, 0.0, 0.0, 0.5]
+  home_duration_s: 2.0
+
+  firmware:
+    interpolator_hz: 50.0
+    watchdog_timeout_s: 0.5
+    firmware_version: "1.0.0"

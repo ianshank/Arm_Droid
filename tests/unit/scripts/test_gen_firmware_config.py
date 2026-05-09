@@ -198,3 +198,191 @@ class TestMainCli:
             ["--output", str(out_path), "--check"]
         )
         assert rc == 1
+
+
+class TestSecretsFile:
+    """Tests for ``_load_secrets`` and the ``--secrets-file`` CLI flag."""
+
+    def _write_env(self, path: Path, content: str) -> Path:
+        secrets = path / "wifi.env"
+        secrets.write_text(content, encoding="utf-8")
+        return secrets
+
+    def test_load_secrets_with_all_fields(
+        self,
+        gen_module: object,
+        tmp_path: Path,
+    ) -> None:
+        env_file = self._write_env(
+            tmp_path,
+            (
+                "ARMDROID_WIFI_SSID=MyNetwork\n"
+                "ARMDROID_WIFI_PASS=hunter2\n"
+                f"ARMDROID_HMAC_KEY={'ab' * 16}\n"
+                "ARMDROID_TCP_PORT=4001\n"
+            ),
+        )
+        secrets = gen_module._load_secrets(env_file)  # type: ignore[attr-defined]
+        assert secrets.wifi_ssid == "MyNetwork"
+        assert secrets.wifi_password == "hunter2"  # noqa: S105 — test fixture, not a real secret
+        assert secrets.hmac_key_hex == "ab" * 16
+        assert secrets.tcp_port == 4001
+        assert secrets.wifi_enabled is True
+        assert secrets.hmac_enabled is True
+
+    def test_load_secrets_strips_quotes(
+        self,
+        gen_module: object,
+        tmp_path: Path,
+    ) -> None:
+        env_file = self._write_env(
+            tmp_path,
+            "ARMDROID_WIFI_SSID=\"Quoted Network\"\nARMDROID_WIFI_PASS='s3cr3t'\n",
+        )
+        secrets = gen_module._load_secrets(env_file)  # type: ignore[attr-defined]
+        assert secrets.wifi_ssid == "Quoted Network"
+        assert secrets.wifi_password == "s3cr3t"  # noqa: S105 — test fixture, not a real secret
+
+    def test_load_secrets_ignores_comments_and_blank_lines(
+        self,
+        gen_module: object,
+        tmp_path: Path,
+    ) -> None:
+        env_file = self._write_env(
+            tmp_path,
+            "# This is a comment\n\nARMDROID_WIFI_SSID=Net1\n",
+        )
+        secrets = gen_module._load_secrets(env_file)  # type: ignore[attr-defined]
+        assert secrets.wifi_ssid == "Net1"
+
+    def test_load_secrets_empty_file_returns_disabled(
+        self,
+        gen_module: object,
+        tmp_path: Path,
+    ) -> None:
+        env_file = self._write_env(tmp_path, "")
+        secrets = gen_module._load_secrets(env_file)  # type: ignore[attr-defined]
+        assert secrets.wifi_enabled is False
+        assert secrets.hmac_enabled is False
+
+    def test_load_secrets_invalid_hmac_hex_exits(
+        self,
+        gen_module: object,
+        tmp_path: Path,
+    ) -> None:
+        env_file = self._write_env(
+            tmp_path,
+            "ARMDROID_HMAC_KEY=not_hex_at_all\n",
+        )
+        with pytest.raises(SystemExit) as exc_info:
+            gen_module._load_secrets(env_file)  # type: ignore[attr-defined]
+        assert exc_info.value.code == 1
+
+    def test_load_secrets_hmac_key_too_short_exits(
+        self,
+        gen_module: object,
+        tmp_path: Path,
+    ) -> None:
+        env_file = self._write_env(
+            tmp_path,
+            "ARMDROID_HMAC_KEY=deadbeef\n",  # 8 hex chars = 4 bytes < 16 required
+        )
+        with pytest.raises(SystemExit) as exc_info:
+            gen_module._load_secrets(env_file)  # type: ignore[attr-defined]
+        assert exc_info.value.code == 1
+
+    def test_load_secrets_bad_tcp_port_exits(
+        self,
+        gen_module: object,
+        tmp_path: Path,
+    ) -> None:
+        env_file = self._write_env(
+            tmp_path,
+            "ARMDROID_TCP_PORT=notanumber\n",
+        )
+        with pytest.raises(SystemExit) as exc_info:
+            gen_module._load_secrets(env_file)  # type: ignore[attr-defined]
+        assert exc_info.value.code == 1
+
+    def test_render_header_with_secrets_enables_wifi(
+        self,
+        gen_module: object,
+        tmp_path: Path,
+    ) -> None:
+        env_file = self._write_env(
+            tmp_path,
+            (
+                "ARMDROID_WIFI_SSID=AcmeNet\n"
+                "ARMDROID_WIFI_PASS=p@ssw0rd\n"
+                f"ARMDROID_HMAC_KEY={'cd' * 16}\n"
+                "ARMDROID_TCP_PORT=3001\n"
+            ),
+        )
+        secrets = gen_module._load_secrets(env_file)  # type: ignore[attr-defined]
+        cfg = ArmSettings()
+        out = gen_module.render_header(cfg, secrets=secrets)  # type: ignore[attr-defined]
+        assert "kWiFiEnabled = true;" in out
+        assert 'kWiFiSSID = "AcmeNet";' in out
+        assert 'kWiFiPassword = "p@ssw0rd";' in out
+        assert "kHmacEnabled = true;" in out
+        assert f'kHmacKeyHex = "{"cd" * 16}";' in out
+
+    def test_render_header_without_secrets_disables_wifi(
+        self,
+        gen_module: object,
+    ) -> None:
+        cfg = ArmSettings()
+        out = gen_module.render_header(cfg)  # type: ignore[attr-defined]
+        assert "kWiFiEnabled = false;" in out
+        assert "kHmacEnabled = false;" in out
+
+    def test_render_header_c_string_escaping(
+        self,
+        gen_module: object,
+        tmp_path: Path,
+    ) -> None:
+        """SSID with backslash and double-quote must be properly escaped."""
+        env_file = self._write_env(
+            tmp_path,
+            'ARMDROID_WIFI_SSID=Net\\"Work\nARMDROID_WIFI_PASS=x\n',
+        )
+        secrets = gen_module._load_secrets(env_file)  # type: ignore[attr-defined]
+        cfg = ArmSettings()
+        out = gen_module.render_header(cfg, secrets=secrets)  # type: ignore[attr-defined]
+        # The backslash and double-quote in the SSID must be escaped in the C string.
+        # Net\"Work in C (3 chars: \, \, \", ") represents Net\"Work literally.
+        assert r'kWiFiSSID = "Net\\\"Work";' in out
+
+    def test_main_with_secrets_file_writes_wifi_constants(
+        self,
+        gen_module: object,
+        tmp_path: Path,
+    ) -> None:
+        env_file = self._write_env(
+            tmp_path,
+            (
+                "ARMDROID_WIFI_SSID=TestNet\n"
+                "ARMDROID_WIFI_PASS=pass1\n"
+                f"ARMDROID_HMAC_KEY={'ef' * 16}\n"
+            ),
+        )
+        out_path = tmp_path / "config_generated.h"
+        rc = gen_module.main(  # type: ignore[attr-defined]
+            ["--output", str(out_path), "--secrets-file", str(env_file)]
+        )
+        assert rc == 0
+        content = out_path.read_text(encoding="utf-8")
+        assert "kWiFiEnabled = true;" in content
+        assert 'kWiFiSSID = "TestNet";' in content
+
+    def test_main_secrets_file_missing_exits_nonzero(
+        self,
+        gen_module: object,
+        tmp_path: Path,
+    ) -> None:
+        out_path = tmp_path / "config_generated.h"
+        missing = tmp_path / "no_such.env"
+        rc = gen_module.main(  # type: ignore[attr-defined]
+            ["--output", str(out_path), "--secrets-file", str(missing)]
+        )
+        assert rc != 0

@@ -56,6 +56,7 @@ dmypy.json
 # IDEs
 .idea/
 .vscode/
+!.vscode/extensions.json
 *.swp
 *.swo
 
@@ -116,3 +117,14 @@ assets/**/usd/*.usdc
 isaac_sim_logs/
 # Local Kit-app shader / scene caches (Isaac Sim writes under cwd or $HOME)
 *.kit-cache/
+
+# Arduino CLI build artifacts
+arduino-build/
+
+# Local secrets — never commit real credentials
+.secrets/*.env
+!.secrets/*.example
+!.secrets/.gitkeep
+
+# Local env overrides
+*.local.env

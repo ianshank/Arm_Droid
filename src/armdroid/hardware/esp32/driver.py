@@ -47,7 +47,7 @@ from armdroid.domain.errors import (
 )
 from armdroid.domain.state import ArmState
 from armdroid.hardware.esp32.framing import _PendingReply, decode_frame
-from armdroid.hardware.esp32.portfinder import open_port_blocking, resolve_port
+from armdroid.hardware.esp32.transport import ArmTransport, make_transport
 from armdroid.hardware.esp32.validator import validate_joint_positions, velocity_anchor
 from armdroid.logging.setup import get_logger
 from armdroid.telemetry import (
@@ -98,15 +98,13 @@ class Esp32JsonDriver:
 
     def __init__(self, cfg: ArmConfig) -> None:
         """Initialise the driver. Does not open the port — call ``connect``."""
-        if _serial_module is None:
-            msg = (
-                "pyserial not installed. Install with `pip install -e .[hardware]`"
-                " to enable the real-hardware driver."
-            )
-            raise ArmDriverError(msg)
         self._cfg = cfg
         self._dof = cfg.dof
-        self._port: Any | None = None
+        self._transport: ArmTransport = make_transport(
+            cfg,
+            serial_module=_serial_module,
+            list_ports_module=_list_ports_module,
+        )
         self._reader_task: asyncio.Task[None] | None = None
         self._send_lock = asyncio.Lock()
 
@@ -133,7 +131,7 @@ class Esp32JsonDriver:
         _log.info(
             "esp32_json_driver_init",
             dof=self._dof,
-            port=cfg.transport.serial_port,
+            transport=cfg.transport.protocol,
             baud=cfg.transport.serial_baud,
         )
 
@@ -147,12 +145,10 @@ class Esp32JsonDriver:
             return
         with get_telemetry().start_span(
             SPAN_DRIVER_CONNECT,
+            transport=self._cfg.transport.protocol,
             baud=self._cfg.transport.serial_baud,
         ):
-            port_path = await resolve_port(self._cfg, _serial_module, _list_ports_module)
-            get_telemetry().record_event("port_resolved", port=port_path)
-            port = await asyncio.to_thread(open_port_blocking, port_path, self._cfg, _serial_module)
-            self._port = port
+            await self._transport.connect()
             self._last_send_monotonic = time.monotonic()
             self._reader_task = asyncio.create_task(self._reader_loop(), name="esp32_json_reader")
             self._keepalive_task = asyncio.create_task(
@@ -168,7 +164,7 @@ class Esp32JsonDriver:
 
             _log.info(
                 "esp32_json_driver_connected",
-                port=port_path,
+                transport=self._cfg.transport.protocol,
                 baud=self._cfg.transport.serial_baud,
             )
 
@@ -242,7 +238,7 @@ class Esp32JsonDriver:
     async def emergency_stop(self) -> None:
         """Latch e-stop — acquires the send lock and writes immediately.
 
-        Holding the send lock ensures pyserial is not called concurrently
+        Holding the send lock ensures the transport is not called concurrently
         with another sender. Raises :exc:`ArmDriverError` if the driver
         is not connected rather than propagating an AssertionError.
         """
@@ -252,7 +248,7 @@ class Esp32JsonDriver:
         async with self._send_lock:
             line, _req_id = self._encode("estop", {})
             try:
-                await asyncio.to_thread(self._write_blocking, line.encode("ascii"))
+                await self._transport.write_line(line.encode("ascii"))
                 self._last_send_monotonic = time.monotonic()
             except Exception as exc:  # pragma: no cover - hardware fault path
                 _log.error("esp32_json_estop_write_failed", error=str(exc))
@@ -418,11 +414,11 @@ class Esp32JsonDriver:
             future: asyncio.Future[None] = loop.create_future()
             self._pending[req_id] = _PendingReply(future=future, cmd_name=cmd)
             try:
-                await asyncio.to_thread(self._write_blocking, line.encode("ascii"))
+                await self._transport.write_line(line.encode("ascii"))
                 self._last_send_monotonic = time.monotonic()
             except Exception as exc:
                 self._pending.pop(req_id, None)
-                err = f"Serial write failed: {exc}"
+                err = f"Transport write failed: {exc}"
                 raise ArmDriverError(err) from exc
 
             try:
@@ -439,13 +435,6 @@ class Esp32JsonDriver:
                 raise ArmDriverError(err) from exc
             finally:
                 self._pending.pop(req_id, None)
-
-    def _write_blocking(self, data: bytes) -> None:
-        if self._port is None:
-            msg = "Esp32JsonDriver is not connected — cannot write to serial port"
-            raise ArmDriverError(msg)
-        self._port.write(data)
-        self._port.flush()
 
     async def _keepalive_loop(self) -> None:
         """Ping the firmware periodically when the wire is otherwise idle.
@@ -483,8 +472,8 @@ class Esp32JsonDriver:
     async def _reader_loop(self) -> None:
         """Read lines forever, dispatch by message type."""
         try:
-            while self._connected and self._port is not None:
-                line = await asyncio.to_thread(self._readline_blocking)
+            while self._connected:
+                line = await self._transport.readline()
                 if not line:
                     continue
                 self._dispatch_line(line)
@@ -492,12 +481,6 @@ class Esp32JsonDriver:
             raise
         except Exception as exc:  # pragma: no cover - hardware fault path
             _log.error("esp32_json_reader_crashed", error=str(exc))
-
-    def _readline_blocking(self) -> bytes:
-        if self._port is None:
-            return b""
-        result: bytes = self._port.readline()
-        return result
 
     def _dispatch_line(self, raw: bytes) -> None:
         max_bytes = self._cfg.transport.max_line_bytes
@@ -577,10 +560,8 @@ class Esp32JsonDriver:
                 with contextlib.suppress(asyncio.CancelledError, Exception):
                     await task
                 setattr(self, task_attr, None)
-        if self._port is not None:
-            with contextlib.suppress(Exception):  # pragma: no cover
-                await asyncio.to_thread(self._port.close)
-            self._port = None
+        with contextlib.suppress(Exception):
+            await self._transport.disconnect()
         for pending in list(self._pending.values()):
             if not pending.future.done():
                 pending.future.set_exception(ArmDriverError("Driver disconnected before reply"))
