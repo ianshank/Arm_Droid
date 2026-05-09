@@ -15,7 +15,11 @@ from armdroid.config.schema.planning import ArmPlanningConfig
 from armdroid.config.schema.sim import ArmSimConfig
 from armdroid.config.schema.sim_isaac import ArmSimIsaacConfig
 from armdroid.config.schema.task import ArmTaskConfig
-from armdroid.config.schema.training import ArmCurriculumConfig, ArmTrainingConfig
+from armdroid.config.schema.training import (
+    ArmCurriculumConfig,
+    ArmTrainingConfig,
+    RslRlPpoConfig,
+)
 
 
 class ArmSettings(BaseSettings):
@@ -39,6 +43,7 @@ class ArmSettings(BaseSettings):
     arm_perception: ArmPerceptionConfig = Field(default_factory=ArmPerceptionConfig)
     arm_planning: ArmPlanningConfig = Field(default_factory=ArmPlanningConfig)
     arm_training: ArmTrainingConfig = Field(default_factory=ArmTrainingConfig)
+    arm_rsl_rl_ppo: RslRlPpoConfig = Field(default_factory=RslRlPpoConfig)
     arm_curriculum: ArmCurriculumConfig = Field(default_factory=ArmCurriculumConfig)
     arm_task: ArmTaskConfig = Field(default_factory=ArmTaskConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
