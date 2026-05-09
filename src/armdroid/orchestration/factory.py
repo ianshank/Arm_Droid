@@ -23,7 +23,7 @@ import numpy as np
 
 from armdroid.control.controller import ArmController
 from armdroid.control.primitives import ActionPrimitives
-from armdroid.control.sac_agent import SACAgent
+from armdroid.control.registry import get_rl_agent
 from armdroid.domain.protocols import (
     ArmControllerProtocol,
     ArmDriverProtocol,
@@ -107,7 +107,16 @@ def build_arm_controller(
         Controller conforming to :class:`ArmControllerProtocol`.
     """
     resolved_driver = driver if driver is not None else build_arm_driver(cfg)
-    agent = SACAgent(cfg.arm_training)
+    # v2 (peer-review S2): dispatch via the registry so PR-B can register
+    # rsl_rl_ppo as a sibling without touching this code. SACAgent is
+    # registered under both "sac" and "sac_her" (the default).
+    # Protocol classes don't constrain ``__init__``, so mypy can't verify
+    # the call signature. ``ArmRLAgentProtocol`` doesn't declare ``__init__``
+    # by design (different agents accept different config types). PR-B B.7
+    # introduces a uniform ``from_settings(cls, ArmSettings)`` classmethod
+    # that does land on the protocol, eliminating the call-arg ignore.
+    agent_cls = get_rl_agent(cfg.arm_training.algorithm)
+    agent = agent_cls(cfg.arm_training)  # type: ignore[call-arg]
     primitives = ActionPrimitives(cfg.arm, resolved_driver)
     _log.info("arm_controller_built", algorithm=cfg.arm_training.algorithm)
     return ArmController(agent, primitives)
