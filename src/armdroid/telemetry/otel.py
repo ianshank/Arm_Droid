@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
     from opentelemetry.trace import TracerProvider as OtelTracerProvider
 
+
 # Check for opentelemetry.trace specifically (not just the top-level namespace)
 # to guard against environments where an unrelated opentelemetry.* namespace
 # package is present without opentelemetry-api being installed.  find_spec on a
@@ -118,6 +119,7 @@ class OtelTelemetry:
             )
             raise ImportError(msg)
         import opentelemetry.trace as _otel_trace_local  # succeeds: _OTEL_AVAILABLE guard above
+
         if tracer_provider is not None:
             self._tracer: Tracer = tracer_provider.get_tracer(tracer_name)
         else:
@@ -151,6 +153,7 @@ class OtelTelemetry:
         """
         if _OTEL_AVAILABLE:
             import opentelemetry.trace as _otel_trace_local  # succeeds when _OTEL_AVAILABLE is True
+
             _otel_trace_local.get_current_span().add_event(name, attributes=attrs)
 
 
