@@ -23,7 +23,7 @@ import numpy as np
 
 from armdroid.control.controller import ArmController
 from armdroid.control.primitives import ActionPrimitives
-from armdroid.control.sac_agent import SACAgent
+from armdroid.control.registry import get_rl_agent
 from armdroid.domain.protocols import (
     ArmControllerProtocol,
     ArmDriverProtocol,
@@ -34,6 +34,7 @@ from armdroid.domain.protocols import (
 from armdroid.environments.registry import get_environment
 from armdroid.hardware.registry import get_driver
 from armdroid.logging.setup import get_logger
+from armdroid.orchestration._driver_kind import resolve_driver_kind
 from armdroid.orchestration.orchestrator import ArmOrchestrator
 from armdroid.perception.facade import ArmPerception
 from armdroid.planning.symbolic_planner import SymbolicPlanner
@@ -53,7 +54,7 @@ def build_arm_driver(cfg: ArmSettings) -> ArmDriverProtocol:
     Returns:
         Driver conforming to :class:`ArmDriverProtocol`.
     """
-    kind = "mock" if cfg.mock_hardware else "esp32"
+    kind = resolve_driver_kind(cfg)
     _log.info("arm_driver_built", kind=kind)
     return get_driver(kind)(cfg.arm)
 
@@ -106,7 +107,15 @@ def build_arm_controller(
         Controller conforming to :class:`ArmControllerProtocol`.
     """
     resolved_driver = driver if driver is not None else build_arm_driver(cfg)
-    agent = SACAgent(cfg.arm_training)
+    # Dispatch via the registry so PR-B can register rsl_rl_ppo as a
+    # sibling without touching this code. SACAgent is registered under
+    # both ``"sac"`` and ``"sac_her"`` (the default). The registry's
+    # ``Callable[..., ArmRLAgentProtocol]`` factory type lets mypy verify
+    # this call without ``# type: ignore[call-arg]`` — Protocol classes
+    # don't constrain ``__init__`` directly, but factory-typed callables
+    # accept any args. (PR #10 review: peer-review C-Copilot.)
+    agent_factory = get_rl_agent(cfg.arm_training.algorithm)
+    agent = agent_factory(cfg.arm_training)
     primitives = ActionPrimitives(cfg.arm, resolved_driver)
     _log.info("arm_controller_built", algorithm=cfg.arm_training.algorithm)
     return ArmController(agent, primitives)

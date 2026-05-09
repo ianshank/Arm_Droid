@@ -11,6 +11,84 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **Isaac Sim / Isaac Lab integration scaffolding (PR-A, no runtime dep)** —
+  groundwork for an opt-in NVIDIA Isaac Sim 5.1 / Isaac Lab 2.3 backend
+  behind a future `armdroid[isaac]` extra. Closes 4 reviewer-flagged
+  code-side defects from PR #8 review (R1, R2, R3, R6 — the
+  doc-only R4 / R5 / R7 / R8 are moot after PR #9 reverted the
+  research doc on main) and 7 pre-existing gaps (G1–G7) without
+  adding any runtime dependency or breaking existing YAMLs / env vars /
+  CLI flags / tests.
+  - **`armdroid.config.paths`** (G7) — single-source asset-path
+    helper. `resolve_asset_path(rel, *, base=None)` walks a 3-stage
+    resolution chain (explicit base → `$ARMDROID_REPO_ROOT` →
+    pyproject.toml marker walk) plus three SO-101 typed helpers
+    (`resolve_so101_urdf`, `…_mjcf_scene`, `…_usd`).
+  - **`arm_driver_kind` discriminator** (G5) — new
+    `ArmSettings.arm_driver_kind: Literal["mock","esp32"] | None`
+    field (PR-B widens to include `"isaac_sim"`). Legacy
+    `mock_hardware: bool` is preserved with a once-per-process
+    `DeprecationWarning` (suppressible via
+    `ARMDROID_SUPPRESS_DEPRECATION=1`); removed in v0.4.0.
+    `armdroid.orchestration._driver_kind.resolve_driver_kind()` is
+    the precedence helper.
+  - **`ArmRLAgentProtocol`** (G4) — new `@runtime_checkable` Protocol
+    in `armdroid.domain.protocols` defining `build / train / predict /
+    save / load / is_trained / is_built`. The `armdroid.rl_agents`
+    registry generic tightens from `type[Any]` to
+    `type[ArmRLAgentProtocol]`. `SACAgent` retrofits the protocol
+    structurally without source changes; `ArmController` widened to
+    accept any conforming agent.
+  - **Algorithm-aware `build_arm_controller`** — dispatches via the
+    `armdroid.rl_agents` registry instead of importing `SACAgent`
+    directly. PR-B can register `rsl_rl_ppo` as a sibling without
+    touching factory code. New `sac_her` registry alias matches the
+    `ArmTrainingConfig.algorithm` default.
+  - **Env + agent telemetry spans** (G6) — 9 new SPAN_* constants
+    under `armdroid.telemetry`: `SPAN_ENV_{RESET,STEP,RENDER,CLOSE}`
+    and `SPAN_AGENT_{BUILD,TRAIN,PREDICT,SAVE,LOAD}`. Wraps every
+    `ArmEnvironmentBase` method (Tower of Hanoi + Laundry Sorting
+    inherit) and every `SACAgent` method. `NullTelemetry` default
+    keeps this zero-cost via `contextlib.nullcontext`.
+  - **Vendored SO-ARM101 simulation assets** (G1, R6) — under
+    `assets/so_arm/so101/`: 2 URDFs, 13 STL meshes, 4 MJCF files,
+    `LICENSE`, `ATTRIBUTION.md` with pinned upstream commit
+    (`fda892cba81032c46c40976a48c9ceadbf40a9ca`,
+    Apache-2.0). Repo-root `THIRD_PARTY_NOTICES.md` indexes vendored
+    content; `arm.urdf_path` default repaired (was an unresolved path).
+    `@field_validator` emits `arm_urdf_path_missing` INFO log when the
+    file is absent without raising.
+  - **Env-protocol property tests** (G2) — Hypothesis-based parametric
+    tests in `tests/property/test_arm_env_invariants.py` over every
+    registered env. Verify `reset()` returns `(dict, dict)` with
+    canonical goal-conditioned keys; `step()` returns the documented
+    5-tuple with reward as Python `float` (not `np.float64`) and
+    `terminated/truncated` as Python `bool`.
+  - **Conftest migration** — `tests/conftest.py` autouse migrated from
+    `ARMDROID_MOCK_HARDWARE=true` to `ARMDROID_ARM_DRIVER_KIND=mock`
+    so the new code path is exercised in CI. `delenv` cleanup
+    neutralises developer-shell leakage. Tests that explicitly assert
+    legacy-bool semantics now use `pytest.warns(DeprecationWarning)`
+    to keep the deprecation surface protected until v0.4.0.
+  - **Shared `RecordingTelemetry` helper** —
+    `tests/helpers/recording_telemetry.py` (promoted from inline class)
+    used by every suite asserting on span emission. Establishes
+    `structlog.testing.capture_logs` as the documented log-assertion
+    pattern (closes peer-review N6).
+  - **Pyproject placeholders for PR-B** — new `isaac` pytest marker;
+    mypy override block + coverage omit for
+    `armdroid.{environments/isaac,hardware/isaac_sim,control.rsl_rl_agent}`;
+    tightened ruff per-file ignore list (`["D","ANN","C901","N","RUF012"]`)
+    for vendored Isaac task code; `make test/test-all/coverage` exclude
+    `isaac` so the default CI matrix never tries to load isaaclab.
+  - **R4 / R5 / R7 / R8 (doc-only fixes)** — applied on this branch
+    against `docs/research/isaac-omniverse-integration.md`, but the doc
+    itself was subsequently reverted on `main` via PR #9 before this
+    branch landed. The corresponding implementation-level closures
+    (plural `set_joint_position_targets`, gripper rescale-and-invert
+    in `gripper.py`, Isaac 5.1 ArticulationCfg) live in PR-B and are
+    enumerated in `NEXT_STEPS.md`.
+
 - **Telemetry seam — Axis 6 (Phase 0.3)** — `armdroid.telemetry` package
   with `TelemetryProvider` Protocol, zero-overhead `NullTelemetry` default
   (`contextlib.nullcontext`), and `OtelTelemetry` backend available under

@@ -87,6 +87,34 @@ class TestBuildArmController:
         assert isinstance(controller, ArmController)
         assert controller.primitives.driver is shared_driver
 
+    def test_default_algorithm_dispatches_via_registry(self) -> None:
+        """``cfg.arm_training.algorithm`` (default 'sac_her') resolves through
+        the registry, not via a hardcoded import.
+
+        Closes preparation seam for PR-B's rsl_rl_ppo agent registration.
+        """
+        from armdroid.control.sac_agent import SACAgent
+
+        cfg = ArmSettings(arm_driver_kind="mock")
+        # Default algorithm is sac_her; both sac and sac_her registered to SACAgent.
+        assert cfg.arm_training.algorithm == "sac_her"
+        controller = build_arm_controller(cfg)
+        assert isinstance(controller, ArmController)
+        assert isinstance(controller.agent, SACAgent)
+
+    def test_explicit_sac_algorithm_dispatches_via_registry(self) -> None:
+        """Setting algorithm='sac' uses the SACAgent registered under 'sac'."""
+        from armdroid.config.schema import ArmTrainingConfig
+        from armdroid.control.sac_agent import SACAgent
+
+        # Override training to algorithm='sac' (the explicit, non-HER label)
+        cfg = ArmSettings(
+            arm_driver_kind="mock",
+            arm_training=ArmTrainingConfig(algorithm="sac"),
+        )
+        controller = build_arm_controller(cfg)
+        assert isinstance(controller.agent, SACAgent)
+
 
 class TestBuildArmPerception:
     """build_arm_perception constructs the perception facade."""

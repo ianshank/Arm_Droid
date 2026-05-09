@@ -131,8 +131,17 @@ pip install -e ".[realsense]"
 # Claude API LLM replanner (anthropic SDK)
 pip install -e ".[anthropic]"
 
-# Install everything
-pip install -e ".[dev,hardware,realsense,anthropic]"
+# OpenTelemetry observability backend (zero-overhead by default)
+pip install -e ".[telemetry]"
+
+# NVIDIA Isaac Sim 5.1 / Isaac Lab 2.3 backend (lands in PR-B; the
+# scaffolding for the [isaac] extra ships in PR-A — vendored URDF +
+# MJCF + STL assets, arm_driver_kind discriminator, ArmRLAgentProtocol,
+# env + agent telemetry spans). Requires a CUDA GPU; ~9 GB install.
+# pip install -e ".[isaac]"   # available after PR-B merges
+
+# Install everything (default-CI-compatible subset)
+pip install -e ".[dev,hardware,realsense,anthropic,telemetry]"
 ```
 
 ### Windows note — MuJoCo and Visual C++ Redistributable

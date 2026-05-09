@@ -21,14 +21,14 @@ lint:          ## Run ruff linter and auto-fix safe issues
 typecheck:     ## Run mypy strict type-check on source tree
 	$(PYTHON) -m mypy --strict $(SRC_DIR)/
 
-test:          ## Run the fast test suite (excludes slow/hardware/gpu)
-	$(PYTHON) -m pytest -m "not slow and not hardware and not gpu" -q
+test:          ## Run the fast test suite (excludes slow/hardware/gpu/isaac)
+	$(PYTHON) -m pytest -m "not slow and not hardware and not gpu and not isaac" -q
 
-test-all:      ## Run the full test suite (skips hardware by default)
-	$(PYTHON) -m pytest -m "not hardware" -q
+test-all:      ## Run the full test suite (skips hardware + isaac by default)
+	$(PYTHON) -m pytest -m "not hardware and not isaac" -q
 
 coverage:      ## Run tests with coverage report (fail under 85%)
-	$(PYTHON) -m pytest --cov=armdroid --cov-fail-under=85 -q
+	$(PYTHON) -m pytest -m "not hardware and not isaac" --cov=armdroid --cov-fail-under=85 -q
 
 pre-commit:    ## Run all pre-commit hooks on staged files
 	pre-commit run --all-files

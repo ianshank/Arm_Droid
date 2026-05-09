@@ -72,6 +72,11 @@ laundry_sorting = "armdroid.environments.laundry_sorting:LaundrySortingEnv"
 
 [project.entry-points."armdroid.rl_agents"]
 sac = "armdroid.control.sac_agent:SACAgent"
+# ``sac_her`` matches ArmTrainingConfig.algorithm's default value;
+# mirrors the in-code _AGENTS.register("sac_her", SACAgent) alias so
+# ``importlib.metadata.entry_points("armdroid.rl_agents")`` reflects the
+# same surface that ``available_rl_agents()`` reports.
+sac_her = "armdroid.control.sac_agent:SACAgent"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/armdroid"]
@@ -91,6 +96,12 @@ ignore = ["D100", "D104", "D107", "D203", "D213", "S101", "ANN401", "TCH", "TC"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["D", "ANN", "S101", "S108", "S603", "S607", "E402"]
 "src/armdroid/planning/llm_replanners/**/*.py" = ["D102"]
+# Vendored Isaac Lab task code (PR-B) — minimal blast radius; only D
+# (pydocstyle: vendored code uses non-Google style), ANN (third-party
+# patterns), C901 (RL config complexity), N (PascalCase configs), and
+# RUF012 (mutable class defaults common in Isaac Lab dataclasses) are
+# disabled. UP/S/B008/T20 stay enabled — they catch real bugs.
+"src/armdroid/environments/isaac/tasks/**/*.py" = ["D", "ANN", "C901", "N", "RUF012"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -114,6 +125,22 @@ disallow_subclassing_any = false
 module = ["armdroid.config.schema", "armdroid.config.schema.*"]
 disable_error_code = ["arg-type", "call-arg"]
 
+# PR-B placeholder — Isaac Lab + RSL-RL upstream are not pip-typed.
+# ``import-not-found`` would be redundant given ``ignore_missing_imports``
+# is true globally; we only relax ``import-untyped``, ``no-any-return``,
+# and ``attr-defined`` which are the real friction points for vendored
+# task code that touches torch + isaaclab heavily.
+[[tool.mypy.overrides]]
+module = [
+    "armdroid.environments.isaac",
+    "armdroid.environments.isaac.*",
+    "armdroid.hardware.isaac_sim",
+    "armdroid.hardware.isaac_sim.*",
+    "armdroid.control.rsl_rl_agent",
+]
+disallow_subclassing_any = false
+disable_error_code = ["import-untyped", "no-any-return", "attr-defined"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]
@@ -122,6 +149,7 @@ markers = [
     "slow: marks tests as slow",
     "hardware: marks tests requiring real hardware (ESP32 + arm wired up)",
     "gpu: marks tests requiring CUDA GPU",
+    "isaac: marks tests requiring NVIDIA Isaac Sim/Lab installed (env var ARMDROID_ISAAC_RUN=1)",
     "regression: marks regression tests guarding existing behaviour against future change",
     "e2e: marks end-to-end pipeline tests (planner -> controller -> driver -> state)",
     "contract: marks driver-protocol contract tests (parametrised over implementations)",
@@ -134,6 +162,14 @@ omit = [
     "*/tests/*",
     "*/main.py",
     "*/__main__.py",
+    # PR-B placeholders — these modules require the optional ``[isaac]``
+    # extra (isaaclab + rsl-rl) which the default CI matrix does not
+    # install. Pure-Python siblings (gripper math, config schemas) live
+    # outside these directories so they DO get coverage.
+    "*/armdroid/environments/isaac/*",
+    "*/armdroid/hardware/isaac_sim/driver.py",
+    "*/armdroid/hardware/isaac_sim/articulation.py",
+    "*/armdroid/control/rsl_rl_agent.py",
 ]
 
 [tool.coverage.report]

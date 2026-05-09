@@ -15,6 +15,14 @@ from numpy.typing import NDArray
 from stable_baselines3 import SAC, HerReplayBuffer
 
 from armdroid.logging.setup import get_logger
+from armdroid.telemetry import (
+    SPAN_AGENT_BUILD,
+    SPAN_AGENT_LOAD,
+    SPAN_AGENT_PREDICT,
+    SPAN_AGENT_SAVE,
+    SPAN_AGENT_TRAIN,
+    get_telemetry,
+)
 
 if TYPE_CHECKING:
     from armdroid.config.schema import ArmTrainingConfig
@@ -54,23 +62,24 @@ class SACAgent:
         Args:
             env: Gymnasium-compatible environment (must support GoalEnv).
         """
-        self._model = SAC(
-            "MultiInputPolicy",
-            env,
-            learning_rate=self._cfg.learning_rate,
-            batch_size=self._cfg.batch_size,
-            buffer_size=self._cfg.buffer_size,
-            gamma=self._cfg.gamma,
-            tau=self._cfg.tau,
-            replay_buffer_class=HerReplayBuffer,
-            replay_buffer_kwargs={
-                "n_sampled_goal": self._cfg.her_n_sampled_goal,
-                "goal_selection_strategy": self._cfg.her_goal_selection,
-            },
-            seed=self._cfg.seed,
-            verbose=0,
-        )
-        _log.info("sac_model_built")
+        with get_telemetry().start_span(SPAN_AGENT_BUILD, algorithm=self._cfg.algorithm):
+            self._model = SAC(
+                "MultiInputPolicy",
+                env,
+                learning_rate=self._cfg.learning_rate,
+                batch_size=self._cfg.batch_size,
+                buffer_size=self._cfg.buffer_size,
+                gamma=self._cfg.gamma,
+                tau=self._cfg.tau,
+                replay_buffer_class=HerReplayBuffer,
+                replay_buffer_kwargs={
+                    "n_sampled_goal": self._cfg.her_n_sampled_goal,
+                    "goal_selection_strategy": self._cfg.her_goal_selection,
+                },
+                seed=self._cfg.seed,
+                verbose=0,
+            )
+            _log.info("sac_model_built")
 
     def train(self, total_timesteps: int | None = None) -> None:
         """Train the SAC+HER policy.
@@ -86,10 +95,11 @@ class SACAgent:
             raise RuntimeError(msg)
 
         steps = total_timesteps or self._cfg.total_timesteps
-        _log.info("training_start", total_timesteps=steps)
-        self._model.learn(total_timesteps=steps)
-        self._is_trained = True
-        _log.info("training_complete")
+        with get_telemetry().start_span(SPAN_AGENT_TRAIN, total_timesteps=steps):
+            _log.info("training_start", total_timesteps=steps)
+            self._model.learn(total_timesteps=steps)
+            self._is_trained = True
+            _log.info("training_complete")
 
     def predict(self, observation: dict[str, NDArray[np.float64]]) -> NDArray[np.float64]:
         """Predict action for given observation.
@@ -107,7 +117,7 @@ class SACAgent:
             msg = "Model not built. Call build(env) first."
             raise RuntimeError(msg)
 
-        with torch.no_grad():
+        with get_telemetry().start_span(SPAN_AGENT_PREDICT), torch.no_grad():
             action, _ = self._model.predict(observation, deterministic=True)
         return np.asarray(action, dtype=np.float64)
 
@@ -128,9 +138,10 @@ class SACAgent:
             raise RuntimeError(msg)
 
         save_path = Path(path or self._cfg.weights_dir) / "sac_her_checkpoint"
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-        self._model.save(str(save_path))
-        _log.info("model_saved", path=str(save_path))
+        with get_telemetry().start_span(SPAN_AGENT_SAVE, path=str(save_path)):
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            self._model.save(str(save_path))
+            _log.info("model_saved", path=str(save_path))
         return save_path
 
     def load(self, path: str) -> None:
@@ -139,9 +150,10 @@ class SACAgent:
         Args:
             path: Path to saved model checkpoint.
         """
-        self._model = SAC.load(path)
-        self._is_trained = True
-        _log.info("model_loaded", path=path)
+        with get_telemetry().start_span(SPAN_AGENT_LOAD, path=path):
+            self._model = SAC.load(path)
+            self._is_trained = True
+            _log.info("model_loaded", path=path)
 
     @property
     def is_trained(self) -> bool:

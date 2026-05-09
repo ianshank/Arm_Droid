@@ -1,8 +1,8 @@
 """Arm controller bridging RL policy and action primitives.
 
-Implements ``ArmControllerProtocol`` by composing a trained
-``SACAgent`` for continuous actions with ``ActionPrimitives``
-for discrete manipulation commands.
+Implements ``ArmControllerProtocol`` by composing any RL agent that
+satisfies ``ArmRLAgentProtocol`` (SAC+HER today; PR-B's RSL-RL PPO next)
+with ``ActionPrimitives`` for discrete manipulation commands.
 """
 
 from __future__ import annotations
@@ -13,11 +13,11 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
+from armdroid.domain.protocols import ArmRLAgentProtocol
 from armdroid.logging.setup import get_logger
 
 if TYPE_CHECKING:
     from armdroid.control.primitives import ActionPrimitives
-    from armdroid.control.sac_agent import SACAgent
     from armdroid.domain.protocols import ArmEnvironmentProtocol
 
 _log = get_logger(__name__)
@@ -26,19 +26,23 @@ _log = get_logger(__name__)
 class ArmController:
     """Goal-conditioned controller for arm manipulation.
 
-    Bridges the RL policy (SACAgent) with hardware-level
-    action primitives for end-to-end control.
+    Bridges any RL policy that satisfies ``ArmRLAgentProtocol`` with
+    hardware-level action primitives for end-to-end control.
 
     Args:
-        agent: Trained SAC+HER policy for continuous control.
+        agent: RL policy conforming to :class:`ArmRLAgentProtocol`.
         primitives: Action primitive library for discrete commands.
     """
 
-    def __init__(self, agent: SACAgent, primitives: ActionPrimitives) -> None:
+    def __init__(
+        self,
+        agent: ArmRLAgentProtocol,
+        primitives: ActionPrimitives,
+    ) -> None:
         """Initialise arm controller.
 
         Args:
-            agent: SAC+HER agent (may or may not be trained).
+            agent: RL agent (may or may not be trained).
             primitives: Pre-trained grasp/place/transit primitives.
         """
         self._agent = agent
@@ -46,8 +50,8 @@ class ArmController:
         _log.info("arm_controller_init", is_trained=agent.is_trained)
 
     @property
-    def agent(self) -> SACAgent:
-        """Return the underlying SAC+HER agent (for orchestrator wiring)."""
+    def agent(self) -> ArmRLAgentProtocol:
+        """Return the underlying RL agent (for orchestrator wiring)."""
         return self._agent
 
     @property

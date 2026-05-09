@@ -10,7 +10,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from armdroid.config.paths import SO101_URDF_REL, resolve_asset_path
+from armdroid.logging.setup import get_logger
+
+_log = get_logger(__name__)
 
 
 class JointLimits(BaseModel):
@@ -231,8 +236,14 @@ class ArmConfig(BaseModel):
     """
 
     urdf_path: Path = Field(
-        Path("urdf/so_arm100.urdf"),
-        description="Path to robot arm URDF file",
+        SO101_URDF_REL,
+        description=(
+            "Path to robot arm URDF file. Repo-relative inputs are resolved "
+            "to absolute via armdroid.config.paths.resolve_asset_path() at "
+            "construction time, so consumers see a stable absolute path "
+            "regardless of CWD. Loaders should branch on ``Path.is_file()`` "
+            "so optional / mock paths still construct."
+        ),
     )
     dof: int = Field(6, gt=0, le=12, description="Degrees of freedom")
     gripper_type: Literal["parallel", "suction", "soft"] = Field(
@@ -315,6 +326,30 @@ class ArmConfig(BaseModel):
         description="Minimum permitted distance between any two non-adjacent "
         "links. Used by the self-collision check.",
     )
+
+    @field_validator("urdf_path", mode="after")
+    @classmethod
+    def _resolve_and_warn_if_urdf_missing(cls, v: Path) -> Path:
+        """Resolve to absolute and emit an INFO log when the URDF is missing.
+
+        Does not raise — mock-hardware test setups and CI runners without
+        the vendored asset tree must keep constructing
+        :class:`ArmSettings`. Loaders downstream branch on
+        :meth:`Path.is_file` and produce a real error only if a real load
+        is attempted.
+
+        Returns the resolved absolute path so callers see a CWD-stable
+        value regardless of where the YAML / env var was authored.
+        """
+        resolved = resolve_asset_path(v)
+        if not resolved.is_file():
+            _log.info(
+                "arm_urdf_path_missing",
+                urdf_path=str(v),
+                resolved=str(resolved),
+                hint="vendor SO101 assets or override arm.urdf_path",
+            )
+        return resolved
 
     @model_validator(mode="before")
     @classmethod
