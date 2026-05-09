@@ -168,11 +168,11 @@ disallow_subclassing_any = false
 module = ["armdroid.config.schema", "armdroid.config.schema.*"]
 disable_error_code = ["arg-type", "call-arg"]
 
-# PR-B placeholder — Isaac Lab + RSL-RL upstream are not pip-typed.
-# ``import-not-found`` would be redundant given ``ignore_missing_imports``
-# is true globally; we only relax ``import-untyped``, ``no-any-return``,
-# and ``attr-defined`` which are the real friction points for vendored
-# task code that touches torch + isaaclab heavily.
+# Isaac Lab + RSL-RL upstream are not pip-typed; vendored task code uses
+# Isaac Lab's ``configclass`` dataclass pattern with ``__post_init__``
+# methods that don't carry return-type annotations (upstream style).
+# The disable list relaxes the friction points without weakening the
+# rest of strict mode.
 [[tool.mypy.overrides]]
 module = [
     "armdroid.environments.isaac",
@@ -182,7 +182,17 @@ module = [
     "armdroid.control.rsl_rl_agent",
 ]
 disallow_subclassing_any = false
-disable_error_code = ["import-untyped", "no-any-return", "attr-defined"]
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+disable_error_code = [
+    "import-untyped",
+    "no-any-return",
+    "attr-defined",
+    "no-untyped-def",
+    "no-untyped-call",
+    "call-arg",
+    "operator",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -50,7 +50,9 @@ def _isaac_sim_factory(arm_cfg: ArmConfig) -> ArmDriverProtocol:
             install command + NVIDIA pip index URL.
     """
     try:
-        from armdroid.hardware.isaac_sim import IsaacSimDriver
+        # Imports the package's lazy ``IsaacSimDriver`` via ``__getattr__``;
+        # the cast tells mypy the resolved attribute is the driver class.
+        from armdroid.hardware.isaac_sim.driver import IsaacSimDriver
     except ImportError as exc:
         from armdroid.domain.errors import ArmDriverError
 

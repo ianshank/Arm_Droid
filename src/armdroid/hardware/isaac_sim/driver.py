@@ -273,6 +273,8 @@ class IsaacSimDriver:
         # Pull joint state from articulation.data; convert gripper back to normalised.
         joint_pos_rad = tuple(float(v) for v in self._articulation.data.joint_pos[0].cpu().numpy())
         joint_vel = tuple(float(v) for v in self._articulation.data.joint_vel[0].cpu().numpy())
+        import time
+
         joint_pos_norm = radians_vector_to_normalised(
             joint_pos_rad,
             self._sim_cfg.gripper_joint_index,
@@ -283,6 +285,7 @@ class IsaacSimDriver:
             joint_velocities=joint_vel,
             is_moving=any(abs(v) > 1e-6 for v in joint_vel),
             estop_active=self._estop_latched,
+            timestamp_s=time.monotonic(),
         )
 
     # ------------------------------------------------------------------ #
