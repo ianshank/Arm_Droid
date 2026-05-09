@@ -98,6 +98,17 @@ class TestProtocolRegression:
         driver = Esp32JsonDriver(cfg.arm)
         assert isinstance(driver, ArmDriverProtocol)
 
+    def test_sac_agent_satisfies_arm_rl_agent_protocol(self) -> None:
+        """SACAgent must implement ArmRLAgentProtocol so the registry can
+        type the value as ``type[ArmRLAgentProtocol]`` (closes G4).
+        """
+        from armdroid.config.schema import ArmTrainingConfig
+        from armdroid.control.sac_agent import SACAgent
+        from armdroid.domain.protocols import ArmRLAgentProtocol
+
+        agent = SACAgent(ArmTrainingConfig())
+        assert isinstance(agent, ArmRLAgentProtocol)
+
 
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
 class TestNamedConstantsRegression:

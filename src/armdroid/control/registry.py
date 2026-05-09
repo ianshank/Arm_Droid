@@ -1,33 +1,41 @@
 """RL agent registry — Phase 2 plugin seam.
 
-Built-in agents (``sac``) register on import. Out-of-tree agents may be
-plugged in via the ``armdroid.rl_agents`` entry-point group.
+Built-in agents (``sac``, ``sac_her``) register on import. Out-of-tree
+agents may be plugged in via the ``armdroid.rl_agents`` entry-point
+group. PR-B registers ``rsl_rl_ppo`` here.
+
+Closes G4: the registry generic is tightened to
+:class:`armdroid.domain.protocols.ArmRLAgentProtocol` so out-of-tree
+agents are forced to satisfy the contract instead of being typed as
+``Any``.
 """
 
 from __future__ import annotations
 
-from typing import Any
-
 from armdroid._registry import Registry
 from armdroid.control.sac_agent import SACAgent
+from armdroid.domain.protocols import ArmRLAgentProtocol
 
-# RL agent classes do not yet share a single Protocol (SB3 typing
-# constraints). Stored as ``type[Any]`` until Phase 4 introduces
-# ``ArmRLAgentProtocol`` in ``armdroid.domain.protocols``.
-_AGENTS: Registry[type[Any]] = Registry(
+_AGENTS: Registry[type[ArmRLAgentProtocol]] = Registry(
     kind="rl_agent",
     entry_point_group="armdroid.rl_agents",
 )
 
 _AGENTS.register("sac", SACAgent)
+# ``sac_her`` alias matches the default value of
+# ``ArmTrainingConfig.algorithm`` so build_arm_controller can resolve the
+# default config directly through the registry without a hardcoded
+# string-compare. Both names point at the same SACAgent (SAC+HER under
+# the hood — the agent class wires HerReplayBuffer in build()).
+_AGENTS.register("sac_her", SACAgent)
 
 
-def register_rl_agent(name: str, factory: type[Any]) -> None:
+def register_rl_agent(name: str, factory: type[ArmRLAgentProtocol]) -> None:
     """Register an RL agent class under ``name``."""
     _AGENTS.register(name, factory)
 
 
-def get_rl_agent(name: str) -> type[Any]:
+def get_rl_agent(name: str) -> type[ArmRLAgentProtocol]:
     """Return the RL agent class registered under ``name``."""
     return _AGENTS.get(name)
 

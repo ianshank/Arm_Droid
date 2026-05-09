@@ -291,10 +291,83 @@ class ArmEnvironmentProtocol(Protocol):
         ...
 
 
+@runtime_checkable
+class ArmRLAgentProtocol(Protocol):
+    """Common contract for RL agents (SAC, RSL-RL PPO, ...).
+
+    Used by the ``armdroid.rl_agents`` registry so the orchestrator can
+    dispatch to any registered agent uniformly. Concrete implementations
+    live under :mod:`armdroid.control` (``SACAgent`` today; PR-B adds
+    ``RslRlPpoAgent``).
+    """
+
+    def build(self, env: ArmEnvironmentProtocol) -> None:
+        """Bind the underlying model to ``env``. Idempotent.
+
+        Args:
+            env: Gymnasium-compatible environment.
+        """
+        ...
+
+    def train(self, total_timesteps: int | None = None) -> None:
+        """Train for ``total_timesteps`` (or use the config default).
+
+        Args:
+            total_timesteps: Optional override; ``None`` uses the agent's
+                configuration's default.
+        """
+        ...
+
+    def predict(
+        self,
+        observation: dict[str, NDArray[np.float64]],
+    ) -> NDArray[np.float64]:
+        """Return greedy action for ``observation``.
+
+        Args:
+            observation: Goal-conditioned observation dict.
+
+        Returns:
+            Action vector.
+        """
+        ...
+
+    def save(self, path: str | None = None) -> Path:
+        """Save model to ``path`` (or the config default).
+
+        Args:
+            path: Optional override; ``None`` uses the agent's
+                configured ``weights_dir``.
+
+        Returns:
+            Filesystem path of the saved checkpoint.
+        """
+        ...
+
+    def load(self, path: str) -> None:
+        """Load model from ``path``.
+
+        Args:
+            path: Path to a saved checkpoint.
+        """
+        ...
+
+    @property
+    def is_trained(self) -> bool:
+        """Whether ``train()`` has completed at least once."""
+        ...
+
+    @property
+    def is_built(self) -> bool:
+        """Whether ``build()`` has bound an environment."""
+        ...
+
+
 __all__ = [
     "ArmControllerProtocol",
     "ArmDriverProtocol",
     "ArmEnvironmentProtocol",
     "ArmPerceptionProtocol",
     "ArmPlannerProtocol",
+    "ArmRLAgentProtocol",
 ]
