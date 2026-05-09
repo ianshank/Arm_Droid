@@ -34,6 +34,7 @@ from armdroid.domain.protocols import (
 from armdroid.environments.registry import get_environment
 from armdroid.hardware.registry import get_driver
 from armdroid.logging.setup import get_logger
+from armdroid.orchestration._driver_kind import resolve_driver_kind
 from armdroid.orchestration.orchestrator import ArmOrchestrator
 from armdroid.perception.facade import ArmPerception
 from armdroid.planning.symbolic_planner import SymbolicPlanner
@@ -53,7 +54,7 @@ def build_arm_driver(cfg: ArmSettings) -> ArmDriverProtocol:
     Returns:
         Driver conforming to :class:`ArmDriverProtocol`.
     """
-    kind = "mock" if cfg.mock_hardware else "esp32"
+    kind = resolve_driver_kind(cfg)
     _log.info("arm_driver_built", kind=kind)
     return get_driver(kind)(cfg.arm)
 

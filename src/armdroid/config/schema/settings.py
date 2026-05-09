@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -41,7 +42,21 @@ class ArmSettings(BaseSettings):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     mock_hardware: bool = Field(
         default=False,
-        description="Use mock hardware drivers instead of real serial/USB devices.",
+        description=(
+            "DEPRECATED — use arm_driver_kind instead. Use mock hardware "
+            "drivers instead of real serial/USB devices. Kept for backwards "
+            "compatibility; ignored when arm_driver_kind is set. Removed in "
+            "armdroid v0.4.0."
+        ),
+    )
+    arm_driver_kind: Literal["mock", "esp32"] | None = Field(
+        default=None,
+        description=(
+            "Explicit driver discriminator. When set, takes precedence over "
+            "the legacy ``mock_hardware`` bool. When ``None``, falls back to "
+            "``mock_hardware`` (with a once-per-process deprecation warning). "
+            "PR-B widens this Literal to include 'isaac_sim'."
+        ),
     )
 
 
