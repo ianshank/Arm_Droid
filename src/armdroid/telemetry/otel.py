@@ -31,11 +31,19 @@ if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
     from opentelemetry.trace import TracerProvider as OtelTracerProvider
 
-# Check availability without binding a module-level variable.  Using find_spec
-# avoids version-specific ``type: ignore`` or Any gymnastics: mypy 2.0 strict
-# flags both ``type: ignore[assignment]`` (unused-ignore) and a try/except
-# rebind of an Any-annotated module variable (no-redef).
-_OTEL_AVAILABLE: bool = importlib.util.find_spec("opentelemetry") is not None
+# Check for opentelemetry.trace specifically (not just the top-level namespace)
+# to guard against environments where an unrelated opentelemetry.* namespace
+# package is present without opentelemetry-api being installed.  find_spec on a
+# dotted name raises ModuleNotFoundError when the parent package is absent, so
+# we wrap it in a helper to keep the module-level assignment simple and typed.
+def _check_otel_trace_available() -> bool:
+    try:
+        return importlib.util.find_spec("opentelemetry.trace") is not None
+    except ModuleNotFoundError:
+        return False
+
+
+_OTEL_AVAILABLE: bool = _check_otel_trace_available()
 
 
 # ---------------------------------------------------------------------------

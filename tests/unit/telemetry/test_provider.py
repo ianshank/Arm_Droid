@@ -30,7 +30,8 @@ from armdroid.telemetry import (
 
 @pytest.fixture(autouse=True)
 def reset_global_provider() -> None:
-    """Reset the module-level provider to NullTelemetry after every test."""
+    """Reset the module-level provider to NullTelemetry before and after every test."""
+    configure_telemetry(None)
     yield  # type: ignore[misc]
     configure_telemetry(None)
 

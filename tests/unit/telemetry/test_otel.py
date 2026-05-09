@@ -61,10 +61,11 @@ if _otel_available:
 
 @pytest.fixture(autouse=True)
 def reset_global_provider() -> None:
-    """Reset armdroid global provider after every test."""
-    yield  # type: ignore[misc]
+    """Reset armdroid global provider before and after every test."""
     from armdroid.telemetry import configure_telemetry as _reset
 
+    _reset(None)
+    yield  # type: ignore[misc]
     _reset(None)
 
 

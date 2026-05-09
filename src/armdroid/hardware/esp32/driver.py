@@ -145,12 +145,12 @@ class Esp32JsonDriver:
         """Open the transport. Idempotent."""
         if self._connected:
             return
-        port_path = await resolve_port(self._cfg, _serial_module, _list_ports_module)
         with get_telemetry().start_span(
             SPAN_DRIVER_CONNECT,
-            port=port_path,
             baud=self._cfg.transport.serial_baud,
         ):
+            port_path = await resolve_port(self._cfg, _serial_module, _list_ports_module)
+            get_telemetry().record_event("port_resolved", port=port_path)
             port = await asyncio.to_thread(open_port_blocking, port_path, self._cfg, _serial_module)
             self._port = port
             self._last_send_monotonic = time.monotonic()
@@ -196,12 +196,12 @@ class Esp32JsonDriver:
     ) -> None:
         """Validate locally, encode, write, await ack."""
         self._require_connected()
-        self._validate_command(positions, duration_s)
         with get_telemetry().start_span(
             SPAN_DRIVER_SEND,
             dof=self._dof,
             duration_s=duration_s,
         ):
+            self._validate_command(positions, duration_s)
             await self._send_and_await_ack(
                 cmd="set_joints",
                 payload={
