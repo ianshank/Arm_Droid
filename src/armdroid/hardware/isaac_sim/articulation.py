@@ -41,7 +41,7 @@ _log = get_logger(__name__)
 
 def build_so_arm100_articulation_cfg(
     sim_cfg: ArmSimIsaacConfig,
-    arm_cfg: ArmConfig,  # noqa: ARG001 — reserved for future per-arm overrides
+    arm_cfg: ArmConfig,
 ) -> Any:
     """Build an Isaac Lab ``ArticulationCfg`` for the SO-ARM101.
 
@@ -62,9 +62,9 @@ def build_so_arm100_articulation_cfg(
             (``isaaclab`` cannot be imported).
     """
     # Lazy imports — module top-level must NOT load isaaclab.
+    import isaaclab.sim as sim_utils
     from isaaclab.actuators import ImplicitActuatorCfg
     from isaaclab.assets import ArticulationCfg
-    import isaaclab.sim as sim_utils
 
     asset_path = resolve_asset_path(sim_cfg.urdf_fallback_path)
     _log.info(
@@ -109,9 +109,7 @@ def build_so_arm100_articulation_cfg(
                 solver_velocity_iteration_count=sim_cfg.solver_velocity_iterations,
             ),
             joint_drive=sim_utils.UrdfConverterCfg.JointDriveCfg(
-                gains=sim_utils.UrdfConverterCfg.JointDriveCfg.PDGainsCfg(
-                    stiffness=0, damping=0
-                ),
+                gains=sim_utils.UrdfConverterCfg.JointDriveCfg.PDGainsCfg(stiffness=0, damping=0),
             ),
         ),
         init_state=ArticulationCfg.InitialStateCfg(

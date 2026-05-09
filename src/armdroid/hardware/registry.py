@@ -36,6 +36,36 @@ _DRIVERS.register("mock", MockArmDriver)
 _DRIVERS.register("esp32", Esp32JsonDriver)
 
 
+def _isaac_sim_factory(arm_cfg: ArmConfig) -> ArmDriverProtocol:
+    """Lazy factory for IsaacSimDriver.
+
+    Wrapping the import inside this function (rather than at module top)
+    keeps ``armdroid.hardware.registry`` importable on default installs
+    without the [isaac] extra. The actual import only happens when
+    ``get_driver("isaac_sim")(cfg.arm)`` is called.
+
+    Raises:
+        ArmDriverError: When the [isaac] extra is not installed
+            (isaaclab cannot be imported), with a hint pointing at the
+            install command + NVIDIA pip index URL.
+    """
+    try:
+        from armdroid.hardware.isaac_sim import IsaacSimDriver
+    except ImportError as exc:
+        from armdroid.domain.errors import ArmDriverError
+
+        msg = (
+            f"isaac_sim driver requires the [isaac] extra: {exc}. "
+            'Install with `pip install -e ".[isaac]" '
+            "--extra-index-url https://pypi.nvidia.com`."
+        )
+        raise ArmDriverError(msg) from exc
+    return IsaacSimDriver(arm_cfg)
+
+
+_DRIVERS.register("isaac_sim", _isaac_sim_factory)
+
+
 def register_driver(name: str, factory: DriverFactory) -> None:
     """Register a driver class under ``name``."""
     _DRIVERS.register(name, factory)

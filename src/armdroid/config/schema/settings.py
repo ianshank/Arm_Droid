@@ -56,13 +56,14 @@ class ArmSettings(BaseSettings):
             "armdroid v0.4.0."
         ),
     )
-    arm_driver_kind: Literal["mock", "esp32"] | None = Field(
+    arm_driver_kind: Literal["mock", "esp32", "isaac_sim"] | None = Field(
         default=None,
         description=(
             "Explicit driver discriminator. When set, takes precedence over "
             "the legacy ``mock_hardware`` bool. When ``None``, falls back to "
             "``mock_hardware`` (with a once-per-process deprecation warning). "
-            "PR-B widens this Literal to include 'isaac_sim'."
+            "``isaac_sim`` requires the [isaac] extra installed at runtime; "
+            "without it, ``build_arm_driver`` raises ``ArmDriverError``."
         ),
     )
 
