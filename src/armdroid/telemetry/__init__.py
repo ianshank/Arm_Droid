@@ -52,6 +52,39 @@ SPAN_DRIVER_DISCONNECT: str = "armdroid.driver.disconnect"
 #: local validation and the firmware ack round-trip.
 SPAN_DRIVER_SEND: str = "armdroid.driver.send_joint_positions"
 
+# Environment span constants — emitted by every ArmEnvironmentBase subclass
+# (Tower of Hanoi, Laundry Sorting today; PR-B's SoArmReachIsaacEnv next).
+
+#: Span covering :meth:`ArmEnvironmentBase.reset`.
+SPAN_ENV_RESET: str = "armdroid.env.reset"
+
+#: Span covering :meth:`ArmEnvironmentBase.step`.
+SPAN_ENV_STEP: str = "armdroid.env.step"
+
+#: Span covering :meth:`ArmEnvironmentBase.render`.
+SPAN_ENV_RENDER: str = "armdroid.env.render"
+
+#: Span covering :meth:`ArmEnvironmentBase.close`.
+SPAN_ENV_CLOSE: str = "armdroid.env.close"
+
+# Agent span constants — emitted by every ArmRLAgentProtocol implementation
+# (SACAgent today; PR-B's RslRlPpoAgent next).
+
+#: Span covering :meth:`ArmRLAgentProtocol.build` (model construction).
+SPAN_AGENT_BUILD: str = "armdroid.agent.build"
+
+#: Span covering :meth:`ArmRLAgentProtocol.train` (full training run).
+SPAN_AGENT_TRAIN: str = "armdroid.agent.train"
+
+#: Span covering :meth:`ArmRLAgentProtocol.predict` (one inference call).
+SPAN_AGENT_PREDICT: str = "armdroid.agent.predict"
+
+#: Span covering :meth:`ArmRLAgentProtocol.save`.
+SPAN_AGENT_SAVE: str = "armdroid.agent.save"
+
+#: Span covering :meth:`ArmRLAgentProtocol.load`.
+SPAN_AGENT_LOAD: str = "armdroid.agent.load"
+
 
 # ---------------------------------------------------------------------------
 # TelemetryProvider protocol
@@ -161,9 +194,18 @@ def get_telemetry() -> TelemetryProvider:
 
 
 __all__ = [
+    "SPAN_AGENT_BUILD",
+    "SPAN_AGENT_LOAD",
+    "SPAN_AGENT_PREDICT",
+    "SPAN_AGENT_SAVE",
+    "SPAN_AGENT_TRAIN",
     "SPAN_DRIVER_CONNECT",
     "SPAN_DRIVER_DISCONNECT",
     "SPAN_DRIVER_SEND",
+    "SPAN_ENV_CLOSE",
+    "SPAN_ENV_RENDER",
+    "SPAN_ENV_RESET",
+    "SPAN_ENV_STEP",
     "NullTelemetry",
     "TelemetryProvider",
     "configure_telemetry",

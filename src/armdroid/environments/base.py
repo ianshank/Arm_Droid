@@ -15,6 +15,13 @@ from numpy.typing import NDArray
 
 from armdroid.environments.reward_shaping import RewardShaper
 from armdroid.logging.setup import get_logger
+from armdroid.telemetry import (
+    SPAN_ENV_CLOSE,
+    SPAN_ENV_RENDER,
+    SPAN_ENV_RESET,
+    SPAN_ENV_STEP,
+    get_telemetry,
+)
 
 if TYPE_CHECKING:
     from armdroid.config.schema import ArmTaskConfig, ArmTrainingConfig
@@ -71,16 +78,17 @@ class ArmEnvironmentBase(abc.ABC):
         Returns:
             Tuple of (observation_dict, info_dict).
         """
-        if seed is not None:
-            self._rng = np.random.default_rng(seed)
+        with get_telemetry().start_span(SPAN_ENV_RESET, seed=seed):
+            if seed is not None:
+                self._rng = np.random.default_rng(seed)
 
-        self._joint_angles = np.zeros(self._dof, dtype=np.float64)
-        self._step_count = 0
-        self._reset_task_state()
+            self._joint_angles = np.zeros(self._dof, dtype=np.float64)
+            self._step_count = 0
+            self._reset_task_state()
 
-        obs = self._get_observation()
-        info: dict[str, Any] = {"is_success": False}
-        return obs, info
+            obs = self._get_observation()
+            info: dict[str, Any] = {"is_success": False}
+            return obs, info
 
     def step(
         self, action: NDArray[np.float64]
@@ -93,23 +101,24 @@ class ArmEnvironmentBase(abc.ABC):
         Returns:
             Tuple of (obs, reward, terminated, truncated, info).
         """
-        self._step_count += 1
+        with get_telemetry().start_span(SPAN_ENV_STEP, dof=self._dof):
+            self._step_count += 1
 
-        action = np.clip(action, self._action_delta_min, self._action_delta_max)
-        self._joint_angles = self._joint_angles + action
-        self._joint_angles = np.clip(self._joint_angles, -np.pi, np.pi)
+            action = np.clip(action, self._action_delta_min, self._action_delta_max)
+            self._joint_angles = self._joint_angles + action
+            self._joint_angles = np.clip(self._joint_angles, -np.pi, np.pi)
 
-        info = self._get_step_info()
+            info = self._get_step_info()
 
-        is_success = self._check_goal()
-        info["is_success"] = is_success
-        terminated = is_success
-        truncated = self._step_count >= self._max_steps
+            is_success = self._check_goal()
+            info["is_success"] = is_success
+            terminated = is_success
+            truncated = self._step_count >= self._max_steps
 
-        obs = self._get_observation()
-        reward = self._reward_shaper.compute(obs["achieved_goal"], obs["desired_goal"], info)
+            obs = self._get_observation()
+            reward = self._reward_shaper.compute(obs["achieved_goal"], obs["desired_goal"], info)
 
-        return obs, reward, terminated, truncated, info
+            return obs, reward, terminated, truncated, info
 
     def render(self) -> NDArray[np.uint8] | None:
         """Render current state (stub — override with MuJoCo rendering).
@@ -117,11 +126,13 @@ class ArmEnvironmentBase(abc.ABC):
         Returns:
             None (headless mode).
         """
-        return None
+        with get_telemetry().start_span(SPAN_ENV_RENDER):
+            return None
 
     def close(self) -> None:
         """Clean up resources."""
-        _log.debug("env_closed")
+        with get_telemetry().start_span(SPAN_ENV_CLOSE):
+            _log.debug("env_closed")
 
     @abc.abstractmethod
     def _reset_task_state(self) -> None:
