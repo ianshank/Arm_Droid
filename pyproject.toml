@@ -72,6 +72,11 @@ laundry_sorting = "armdroid.environments.laundry_sorting:LaundrySortingEnv"
 
 [project.entry-points."armdroid.rl_agents"]
 sac = "armdroid.control.sac_agent:SACAgent"
+# ``sac_her`` matches ArmTrainingConfig.algorithm's default value;
+# mirrors the in-code _AGENTS.register("sac_her", SACAgent) alias so
+# ``importlib.metadata.entry_points("armdroid.rl_agents")`` reflects the
+# same surface that ``available_rl_agents()`` reports.
+sac_her = "armdroid.control.sac_agent:SACAgent"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/armdroid"]

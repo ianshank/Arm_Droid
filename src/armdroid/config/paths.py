@@ -24,8 +24,14 @@ from typing import Final
 
 REPO_ROOT_ENV: Final[str] = "ARMDROID_REPO_ROOT"
 SO101_ASSETS_REL: Final[Path] = Path("assets/so_arm/so101")
-SO101_URDF_REL: Final[Path] = SO101_ASSETS_REL / "urdf" / "so101_new_calib.urdf"
-SO101_MJCF_SCENE_REL: Final[Path] = SO101_ASSETS_REL / "mjcf" / "scene.xml"
+# Flat layout matching upstream `TheRobotStudio/SO-ARM100/Simulation/SO101/`:
+# URDF, MJCF, and joints_properties live at the package root; STL meshes
+# live in the `assets/` subdirectory referenced by both the URDF
+# (``<mesh filename="assets/X.stl"/>``) and the MJCF
+# (``<compiler meshdir="assets" ...>``). This is the *only* layout that
+# works for both consumers without modifying vendored XML.
+SO101_URDF_REL: Final[Path] = SO101_ASSETS_REL / "so101_new_calib.urdf"
+SO101_MJCF_SCENE_REL: Final[Path] = SO101_ASSETS_REL / "scene.xml"
 SO101_USD_REL: Final[Path] = SO101_ASSETS_REL / "usd" / "so101.usd"
 
 
@@ -35,7 +41,10 @@ def _find_repo_root_from(start: Path) -> Path:
     Falls back to ``start`` if no marker found within the parent chain.
 
     Args:
-        start: Starting directory (typically ``Path(__file__).resolve()``).
+        start: Starting **directory** (callers must ensure ``start`` is a
+            directory, not a file path; pass
+            ``Path(__file__).resolve().parent`` rather than
+            ``Path(__file__).resolve()``).
 
     Returns:
         Repo root if found, else ``start``.
@@ -69,7 +78,13 @@ def resolve_asset_path(
     env_base = os.environ.get(REPO_ROOT_ENV)
     if env_base:
         return (Path(env_base) / p).resolve()
-    return (_find_repo_root_from(Path(__file__).resolve()) / p).resolve()
+    # NB: walk starts at this module's *parent directory*, not the
+    # module file itself. Passing the file path would make
+    # _find_repo_root_from check ``paths.py/pyproject.toml`` on the first
+    # iteration and, on fallback, return the file path — joining a
+    # relative asset path onto it produces ``.../paths.py/assets/...``
+    # which is invalid.
+    return (_find_repo_root_from(Path(__file__).resolve().parent) / p).resolve()
 
 
 def resolve_so101_urdf(*, base: Path | None = None) -> Path:

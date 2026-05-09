@@ -107,16 +107,15 @@ def build_arm_controller(
         Controller conforming to :class:`ArmControllerProtocol`.
     """
     resolved_driver = driver if driver is not None else build_arm_driver(cfg)
-    # v2 (peer-review S2): dispatch via the registry so PR-B can register
-    # rsl_rl_ppo as a sibling without touching this code. SACAgent is
-    # registered under both "sac" and "sac_her" (the default).
-    # Protocol classes don't constrain ``__init__``, so mypy can't verify
-    # the call signature. ``ArmRLAgentProtocol`` doesn't declare ``__init__``
-    # by design (different agents accept different config types). PR-B B.7
-    # introduces a uniform ``from_settings(cls, ArmSettings)`` classmethod
-    # that does land on the protocol, eliminating the call-arg ignore.
-    agent_cls = get_rl_agent(cfg.arm_training.algorithm)
-    agent = agent_cls(cfg.arm_training)  # type: ignore[call-arg]
+    # Dispatch via the registry so PR-B can register rsl_rl_ppo as a
+    # sibling without touching this code. SACAgent is registered under
+    # both ``"sac"`` and ``"sac_her"`` (the default). The registry's
+    # ``Callable[..., ArmRLAgentProtocol]`` factory type lets mypy verify
+    # this call without ``# type: ignore[call-arg]`` — Protocol classes
+    # don't constrain ``__init__`` directly, but factory-typed callables
+    # accept any args. (PR #10 review: peer-review C-Copilot.)
+    agent_factory = get_rl_agent(cfg.arm_training.algorithm)
+    agent = agent_factory(cfg.arm_training)
     primitives = ActionPrimitives(cfg.arm, resolved_driver)
     _log.info("arm_controller_built", algorithm=cfg.arm_training.algorithm)
     return ArmController(agent, primitives)

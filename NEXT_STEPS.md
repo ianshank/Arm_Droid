@@ -2,9 +2,11 @@
 
 This document tracks the post-PR-A roadmap for the Isaac Sim / Isaac Lab
 integration plus the broader follow-ups surfaced during the PR-A scan.
-The full plan lives at
-[`C:\Users\iansh\.claude\plans\please-analyze-and-research-shiny-wozniak.md`](../.claude/plans/please-analyze-and-research-shiny-wozniak.md);
-this file is the executive summary.
+The full multi-thousand-line implementation plan is held by the PR
+author locally (out-of-tree, not under version control); the PR review
+feedback has been folded into the relevant sections below so this
+document is self-sufficient. The PR-#10 commit-by-commit history
+(visible on GitHub) is the canonical record of what landed.
 
 > **Background note:** the original research doc
 > `docs/research/isaac-omniverse-integration.md` was merged via PR #8
