@@ -148,6 +148,12 @@ ignore = ["D100", "D104", "D107", "D203", "D213", "S101", "ANN401", "TCH", "TC"]
     "D", "ANN", "C901", "N", "RUF012", "W292", "I001", "E501", "F401",
     "ARG001", "ARG002", "S101", "B008", "T20", "RUF013", "A001", "A002",
 ]
+# Operator-facing CLI scripts under scripts/ legitimately print to
+# stdout (T201), shell out to system tools by partial path (S603/S607
+# for nvidia-smi / powershell), and use a single main() entrypoint
+# without a docstring on the symbol that already has a module
+# docstring (D103).
+"scripts/**/*.py" = ["T201", "S603", "S607", "D103"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
