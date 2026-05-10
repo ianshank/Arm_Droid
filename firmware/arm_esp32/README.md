@@ -77,6 +77,9 @@ Pin map and pulse calibration are configurable in
 `src/armdroid/config/schema.py` (`ArmServoConfig`). Avoid ESP32 strapping
 pins (0, 2, 5, 12, 15) and input-only pins (34–39).
 
+Construction-time wiring, power-distribution, and joint stack-up
+diagrams live in [`docs/architecture/WIRING.md`](../../docs/architecture/WIRING.md).
+
 Power: each MG995 can draw ~1 A peak under load — do **not** power the
 servos from the ESP32's 5 V regulator. Use a separate 5 V / 5 A supply
 common-grounded with the ESP32.
