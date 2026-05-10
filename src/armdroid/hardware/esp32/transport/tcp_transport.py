@@ -1,9 +1,7 @@
 """TCP (WiFi) transport for the ESP32 JSON driver.
 
-Opens an asyncio TCP connection to the firmware's WiFi server and speaks the
-same newline-delimited JSON protocol as serial.  The firmware allows only one
-active client at a time; additional connection attempts are rejected until the
-current client disconnects.
+Opens an asyncio TCP connection to a compatible TCP endpoint and speaks the
+same newline-delimited JSON protocol as serial.
 
 No third-party dependencies — uses stdlib ``asyncio`` only.
 """
