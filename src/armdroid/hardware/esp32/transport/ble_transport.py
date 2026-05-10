@@ -309,7 +309,7 @@ class BleTransport:
         while not self._rx_queue.empty():
             try:
                 self._rx_queue.get_nowait()
-            except asyncio.QueueEmpty:  # pragma: no cover – race-safe guard
+            except asyncio.QueueEmpty:  # pragma: no cover - race-safe guard
                 break
         self._rx_buf.clear()
 
