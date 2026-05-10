@@ -49,6 +49,15 @@ _log = get_logger(__name__)
 def build_arm_driver(cfg: ArmSettings) -> ArmDriverProtocol:
     """Build the robot-arm hardware driver.
 
+    The ``isaac_sim`` driver requires both ``ArmConfig`` and
+    ``ArmSimIsaacConfig`` and therefore bypasses the registry — the
+    registry's single-arg ``DriverFactory`` cannot accommodate the dual
+    config without dropping YAML overlays via ``ArmSettings()`` re-read
+    (mirrors the ``rsl_rl_ppo`` agent special-case in
+    :func:`build_arm_controller`). PR-11 review fix: devin #7,
+    copilot ``H-cfg-thread-driver-factory`` /
+    ``H-cfg-thread-driver-default``.
+
     Args:
         cfg: Root settings.
 
@@ -57,6 +66,13 @@ def build_arm_driver(cfg: ArmSettings) -> ArmDriverProtocol:
     """
     kind = resolve_driver_kind(cfg)
     _log.info("arm_driver_built", kind=kind)
+    if kind == "isaac_sim":
+        # Direct dispatch threads cfg.arm_sim_isaac through so YAML /
+        # env overlays on arm_sim_isaac.* take effect. The registry
+        # registration of "isaac_sim" remains for entry-point parity.
+        from armdroid.hardware.isaac_sim.driver import IsaacSimDriver
+
+        return IsaacSimDriver(cfg.arm, sim_cfg=cfg.arm_sim_isaac)
     return get_driver(kind)(cfg.arm)
 
 
@@ -76,6 +92,14 @@ def build_arm_planner(cfg: ArmSettings) -> ArmPlannerProtocol:
 def build_arm_environment(cfg: ArmSettings) -> ArmEnvironmentProtocol:
     """Build the Gymnasium environment for arm training.
 
+    The ``so_arm_reach_isaac`` env requires ``ArmSimIsaacConfig`` in
+    addition to the task / training configs; threading
+    ``cfg.arm_sim_isaac`` through is required for YAML / env overlays
+    on ``arm_sim_isaac.*`` to take effect (the env's own
+    ``sim_isaac_cfg`` parameter falls back to a fresh defaults object
+    otherwise). PR-11 review fix: devin #6, copilot
+    ``H-cfg-thread-env-default`` / ``H-overlay-yaml-not-applied``.
+
     Args:
         cfg: Root settings.
 
@@ -85,7 +109,15 @@ def build_arm_environment(cfg: ArmSettings) -> ArmEnvironmentProtocol:
     dof = cfg.arm.dof
     task_type = cfg.arm_task.task_type
     _log.info("arm_env_built", task_type=task_type)
-    return get_environment(task_type)(cfg.arm_task, cfg.arm_training, dof=dof)
+    factory = get_environment(task_type)
+    if task_type == "so_arm_reach_isaac":
+        return factory(
+            cfg.arm_task,
+            cfg.arm_training,
+            dof=dof,
+            sim_isaac_cfg=cfg.arm_sim_isaac,
+        )
+    return factory(cfg.arm_task, cfg.arm_training, dof=dof)
 
 
 def build_arm_controller(

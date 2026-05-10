@@ -18,19 +18,26 @@ types, so this test should pass on the first GREEN. Type-coercion is
 NOT expected to be needed; failures here indicate a regression.
 
 PR-B extends ``_BUILTIN_ENVS`` to include ``"so_arm_reach_isaac"`` —
-the Isaac branch is gated on ``pytest.importorskip("isaaclab")`` so
-this file remains skip-clean without the optional extra installed.
+the Isaac branch is gated on BOTH ``ARMDROID_ISAAC_RUN=1`` AND
+``isaaclab`` being importable. Merely having ``isaaclab`` installed
+must not opt a developer into Isaac/Kit-booting tests on the default
+test run (PR-11 review fix: copilot ``M-property-tests-isaac-gating``
+/ ``H-property-tests-isaac-gating``).
 """
 
 from __future__ import annotations
 
 # Built-in envs that PR-A can safely exercise without optional extras.
-# PR-B (this commit) extends with "so_arm_reach_isaac" gated on
-# importlib.util.find_spec("isaaclab") — peer-review S-5: find_spec
-# checks installation without import side-effects (raw try/except
-# import would trigger AppLauncher singleton in some Isaac Lab
-# configs).
+# PR-B extends with "so_arm_reach_isaac" gated on:
+#   1. importlib.util.find_spec("isaaclab") — peer-review S-5: find_spec
+#      checks installation without import side-effects (raw try/except
+#      import would trigger AppLauncher singleton in some Isaac Lab
+#      configs).
+#   2. ARMDROID_ISAAC_RUN=1 env var — explicit opt-in. Without this,
+#      `isaaclab installed` is not sufficient to enrol the Isaac env in
+#      the property suite (PR-11 review fix).
 import importlib.util as _importlib_util
+import os as _os
 
 import numpy as np
 import pytest
@@ -41,15 +48,16 @@ from armdroid.config.schema import ArmTaskConfig, ArmTrainingConfig
 from armdroid.domain.protocols import ArmEnvironmentProtocol
 from armdroid.environments.registry import get_environment
 
-_BUILTIN_ENVS = ("tower_of_hanoi", "laundry_sorting")
+_BUILTIN_ENVS: tuple[str, ...] = ("tower_of_hanoi", "laundry_sorting")
 _HAS_ISAAC = _importlib_util.find_spec("isaaclab") is not None
-if _HAS_ISAAC:
+_ISAAC_OPT_IN = _os.environ.get("ARMDROID_ISAAC_RUN") == "1"
+if _HAS_ISAAC and _ISAAC_OPT_IN:
     _BUILTIN_ENVS = (*_BUILTIN_ENVS, "so_arm_reach_isaac")
 
 
 def _env_for(name: str, dof: int = 6) -> ArmEnvironmentProtocol:
     """Construct a registered env, overriding ``task_type`` to match name."""
-    task_cfg = ArmTaskConfig(task_type=name)  # type: ignore[arg-type]
+    task_cfg = ArmTaskConfig(task_type=name)
     env = get_environment(name)(task_cfg, ArmTrainingConfig(), dof=dof)
     # Belt-and-braces: every registered env must satisfy the protocol.
     assert isinstance(env, ArmEnvironmentProtocol)
