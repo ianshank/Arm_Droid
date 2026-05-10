@@ -23,7 +23,10 @@ arm:
     auth:
       key_env_var: ARMDROID_HMAC_KEY
       required: true
-    serial_port: null
+    # serial_port is declared as a required string with default "auto"
+    # in ArmTransportConfig; it has no effect when protocol == "tcp"
+    # but Pydantic still validates the type, so leave it at "auto".
+    serial_port: "auto"
     serial_baud: 115200
     command_timeout_s: 1.0
     heartbeat_hz: 10.0
@@ -75,5 +78,9 @@ arm:
 
   firmware:
     interpolator_hz: 50.0
-    watchdog_timeout_s: 0.5
+    # watchdog_timeout_s must exceed transport.keepalive_interval_s
+    # (5.0 above) so the firmware does not latch e-stop while the driver
+    # is still actively pinging. Wireless links justify a longer
+    # watchdog than the cabled-serial default.
+    watchdog_timeout_s: 15.0
     firmware_version: "1.0.0"

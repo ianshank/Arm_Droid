@@ -100,14 +100,24 @@ class TcpTransport:
             return b""
         try:
             line = await self._reader.readline()
-            return line
         except (ConnectionResetError, OSError) as exc:
-            # Connection lost — clear state so is_connected => False and
-            # the driver's reader loop exits cleanly rather than spinning.
+            # Connection lost mid-read — clear state so is_connected
+            # => False and the driver's reader loop exits cleanly rather
+            # than spinning.
             self._writer = None
             self._reader = None
             _log.warning("tcp_transport_connection_lost", error=str(exc))
             return b""
+        if line == b"":
+            # Clean EOF — peer closed the socket. ``StreamReader.readline``
+            # does not raise on EOF, it just returns an empty line. Without
+            # clearing _reader / _writer, ``is_connected`` would stay True
+            # and the driver's reader loop would spin on every subsequent
+            # call. Treat this identically to a hard error.
+            self._writer = None
+            self._reader = None
+            _log.warning("tcp_transport_connection_lost", error="eof")
+        return line
 
 
 __all__ = ["TcpTransport"]

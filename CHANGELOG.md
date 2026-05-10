@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   package adds three pluggable transports behind a common
   ``ArmTransport`` base: ``SerialTransport`` (legacy USB-UART, default),
   ``TcpTransport`` (Wi-Fi-attached firmware), and ``BleTransport``
-  (BLE GATT). Selected via ``ArmTransportConfig.kind`` with HMAC-SHA256
+  (BLE GATT). Selected via ``ArmTransportConfig.protocol`` with HMAC-SHA256
   auth (``TransportAuthConfig``) for the wireless variants. `[ble]`
   extra adds the optional ``bleak>=0.22`` dependency. Worked examples
   in ``config/examples/arm_tcp.example.yaml`` and
@@ -125,7 +125,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   - **`tests/isaac/`** smoke suite — `tests/isaac/conftest.py` mirrors
     `tests/hardware/conftest.py`'s env-var-gated pattern
     (`ARMDROID_ISAAC_RUN=1`); auto-marks every test `@pytest.mark.isaac`
-    + `@pytest.mark.gpu`. `test_smoke_isaac_driver.py` covers the full
+    plus `@pytest.mark.gpu`. `test_smoke_isaac_driver.py` covers the full
     driver lifecycle; `test_smoke_isaac_env.py` covers reset → step×5
     → close. Local-only (CI doesn't install isaaclab).
   - **`.github/workflows/gpu-ci.yml`** — manual-dispatch + `gpu` PR

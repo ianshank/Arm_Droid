@@ -470,11 +470,28 @@ class Esp32JsonDriver:
             raise
 
     async def _reader_loop(self) -> None:
-        """Read lines forever, dispatch by message type."""
+        """Read lines forever, dispatch by message type.
+
+        On TCP / BLE EOF the underlying transport returns ``b""`` and
+        flips ``transport.is_connected`` to False. Without an explicit
+        check this would spin at 100% CPU on every empty read; break
+        when the transport reports it is disconnected so the driver's
+        :meth:`disconnect` (or a supervisor task) can rebuild the
+        transport rather than the loop pegging a core. Empty reads on a
+        still-connected transport (legitimate keepalive idle) keep the
+        original ``continue`` semantics so existing behaviour is
+        preserved on the serial path.
+        """
         try:
             while self._connected:
                 line = await self._transport.readline()
                 if not line:
+                    if not self._transport.is_connected:
+                        _log.warning(
+                            "esp32_json_reader_transport_disconnected",
+                            transport=type(self._transport).__name__,
+                        )
+                        break
                     continue
                 self._dispatch_line(line)
         except asyncio.CancelledError:

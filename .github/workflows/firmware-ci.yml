@@ -24,16 +24,16 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-      - name: Install armdroid (host config + codegen deps only)
+      - name: Install armdroid (full base deps, no [dev])
         run: |
           python -m pip install --upgrade pip
-          # Install just the schema / loader deps so codegen is fast.
-          # We deliberately skip torch / mujoco / SB3 — they're not needed
-          # to render the firmware header. ``numpy`` is required because
-          # ``armdroid/__init__.py`` re-exports protocol types whose
-          # annotations reference ``numpy.typing.NDArray`` (lazy at runtime
-          # but still resolved when modules import the public API).
-          pip install "pydantic>=2.7" "pydantic-settings>=2.7" "structlog>=23.0" "pyyaml>=6.0" "numpy>=1.24"
+          # ``armdroid/__init__.py`` transitively imports
+          # ``armdroid.environments`` (gymnasium) and
+          # ``armdroid.control.sac_agent`` (stable-baselines3) at package
+          # init time, so importing ``armdroid.config.schema`` from the
+          # codegen script needs the full base dependency set. Skipping
+          # [dev] keeps ruff / mypy / pytest out of this fast job.
+          pip install -e .
       - name: Verify config_generated.h is in sync with ArmSettings
         run: python scripts/gen_firmware_config.py --check
 

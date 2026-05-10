@@ -95,6 +95,12 @@ def _load_secrets(path: Path) -> _Secrets:
     except ValueError:
         sys.stderr.write("[gen_firmware_config] ARMDROID_TCP_PORT must be an integer\n")
         sys.exit(1)
+    # The generated header emits the port into a uint16_t, so validate
+    # the range before we silently truncate / wrap. <=0 is nonsensical
+    # for a TCP listen port.
+    if not 1 <= tcp_port <= 65535:
+        sys.stderr.write("[gen_firmware_config] ARMDROID_TCP_PORT must be between 1 and 65535\n")
+        sys.exit(1)
 
     if hmac_key:
         # Validate: must be valid hex and at least 32 hex chars (16 bytes)
@@ -132,8 +138,22 @@ _BANNER = (
 
 
 def _c_str(s: str) -> str:
-    """Escape a Python string for embedding in a C string literal."""
-    return s.replace("\\", "\\\\").replace('"', '\\"')
+    """Escape a Python string for embedding in a C string literal.
+
+    Handles backslash and double-quote (the obvious cases) plus
+    newline / carriage-return / tab so a SSID or password containing
+    those characters does not break the generated C++ header. Any other
+    non-printable control character would still produce broken output;
+    those are extremely rare in WiFi credentials and the firmware will
+    fail to compile rather than silently mis-parse.
+    """
+    return (
+        s.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
+    )
 
 
 def _format_float_array(values: list[float], suffix: str = "f") -> str:
@@ -306,6 +326,23 @@ def main(argv: list[str] | None = None) -> int:
     rendered = render_header(cfg, secrets=secrets)
 
     output_path: Path = args.output
+    # Security guard: the default ``DEFAULT_OUTPUT`` path is tracked in
+    # git (codegen-check validates the committed header stays in sync
+    # with ArmSettings). Writing a secrets-bearing header to that path
+    # is one ``git add`` away from leaking WiFi credentials and the
+    # HMAC key. Refuse the write and require an explicit ``--output``
+    # so the operator has to think about where the secrets-bearing
+    # header lands. Local-only paths can be added to .gitignore (see
+    # the ``firmware/arm_esp32/src/`` block).
+    secrets_present = secrets is not None and (secrets.wifi_enabled or secrets.hmac_enabled)
+    if secrets_present and not args.check and output_path == DEFAULT_OUTPUT:
+        sys.stderr.write(
+            "[gen_firmware_config] refusing to write secrets-bearing header to "
+            f"{output_path} — that file is tracked in git. Re-run with "
+            "--output <path> pointing at a gitignored location "
+            "(e.g. firmware/arm_esp32/src/config_generated_with_secrets.h).\n"
+        )
+        return 1
     if args.check:
         if not output_path.exists():
             sys.stderr.write(

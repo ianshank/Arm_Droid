@@ -44,7 +44,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 # Minimum NVIDIA driver version per Isaac Sim 5.1 official requirements.
-# See: https://docs.isaacsim.omniverse.nvidia.com/4.5.0/installation/requirements.html
+# See: https://docs.isaacsim.omniverse.nvidia.com/latest/installation/requirements.html
+# (``latest`` slug avoids version-rot when NVIDIA rotates the per-release
+# doc URLs.)
 ISAAC_SIM_MIN_DRIVER_MAJOR = 535
 
 # Compute capability thresholds. Ampere (compute 8.0) is the official

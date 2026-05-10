@@ -113,10 +113,15 @@ class BleTransport:
             a real :class:`bleak.BleakClient` is constructed.
     """
 
-    # Maximum bytes the BLE stack can deliver in one notification.
-    # The NUS TX characteristic MTU is typically 20 bytes on a default
-    # connection; the firmware sends full lines so we must reassemble.
-    _MAX_NOTIFY_BYTES: int = 512
+    #: Hard floor for the in-memory notification reassembly buffer. The
+    #: NUS TX characteristic MTU is typically 20 bytes; one JSON line
+    #: comfortably fits in well under 512 bytes. The actual cap used at
+    #: runtime is ``max(_MIN_NOTIFY_BUF_BYTES, cfg.transport.max_line_bytes)``
+    #: so operators raising ``max_line_bytes`` for larger frames cannot
+    #: have their frames silently dropped here. The floor protects against
+    #: a misconfigured ``max_line_bytes=0`` from disabling reassembly
+    #: entirely.
+    _MIN_NOTIFY_BUF_BYTES: int = 512
 
     def __init__(
         self,
@@ -135,6 +140,16 @@ class BleTransport:
         self._rx_buf: bytearray = bytearray()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._is_connected: bool = False
+        # Resolve the reassembly cap once at init. ``cfg`` is sometimes a
+        # ``MagicMock`` in tests; comparing an int with a MagicMock
+        # cascades truthy and would silently corrupt the overflow check
+        # at every notification. Coercing to ``int`` here pins the cap
+        # to a real number for the lifetime of the transport.
+        try:
+            cfg_max = int(cfg.transport.max_line_bytes)
+        except (TypeError, ValueError):
+            cfg_max = self._MIN_NOTIFY_BUF_BYTES
+        self._rx_buf_max_bytes: int = max(self._MIN_NOTIFY_BUF_BYTES, cfg_max)
 
     # ------------------------------------------------------------------ #
     # ArmTransport protocol
@@ -236,16 +251,19 @@ class BleTransport:
     def _ingest_chunk(self, chunk: bytes) -> None:
         """Reassemble notification chunks into complete lines.
 
-        If the buffer grows beyond ``_MAX_NOTIFY_BYTES`` without a newline
-        (e.g. firmware bug or a corrupted stream) the buffer is discarded to
-        prevent unbounded memory growth.
+        If the buffer grows beyond the configured maximum line length
+        without a newline (e.g. firmware bug or a corrupted stream) the
+        buffer is discarded to prevent unbounded memory growth. The cap
+        is sourced from ``cfg.transport.max_line_bytes`` (with a hard
+        floor of :attr:`_MIN_NOTIFY_BUF_BYTES`) so operators tuning
+        max_line_bytes upward also lift the BLE reassembly cap.
         """
         self._rx_buf.extend(chunk)
-        if len(self._rx_buf) > self._MAX_NOTIFY_BYTES and b"\n" not in self._rx_buf:
+        if len(self._rx_buf) > self._rx_buf_max_bytes and b"\n" not in self._rx_buf:
             _log.warning(
                 "ble_transport_rx_buffer_overflow",
                 buf_len=len(self._rx_buf),
-                max_bytes=self._MAX_NOTIFY_BYTES,
+                max_bytes=self._rx_buf_max_bytes,
             )
             self._rx_buf.clear()
             return

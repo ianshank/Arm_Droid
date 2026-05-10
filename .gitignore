@@ -128,6 +128,16 @@ arduino-build/
 !.secrets/*.example
 !.secrets/.gitkeep
 
+# Firmware headers built with --secrets-file (WiFi creds + HMAC key
+# baked into C string literals). The base firmware/arm_esp32/src/
+# config_generated.h is tracked and validated by codegen-check; the
+# *_with_secrets.h variant is local-only and must never be committed.
+# scripts/gen_firmware_config.py refuses to write secrets to the
+# tracked default path; this glob is the second line of defence in
+# case someone names their secrets header by hand.
+firmware/arm_esp32/src/config_generated_with_secrets.h
+firmware/arm_esp32/src/*_with_secrets.h
+
 # Local env overrides
 *.local.env
 

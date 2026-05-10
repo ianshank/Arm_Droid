@@ -128,7 +128,7 @@ class HmacFramer:
             ValueError: If *line* is not valid JSON.
         """
         try:
-            frame: dict[str, Any] = json.loads(line.decode("ascii"))
+            frame: dict[str, Any] = json.loads(line.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             msg = f"Cannot sign non-JSON frame: {exc}"
             raise ValueError(msg) from exc
@@ -136,10 +136,19 @@ class HmacFramer:
         self._out_seq += 1
         frame["seq"] = self._out_seq
         # Canonical form: sorted keys, compact separators, no sig field yet.
-        canonical = json.dumps(frame, sort_keys=True, separators=(",", ":")).encode("ascii")
+        # ``ensure_ascii=False`` keeps non-ASCII characters (e.g. event
+        # messages or object names) intact in the canonical bytes that
+        # both sides hash; the wire bytes are utf-8 to match
+        # PROTOCOL.md.
+        canonical = json.dumps(
+            frame,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
         sig_hex = hmac.digest(self._key, canonical, hashlib.sha256).hex()
         frame["sig"] = sig_hex
-        return (json.dumps(frame, separators=(",", ":")) + "\n").encode("ascii")
+        return (json.dumps(frame, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
 
     def verify(self, line: bytes) -> bytes:
         """Verify *line* and return it with ``sig`` stripped.
@@ -156,7 +165,7 @@ class HmacFramer:
                 replay, missing fields, bad encoding).
         """
         try:
-            frame: dict[str, Any] = json.loads(line.decode("ascii").strip())
+            frame: dict[str, Any] = json.loads(line.decode("utf-8").strip())
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             msg = f"Cannot verify non-JSON frame: {exc}"
             raise ValueError(msg) from exc
@@ -175,14 +184,19 @@ class HmacFramer:
             msg = f"Anti-replay: seq {seq} ≤ last accepted {self._last_in_seq}"
             raise ValueError(msg)
 
-        canonical = json.dumps(frame, sort_keys=True, separators=(",", ":")).encode("ascii")
+        canonical = json.dumps(
+            frame,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
         expected_hex = hmac.digest(self._key, canonical, hashlib.sha256).hex()
         if not hmac.compare_digest(sig, expected_hex):
             msg = "HMAC-SHA256 signature verification failed"
             raise ValueError(msg)
 
         self._last_in_seq = seq
-        return (json.dumps(frame, separators=(",", ":")) + "\n").encode("ascii")
+        return (json.dumps(frame, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
 
 
 # ---------------------------------------------------------------------------

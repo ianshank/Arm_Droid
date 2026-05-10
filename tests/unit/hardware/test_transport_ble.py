@@ -247,19 +247,44 @@ async def test_ble_transport_unexpected_disconnect_clears_is_connected() -> None
 
 @pytest.mark.asyncio
 async def test_ble_transport_buffer_overflow_protection() -> None:
-    """_ingest_chunk discards the buffer when it exceeds _MAX_NOTIFY_BYTES without a newline."""
+    """_ingest_chunk discards the buffer when it exceeds _rx_buf_max_bytes without a newline."""
     cfg = _make_cfg()
     fake_client = FakeBleClient("AA:BB:CC:DD:EE:FF")
     t = BleTransport(cfg, client_factory=lambda addr: fake_client)
     await t.connect()
 
-    # Inject a chunk larger than _MAX_NOTIFY_BYTES with no newline.
-    garbage = b"x" * (BleTransport._MAX_NOTIFY_BYTES + 1)
+    # Inject a chunk larger than the resolved buffer cap with no newline.
+    # The cap is sourced from cfg.transport.max_line_bytes (with a hard
+    # floor of _MIN_NOTIFY_BUF_BYTES) and exposed as the instance attr
+    # _rx_buf_max_bytes after BleTransport.__init__.
+    garbage = b"x" * (t._rx_buf_max_bytes + 1)
     t._ingest_chunk(garbage)
 
     # Buffer must have been cleared — no items in queue.
     assert t._rx_queue.empty()
     assert len(t._rx_buf) == 0
+
+
+@pytest.mark.asyncio
+async def test_ble_transport_buffer_cap_respects_max_line_bytes() -> None:
+    """Lifting cfg.transport.max_line_bytes above the floor lifts the cap (TD)."""
+    cfg = _make_cfg()
+    cfg.transport.max_line_bytes = 4096
+    fake_client = FakeBleClient("AA:BB:CC:DD:EE:FF")
+    t = BleTransport(cfg, client_factory=lambda addr: fake_client)
+    await t.connect()
+
+    # The reassembly cap should reflect the configured max — operators
+    # raising max_line_bytes for larger frames must not be silently
+    # capped at the 512-byte floor.
+    assert t._rx_buf_max_bytes == 4096
+
+    # Sanity: a frame just under the cap with a trailing newline must
+    # be reassembled and delivered.
+    payload = b"y" * (4096 - 1) + b"\n"
+    t._ingest_chunk(payload)
+    line = await t.readline()
+    assert line == payload
 
 
 # ---------------------------------------------------------------------------
