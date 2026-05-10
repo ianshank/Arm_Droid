@@ -246,6 +246,78 @@ async def test_ble_transport_unexpected_disconnect_clears_is_connected() -> None
 
 
 @pytest.mark.asyncio
+async def test_ble_transport_reconnect_clears_stale_sentinel() -> None:
+    """connect() drains the b"" sentinel enqueued by a prior disconnect().
+
+    Without draining, a reconnect would immediately return b"" from the first
+    readline(), falsely signalling disconnect to the new session.
+    """
+    cfg = _make_cfg()
+    fake_client = FakeBleClient("AA:BB:CC:DD:EE:FF")
+    t = BleTransport(cfg, client_factory=lambda addr: fake_client)
+
+    # First connect → disconnect cycle (puts b"" sentinel in queue).
+    await t.connect()
+    await t.disconnect()
+
+    # Simulate the fake client being re-connectable.
+    fake_client._connected = False
+
+    # Reconnect: the queue should be drained before the new session starts.
+    await t.connect()
+    assert t.is_connected
+
+    # Inject a real notification; readline() must return that, not the old sentinel.
+    line = b'{"t":"ack","id":42}\n'
+    fake_client.inject_notification(line)
+    result = await t.readline()
+    assert result == line
+
+
+@pytest.mark.asyncio
+async def test_ble_transport_reconnect_clears_stale_rx_buf() -> None:
+    """connect() clears any leftover reassembly buffer from a prior connection.
+
+    Pre-disconnect partial frames must not bleed into the new session.
+    """
+    cfg = _make_cfg()
+    fake_client = FakeBleClient("AA:BB:CC:DD:EE:FF")
+    t = BleTransport(cfg, client_factory=lambda addr: fake_client)
+
+    await t.connect()
+    # Inject a partial frame (no newline) that won't be enqueued.
+    t._ingest_chunk(b'{"t":"partial')
+    assert len(t._rx_buf) > 0
+
+    await t.disconnect()
+
+    # Reconnect: the reassembly buffer must have been cleared.
+    fake_client._connected = False
+    await t.connect()
+    assert len(t._rx_buf) == 0
+
+
+@pytest.mark.asyncio
+async def test_ble_transport_unexpected_disconnect_clears_rx_buf() -> None:
+    """_handle_unexpected_disconnect() also clears the reassembly buffer."""
+    cfg = _make_cfg()
+    fake_client = FakeBleClient("AA:BB:CC:DD:EE:FF")
+    t = BleTransport(cfg, client_factory=lambda addr: fake_client)
+
+    await t.connect()
+    t._ingest_chunk(b'{"t":"partial')
+    assert len(t._rx_buf) > 0
+
+    t._handle_unexpected_disconnect()
+
+    assert not t.is_connected
+    assert len(t._rx_buf) == 0
+    # The sentinel must still be queued to unblock any awaiting readline().
+    result = t._rx_queue.get_nowait()
+    assert result == b""
+
+
+@pytest.mark.asyncio
 async def test_ble_transport_buffer_overflow_protection() -> None:
     """_ingest_chunk discards the buffer when it exceeds _rx_buf_max_bytes without a newline."""
     cfg = _make_cfg()

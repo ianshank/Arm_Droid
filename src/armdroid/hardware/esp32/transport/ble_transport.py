@@ -171,6 +171,12 @@ class BleTransport:
             )
             raise ArmDriverError(msg)
 
+        # Drain stale RX state from any previous connection, including the b""
+        # sentinel that disconnect() / _handle_unexpected_disconnect() enqueue.
+        # Without this, a reconnect can immediately see phantom empty reads or
+        # deliver pre-disconnect frame fragments to the new session.
+        self._drain_rx_state()
+
         self._loop = asyncio.get_running_loop()
         ble: BleTransportConfig = self._cfg.transport.ble  # type: ignore[assignment]
 
@@ -283,8 +289,29 @@ class BleTransport:
     def _handle_unexpected_disconnect(self) -> None:
         """Run on the event loop when bleak fires the disconnected callback."""
         self._is_connected = False
+        # Clear the reassembly buffer; any in-flight partial frame belongs to
+        # the now-dead connection and must not be delivered to a future session.
+        self._rx_buf.clear()
         self._rx_queue.put_nowait(b"")
         _log.warning("ble_transport_unexpected_disconnect")
+
+    # ------------------------------------------------------------------ #
+    # Helpers
+    # ------------------------------------------------------------------ #
+
+    def _drain_rx_state(self) -> None:
+        """Drain the RX queue and clear the reassembly buffer.
+
+        Called at the start of :meth:`connect` to discard any stale sentinels
+        or leftover frame fragments from a previous connection so the new
+        session starts with a clean slate.
+        """
+        while not self._rx_queue.empty():
+            try:
+                self._rx_queue.get_nowait()
+            except asyncio.QueueEmpty:  # pragma: no cover – race-safe guard
+                break
+        self._rx_buf.clear()
 
     async def _scan_for_device(self, ble: BleTransportConfig) -> str:
         """Scan for a BLE device matching ``ble.device_name`` or service UUID."""
