@@ -58,7 +58,13 @@ dev = [
     "pytest-xdist>=3.0",
     "hypothesis>=6.80",
     "ruff==0.15.12",
-    "mypy>=1.5",
+    # mypy 1.13+ — earlier versions crash with internal AssertionError
+    # ("Cannot find module for _frozen_importlib.ModuleSpec") on strict
+    # scans of code that calls ``importlib.util.find_spec``. Multiple
+    # armdroid modules use that pattern (telemetry/otel.py for the
+    # opentelemetry probe, hardware/esp32/transport/ble_transport.py for
+    # the bleak probe) so the pin is load-bearing.
+    "mypy>=1.13",
     "types-PyYAML>=6.0",
 ]
 
