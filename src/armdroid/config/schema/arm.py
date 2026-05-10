@@ -88,19 +88,22 @@ class TransportAuthConfig(BaseModel):
     """HMAC-SHA256 frame authentication for TCP and BLE transports.
 
     The key is loaded from ``key_env_var`` (``ARMDROID_HMAC_KEY`` by
-    default), expected to be a 32-byte hex-encoded string (64 hex chars).
+    default) and must be a hex-encoded string of at least 16 bytes
+    (32 hex chars). A 32-byte key (64 hex chars) is recommended.
     Set ``key_hex`` to override the env var at config time (test fixtures
     only — never commit real keys in config files).
     """
 
     key_hex: str | None = Field(
         default=None,
-        description="32-byte hex-encoded HMAC key (overrides key_env_var; "
-        "test fixtures only — do not commit real keys).",
+        description="Hex-encoded HMAC key of at least 16 bytes (32 hex chars); "
+        "32 bytes (64 hex chars) recommended. Overrides key_env_var; "
+        "test fixtures only — do not commit real keys.",
     )
     key_env_var: str = Field(
         default="ARMDROID_HMAC_KEY",
-        description="Env var holding the 32-byte hex-encoded HMAC key.",
+        description="Env var holding a hex-encoded HMAC key of at least "
+        "16 bytes (32 hex chars); 32 bytes (64 hex chars) recommended.",
     )
     required: bool = Field(
         default=True,
