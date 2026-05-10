@@ -1,9 +1,20 @@
-"""Isaac Lab ArticulationCfg builder for the SO-ARM101 (PR-B B.8).
+"""Isaac Lab ArticulationCfg builder for the SO-ARM100 / SO-ARM101 (PR-B B.8).
 
 Vendored from MuammerBay/isaac_so_arm101 @ e4624dea075b00a36dbc66bebd531d191c92e8cd
 under BSD 3-Clause License (Copyright 2025, Muammer Bay (LycheeAI),
 Louis Le Lay). Source file:
 src/isaac_so_arm101/robots/trs_so100/so_arm100.py.
+
+Naming note (Copilot M-articulation-naming):
+  The function name :func:`build_so_arm100_articulation_cfg` and the
+  upstream module path (``so_arm100.py``) preserve the upstream's
+  legacy "100" suffix to keep the vendoring trail auditable. The
+  builder itself is kinematically generic across SO-ARM100 and
+  SO-ARM101 — both ship the same 5-arm-joint + 1-gripper structure —
+  so the actual robot variant is selected by the URDF supplied via
+  ``ArmSimIsaacConfig.urdf_fallback_path`` (default: SO-ARM101). Do
+  *not* rename without updating the vendoring trail in
+  ``THIRD_PARTY_NOTICES.md`` and ``ADR-0005-isaac-sim-backend.md``.
 
 Modifications from upstream:
 - Every numeric value (PD gains, init pose, solver iterations, fix_base,
@@ -43,7 +54,7 @@ def build_so_arm100_articulation_cfg(
     sim_cfg: ArmSimIsaacConfig,
     arm_cfg: ArmConfig,
 ) -> Any:
-    """Build an Isaac Lab ``ArticulationCfg`` for the SO-ARM101.
+    """Build an Isaac Lab ``ArticulationCfg`` for the SO-ARM100/SO-ARM101.
 
     Args:
         sim_cfg: Isaac Sim configuration. Every numeric / string knob

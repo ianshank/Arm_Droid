@@ -68,10 +68,11 @@ class ArmCurriculumConfig(BaseModel):
 class RslRlPpoConfig(BaseModel):
     """RSL-RL PPO hyperparameter configuration (PR-B B.3).
 
-    Field defaults mirror MuammerBay/isaac_so_arm101's ReachPPORunnerCfg
-    pinned at the upstream commit SHA captured in
-    ``assets/so_arm/so101/ATTRIBUTION.md`` (under "Pending in PR-B" →
-    "Pinned" once vendoring lands).
+    Field defaults mirror MuammerBay/isaac_so_arm101's ``ReachPPORunnerCfg``
+    pinned at upstream commit ``e4624dea075b00a36dbc66bebd531d191c92e8cd``
+    (see ``THIRD_PARTY_NOTICES.md`` and ``ADR-0005-isaac-sim-backend.md``
+    for the vendoring trail). Source:
+    ``src/isaac_so_arm101/tasks/reach/agents/rsl_rl_ppo_cfg.py``.
 
     Consumed by ``armdroid.control.rsl_rl_agent.RslRlPpoAgent``;
     instantiation lives in ``build_arm_controller``'s explicit

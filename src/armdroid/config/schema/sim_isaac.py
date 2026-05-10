@@ -231,12 +231,23 @@ class ArmSimIsaacConfig(BaseModel):
     # ------------------------------------------------------------------ #
 
     reach_env_id: str = Field(
-        default="Isaac-SO-ARM100-Reach-v0",
-        description="gymnasium env id used by gym.make() in SoArmReachIsaacEnv.",
+        default="Isaac-SO-ARM101-Reach-v0",
+        description=(
+            "gymnasium env id used by gym.make() in SoArmReachIsaacEnv. "
+            "Defaults to the SO-ARM101 task to match the SO101 URDF "
+            "asset default (urdf_fallback_path); the vendored "
+            "tasks/reach/__init__.py also registers the SO-ARM100 "
+            "variant, but using a 100 env id with a SO101 URDF would "
+            "silently train against a different robot config."
+        ),
     )
     reach_play_env_id: str = Field(
-        default="Isaac-SO-ARM100-Reach-Play-v0",
-        description="gymnasium env id for evaluation rollouts (no domain randomisation).",
+        default="Isaac-SO-ARM101-Reach-Play-v0",
+        description=(
+            "gymnasium env id for evaluation rollouts (no domain "
+            "randomisation). Defaults to the SO-ARM101 play task for "
+            "the same asset-consistency reason as reach_env_id."
+        ),
     )
 
     # ------------------------------------------------------------------ #

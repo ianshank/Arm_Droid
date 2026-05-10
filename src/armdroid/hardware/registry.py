@@ -18,10 +18,13 @@ from typing import TYPE_CHECKING, TypeAlias
 from armdroid._registry import Registry
 from armdroid.hardware.esp32 import Esp32JsonDriver
 from armdroid.hardware.mock_arm_driver import MockArmDriver
+from armdroid.logging.setup import get_logger
 
 if TYPE_CHECKING:
     from armdroid.config.schema import ArmConfig
     from armdroid.domain.protocols import ArmDriverProtocol
+
+_log = get_logger(__name__)
 
 #: A driver factory: a callable that accepts an :class:`ArmConfig` and
 #: returns a fully-constructed :class:`ArmDriverProtocol` instance.
@@ -51,6 +54,20 @@ def _isaac_sim_factory(arm_cfg: ArmConfig) -> ArmDriverProtocol:
     time, instead of leaking through later as a less-actionable Kit
     error from ``IsaacSimDriver.connect()``.
 
+    .. warning::
+       This registry path **drops** ``cfg.arm_sim_isaac`` overlays
+       (Copilot M-overlay-drop). The registry's
+       ``Callable[[ArmConfig], ArmDriverProtocol]`` signature can only
+       accept a single ``ArmConfig``, so this factory always
+       constructs ``IsaacSimDriver(arm_cfg)`` with a fresh
+       :func:`armdroid.config.schema.sim_isaac._default_sim_cfg`. YAML
+       / env overlays for ``arm_sim_isaac`` are silently ignored on
+       this path. Callers who need overlays applied **must** route via
+       :func:`armdroid.orchestration.factory.build_arm_driver` (which
+       branches on the Isaac driver kind to thread
+       ``cfg.arm_sim_isaac`` through explicitly), not
+       ``get_driver("isaac_sim")``.
+
     Raises:
         ArmDriverError: When the [isaac] extra is not installed
             (isaaclab cannot be imported), with a hint pointing at the
@@ -70,6 +87,20 @@ def _isaac_sim_factory(arm_cfg: ArmConfig) -> ArmDriverProtocol:
 
     from armdroid.hardware.isaac_sim.driver import IsaacSimDriver
 
+    # Surface the overlay-drop at runtime (Copilot M-overlay-drop).
+    # build_arm_driver()'s explicit branch threads cfg.arm_sim_isaac
+    # through, so the warning fires only on the direct registry path
+    # (typically out-of-band callers / plugin-based dispatch).
+    _log.warning(
+        "isaac_sim_factory_overlay_drop",
+        message=(
+            "get_driver('isaac_sim') constructs IsaacSimDriver with the "
+            "default arm_sim_isaac config; YAML / env overlays will not "
+            "apply on this path. Use armdroid.orchestration.factory."
+            "build_arm_driver(ArmSettings) for the fully-configured "
+            "path."
+        ),
+    )
     return IsaacSimDriver(arm_cfg)
 
 

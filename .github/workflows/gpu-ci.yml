@@ -5,11 +5,10 @@ name: GPU CI (Isaac Sim)
 #   * workflow_dispatch — manual run from any branch
 #   * pull_request push that touches Isaac code paths (default
 #     types: opened, synchronize, reopened — paths filter applies)
-#   * pull_request labelled "gpu" — explicit opt-in for arbitrary PRs
-#
-# Peer-review hole-finder fix: ``paths`` is ignored under
-# ``types: [labeled]``. We use TWO trigger blocks: one for path-based
-# auto-runs (default types), one for label-based explicit opt-in.
+#   * pull_request labelled "gpu" — explicit opt-in for arbitrary PRs.
+#     ``types: [..., labeled]`` is required so the labeled action
+#     reaches the workflow at all; the ``paths`` filter is then
+#     evaluated against the PR head branch.
 #
 # Runs on ubuntu-latest. The pure-Python isaac-extra unit tests
 # (gripper math, tensor adapter, configs) cover the import surface +
@@ -20,6 +19,7 @@ name: GPU CI (Isaac Sim)
 on:
   workflow_dispatch:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - 'src/armdroid/environments/isaac/**'
       - 'src/armdroid/environments/_tensor_adapter.py'
@@ -40,6 +40,24 @@ jobs:
               || github.event.action != 'labeled'))
     steps:
       - uses: actions/checkout@v4
+
+      - name: Free disk space for the multi-GB isaaclab wheel set
+        # isaacsim + isaaclab + CUDA runtime wheels exceed the
+        # ubuntu-latest runner's default ~14 GB free space; the previous
+        # round produced "OSError [Errno 28] No space left on device"
+        # mid-install. jlumbroso/free-disk-space@main reclaims ~30 GB by
+        # purging unused pre-installed tooling (Android SDK, .NET, dotnet
+        # caches, swap). All flags pinned via inputs to keep the action's
+        # behaviour deterministic and easy to audit.
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false  # keep Python interpreters cache
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
 
       - uses: actions/setup-python@v6
         with:
