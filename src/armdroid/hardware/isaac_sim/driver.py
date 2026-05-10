@@ -93,6 +93,20 @@ class IsaacSimDriver:
 
             sim_cfg = _default_sim_cfg()
 
+        # ArmDriverProtocol assumes a single arm — vectorised training
+        # (num_envs > 1) bypasses the driver and uses Isaac Lab's runner
+        # directly. Reject the misconfiguration up front so the failure is
+        # actionable; otherwise send_joint_positions() reshape((num_envs,
+        # -1)) would raise an opaque torch error on the first command.
+        if sim_cfg.num_envs != 1:
+            msg = (
+                f"IsaacSimDriver requires sim_cfg.num_envs == 1 (protocol "
+                f"path is single-arm); got num_envs={sim_cfg.num_envs}. "
+                "For vectorised training, bypass the driver/protocol and "
+                "use Isaac Lab's OnPolicyRunner against the raw env."
+            )
+            raise ArmDriverError(msg)
+
         self._cfg = cfg
         self._sim_cfg = sim_cfg
         self._dof = cfg.dof
@@ -316,7 +330,7 @@ class IsaacSimDriver:
                 # Advance the sim so the PD controller actually executes
                 # the move; without stepping, set_joint_position_target +
                 # write_data_to_sim leave the articulation state unchanged.
-                n_steps = max(1, int(round(duration_s / self._sim_cfg.physics_dt_s)))
+                n_steps = max(1, round(duration_s / self._sim_cfg.physics_dt_s))
                 await asyncio.to_thread(self._step_sim, n_steps)
             except Exception as exc:
                 _log.error(

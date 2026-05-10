@@ -120,6 +120,11 @@ class SoArmReachIsaacEnv:
     ) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
         """Execute one environment step."""
         with get_telemetry().start_span(SPAN_ENV_STEP, dof=self._dof):
+            # Match the lazy-build contract documented on _ensure_built —
+            # callers that step() before reset() (or future wrappers that
+            # invert that order) get a clean gym build instead of an
+            # AttributeError on None._isaac_env.
+            self._ensure_built()
             isaac_action = self._adapter.action_from_protocol(action)
             return self._adapter.step_to_protocol(self._isaac_env.step(isaac_action))
 

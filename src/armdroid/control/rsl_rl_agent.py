@@ -185,6 +185,14 @@ class RslRlPpoAgent:
                 with torch.no_grad():
                     action_t = policy(obs_t)
                 action_np = action_t.cpu().numpy().astype(np.float64)
+                # RSL-RL's policy returns shape (num_envs, action_dim);
+                # ArmRLAgentProtocol.predict() (matching SACAgent / the
+                # ActionPrimitives path) expects a flat (action_dim,)
+                # vector. Squeeze the leading env dim when num_envs == 1
+                # — the only configuration the protocol path supports —
+                # so callers receive the documented shape.
+                if action_np.ndim >= 2 and action_np.shape[0] == 1:
+                    action_np = action_np.reshape(action_np.shape[1:])
                 _log.debug("rsl_rl_ppo_predict", obs_keys=list(observation.keys()))
                 return action_np
             except Exception as exc:

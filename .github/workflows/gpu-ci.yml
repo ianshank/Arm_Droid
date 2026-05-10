@@ -46,6 +46,13 @@ jobs:
           python-version: "3.11"
           cache: pip
 
+      - name: Bootstrap legacy build deps (setuptools/wheel for flatdict)
+        # isaaclab pulls flatdict, whose sdist build invokes pkg_resources.
+        # Python 3.12+ runners no longer ship setuptools by default; explicit
+        # install keeps the [dev,isaac] step from failing on a missing
+        # legacy-builder rather than a real isaaclab problem.
+        run: pip install --upgrade pip setuptools wheel
+
       - name: Install [dev,isaac] extras (NVIDIA index for isaaclab)
         id: isaac_install
         continue-on-error: true
