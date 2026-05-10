@@ -7,8 +7,9 @@ sparse-reward manipulation tasks.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
+import gymnasium as gym
 import numpy as np
 import torch
 from numpy.typing import NDArray
@@ -26,6 +27,7 @@ from armdroid.telemetry import (
 
 if TYPE_CHECKING:
     from armdroid.config.schema import ArmTrainingConfig
+    from armdroid.domain.protocols import ArmEnvironmentProtocol
 
 _log = get_logger(__name__)
 
@@ -56,16 +58,30 @@ class SACAgent:
             buffer_size=training_cfg.buffer_size,
         )
 
-    def build(self, env: Any) -> None:
+    def build(self, env: ArmEnvironmentProtocol) -> None:
         """Build the SAC+HER model for a given environment.
 
+        Tightens the previous ``env: Any`` signature to the protocol
+        (TD-4). The SB3 ``SAC`` constructor accepts a duck-typed gym
+        env; the protocol guarantees the methods SB3 needs
+        (``reset``/``step``/``render``/``close``) plus the
+        goal-conditioned dict observation surface required by
+        :class:`stable_baselines3.HerReplayBuffer`.
+
         Args:
-            env: Gymnasium-compatible environment (must support GoalEnv).
+            env: Gymnasium-compatible environment satisfying
+                :class:`ArmEnvironmentProtocol` and exposing a
+                goal-conditioned observation dict (HER requirement).
         """
         with get_telemetry().start_span(SPAN_AGENT_BUILD, algorithm=self._cfg.algorithm):
+            # SB3 is typed against gymnasium.Env, not our protocol.
+            # ArmEnvironmentProtocol is structurally compatible (every
+            # SB3-required method is on the protocol), so we cast at the
+            # boundary rather than weaken the build() parameter type.
+            sb3_env = cast("gym.Env[Any, Any]", env)
             self._model = SAC(
                 "MultiInputPolicy",
-                env,
+                sb3_env,
                 learning_rate=self._cfg.learning_rate,
                 batch_size=self._cfg.batch_size,
                 buffer_size=self._cfg.buffer_size,

@@ -4,15 +4,22 @@ Built-in agents (``sac``, ``sac_her``) register on import. Out-of-tree
 agents may be plugged in via the ``armdroid.rl_agents`` entry-point
 group. PR-B registers ``rsl_rl_ppo`` here.
 
-Closes G4: the registry generic is a callable factory that returns
+The registry generic is a callable factory that returns
 :class:`armdroid.domain.protocols.ArmRLAgentProtocol`, so out-of-tree
-agents must satisfy the contract on construction. Using ``Callable[...,
+agents must satisfy the contract on construction (verified by
+``tests/regression/test_baseline.py::test_sac_agent_satisfies_protocol``
++ ``tests/unit/test_protocols.py``). Using ``Callable[...,
 ArmRLAgentProtocol]`` rather than ``type[ArmRLAgentProtocol]`` accepts
 both class objects (whose ``__init__`` becomes the factory) and plain
 factory functions, AND it lets mypy verify ``agent_cls(cfg.arm_training)``
 without a ``# type: ignore[call-arg]`` (Protocol classes don't constrain
-``__init__``). PR-B's ``RslRlPpoAgent`` can register itself as a class
-or as a wrapped factory without changing this surface.
+``__init__``). PR-B's ``RslRlPpoAgent`` registers as a wrapped factory
+because its constructor takes both ``training_cfg`` and ``ppo_cfg`` —
+see ``_rsl_rl_ppo_factory`` below.
+
+Both built-in agent classes (``SACAgent``, ``RslRlPpoAgent``) declare
+``build(env: ArmEnvironmentProtocol) -> None`` (TD-4): runtime
+isinstance checks pass and mypy strict verifies signature variance.
 """
 
 from __future__ import annotations
