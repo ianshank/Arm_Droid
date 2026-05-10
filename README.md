@@ -125,6 +125,9 @@ pip install -e ".[dev]"
 # Real arm driver (ESP32 JSON-over-UART via pyserial)
 pip install -e ".[hardware]"
 
+# BLE GATT transport for the ESP32 (Phase 1.0; bleak SDK)
+pip install -e ".[ble]"
+
 # Intel RealSense D435i depth camera (pyrealsense2)
 pip install -e ".[realsense]"
 
@@ -134,15 +137,18 @@ pip install -e ".[anthropic]"
 # OpenTelemetry observability backend (zero-overhead by default)
 pip install -e ".[telemetry]"
 
-# NVIDIA Isaac Sim 5.1 / Isaac Lab 2.3 backend (PR-B). Requires a CUDA
-# GPU + NVIDIA driver >=535 + the NVIDIA pip index. ~8-10 GB install.
-# isaaclab is hosted on https://pypi.nvidia.com (NOT PyPI), so the
-# extra index URL is REQUIRED — without it pip fails with "no matching
-# distribution found for isaacsim".
+# NVIDIA Isaac Sim 5.1 / Isaac Lab 2.3 backend. Requires a CUDA GPU
+# (Ampere+ — RTX 30/40/50 series, A/L/H-series) + NVIDIA driver >=535
+# + the NVIDIA pip index. ~9-15 GB install. isaaclab is hosted on
+# https://pypi.nvidia.com (NOT PyPI), so the extra index URL is
+# REQUIRED. Run `python scripts/check_isaac_install.py` first — it
+# probes Python pin / driver / per-GPU compute capability / package
+# state and exits 0 when the host is ready, 2 with degraded warnings,
+# 1 on hard incompatibility.
 pip install -e ".[isaac]" --extra-index-url https://pypi.nvidia.com
 
 # Install everything (default-CI-compatible subset)
-pip install -e ".[dev,hardware,realsense,anthropic,telemetry]"
+pip install -e ".[dev,hardware,ble,realsense,anthropic,telemetry]"
 ```
 
 ### Windows note — MuJoCo and Visual C++ Redistributable
@@ -381,26 +387,35 @@ tests/
 
 ## Roadmap / Next steps
 
-1. **Real arm validation** — run the decomposed ESP32 driver on the physical MakerWorld arm,
-  calibrate joint limits and home pose, and validate emergency-stop / reconnect behaviour.
+1. **Real arm validation across all transports** — run the decomposed ESP32 driver on the
+   physical MakerWorld arm over USB-UART, Wi-Fi (TCP), and BLE; calibrate joint limits and
+   home pose; validate emergency-stop / reconnect / HMAC-auth behaviour for each transport.
 
-2. **Complete registry dispatch** — extend the same named-factory lookup used for drivers and
+2. **Isaac Sim sim-to-real bridge** — install `[isaac]` on Ampere+ hardware (the probe at
+   `scripts/check_isaac_install.py` reports readiness), train PPO via `RslRlPpoAgent`,
+   add domain randomisation over PD gains / friction / mass, and validate zero-shot
+   transfer to the real arm. Tower of Hanoi as an Isaac task (currently only the reach
+   primitive is wired) is part of this.
+
+3. **MuJoCo render + perception PnP** — implement
+   `BaseEnv.render` against `mujoco.Renderer` (TD-6) and replace the bbox-derived
+   orientation in `PoseEstimator` with full OpenCV PnP keyed off per-class 3D models
+   (TD-7). Both are currently scope-deferred with structured-log placeholders.
+
+4. **Complete registry dispatch** — extend the same named-factory lookup used for drivers and
   environments to the remaining planner, perception, and controller composition paths where
   external plugins are expected.
 
-3. **Tighten the typing envelope** — retire the remaining targeted mypy relaxations in
+5. **Tighten the typing envelope** — retire the remaining targeted mypy relaxations in
   `config.schema`, `control.sac_agent`, `perception.object_detector`, and
   `perception.depth_processor` as third-party boundaries are wrapped more narrowly.
 
-4. **Broaden public-surface regression coverage** — keep expanding regression tests around
+6. **Broaden public-surface regression coverage** — keep expanding regression tests around
   `armdroid.api`, root-package re-exports, and entry-point/plugin discovery so future internal
   refactors cannot silently change the public contract.
 
-5. **RealSense + YOLO production tuning** — connect the live D435i pipeline, collect task data,
-  and tune detector / pose-estimation thresholds from real camera intrinsics and scenes.
-
-6. **7-DoF and sim-to-real follow-through** — finish the MuJoCo scene assets, validate domain
-  randomisation against real rollouts, and only then consider making 7-DoF the default config.
+7. **7-DoF and full perception loop** — finish the MuJoCo scene assets, connect the live D435i
+   pipeline, and only then consider making 7-DoF the default config.
 
 ---
 

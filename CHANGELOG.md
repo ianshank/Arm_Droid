@@ -11,6 +11,73 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **ESP32 Phase 1.0 multi-transport** — `armdroid.hardware.esp32.transport`
+  package adds three pluggable transports behind a common
+  ``ArmTransport`` base: ``SerialTransport`` (legacy USB-UART, default),
+  ``TcpTransport`` (Wi-Fi-attached firmware), and ``BleTransport``
+  (BLE GATT). Selected via ``ArmTransportConfig.protocol`` with HMAC-SHA256
+  auth (``TransportAuthConfig``) for the wireless variants. `[ble]`
+  extra adds the optional ``bleak>=0.22`` dependency. Worked examples
+  in ``config/examples/arm_tcp.example.yaml`` and
+  ``config/examples/arm_ble.example.yaml``.
+- **`scripts/check_isaac_install.py`** — pre-install / pre-boot probe
+  for the `[isaac]` extra. Reports Python version vs Isaac Lab's 3.11
+  pin, NVIDIA driver vs Isaac Sim 5.1's 535 minimum, per-GPU compute
+  capability with a name-based heuristic fallback (handles mixed
+  Tesla / GeForce driver layouts on Windows where ``nvidia-smi`` only
+  enumerates one branch's cards), and which `[isaac]` packages are
+  actually importable. Verdict severity drives the exit code (0 ok /
+  1 hard fail / 2 soft warning) so CI / install scripts can branch.
+  Safe on any machine — never imports ``isaaclab`` / ``isaacsim``.
+- **`ArmOrchestrator.task_cfg`** — optional `ArmTaskConfig` parameter
+  (TD-5). When provided, ``rollout()`` resolves PDDL plan-step args
+  (e.g. ``["disk_1", "peg_a", "peg_c"]``) to real Cartesian XYZ
+  targets via ``task_cfg.peg_positions`` / ``basket_positions``
+  rather than always passing zeros. ``_resolve_target_position``
+  helper exposes the lookup; ``_step_args_to_target`` retained as a
+  backward-compat shim. ``build_arm_orchestrator(cfg)`` now threads
+  ``cfg.arm_task`` through automatically.
+
+### Changed
+
+- **`SACAgent.build`** signature tightened from `env: Any` to
+  `env: ArmEnvironmentProtocol` (TD-4). Behaviour unchanged — the SB3
+  ``SAC`` constructor receives a ``cast`` at the boundary because SB3
+  is typed against ``gymnasium.Env``, not our protocol. Runtime
+  ``isinstance`` checks continue to pass.
+- **`mypy>=1.13`** — bumped from `>=1.5` (TD-1). Earlier 1.11.x
+  versions crashed in strict mode on ``importlib.util.find_spec``
+  callers (``AssertionError: Cannot find module for
+  _frozen_importlib.ModuleSpec``). The probe and several
+  base-library modules use that pattern, so the pin is load-bearing.
+- **`scripts/**/*.py` ruff per-file-ignores** — `T201` (print),
+  `S603`/`S607` (partial-path subprocess), `D103` (no docstring on
+  `main`) for operator-facing CLI scripts. Matches existing
+  vendored-Isaac-task and tests-folder per-file ignores.
+
+### Deprecated
+
+- **`armdroid.orchestration.orchestrator._step_args_to_target`** —
+  retained as a thin wrapper around `_resolve_target_position(args,
+  task_cfg=None)` for the v0.2.x line. Remove in v0.4.0 once all
+  callers migrate to the resolver tuple `(target, used_fallback)`.
+- **`ArmOrchestrator(...)` without `task_cfg`** — accepted with a
+  one-time structured warning per rollout
+  (``arm_orchestrator_step_target_fallback``). Default-`None` argument
+  becomes required in v0.4.0.
+
+### Documentation
+
+- **TD-6 / TD-7 scope-defer notes** — `BaseEnv.render` and
+  `PoseEstimator.estimate_pose` now carry explicit "deferred to
+  v0.4 because" docstrings spelling out the wiring needed (MJCF
+  loading + offscreen framebuffer for render; per-class 3D model +
+  calibrated camera matrix for PnP). No runtime behaviour change;
+  both call sites still return zeros / ``None``, but with a
+  structured-log marker (``orientation_unmeasured=True``,
+  ``env_render_headless``) so downstream code can detect the
+  placeholder at runtime.
+
 - **Isaac Sim / Isaac Lab runtime integration (PR-B, opt-in `[isaac]` extra)** —
   the actual NVIDIA Isaac Sim 5.1 / Isaac Lab 2.3 runtime code, behind
   the `armdroid[isaac]` extra. Default install (`pip install -e ".[dev]"`)
@@ -58,7 +125,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   - **`tests/isaac/`** smoke suite — `tests/isaac/conftest.py` mirrors
     `tests/hardware/conftest.py`'s env-var-gated pattern
     (`ARMDROID_ISAAC_RUN=1`); auto-marks every test `@pytest.mark.isaac`
-    + `@pytest.mark.gpu`. `test_smoke_isaac_driver.py` covers the full
+    plus `@pytest.mark.gpu`. `test_smoke_isaac_driver.py` covers the full
     driver lifecycle; `test_smoke_isaac_env.py` covers reset → step×5
     → close. Local-only (CI doesn't install isaaclab).
   - **`.github/workflows/gpu-ci.yml`** — manual-dispatch + `gpu` PR

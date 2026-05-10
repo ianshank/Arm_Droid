@@ -49,4 +49,14 @@ constexpr uint32_t kSerialBaud = 115200;
 // Firmware version — emitted in the boot evt frame.
 constexpr const char* kFirmwareVersion = "arm-esp32-1.0.0";
 
+// WiFi / TCP transport.
+constexpr bool kWiFiEnabled = false;
+constexpr const char* kWiFiSSID = "";
+constexpr const char* kWiFiPassword = "";
+constexpr uint16_t kTcpPort = 3001;
+
+// HMAC-SHA256 authentication.
+constexpr bool kHmacEnabled = false;
+constexpr const char* kHmacKeyHex = "";
+
 }  // namespace armdroid::firmware::config

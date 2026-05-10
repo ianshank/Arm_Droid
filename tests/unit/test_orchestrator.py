@@ -10,7 +10,11 @@ from armdroid.config.schema import ArmSettings
 from armdroid.control.controller import ArmController
 from armdroid.domain.state import PlanStep, SymbolicState
 from armdroid.orchestration.factory import build_arm_orchestrator
-from armdroid.orchestration.orchestrator import ArmOrchestrator, _step_args_to_target
+from armdroid.orchestration.orchestrator import (
+    ArmOrchestrator,
+    _resolve_target_position,
+    _step_args_to_target,
+)
 
 
 @pytest.fixture
@@ -128,7 +132,7 @@ class TestArmOrchestratorRollout:
 
 
 class TestStepArgsToTarget:
-    """_step_args_to_target adapter."""
+    """_step_args_to_target adapter (legacy shim, always zero)."""
 
     def test_returns_zero_array_with_args(self) -> None:
         import numpy as np
@@ -146,6 +150,118 @@ class TestStepArgsToTarget:
         import numpy as np
 
         target = _step_args_to_target(["x"])
+        assert target.dtype == np.float64
+
+
+class TestResolveTargetPosition:
+    """_resolve_target_position resolves PDDL args via task_cfg (TD-5)."""
+
+    def test_falls_back_to_zeros_without_task_cfg(self) -> None:
+        import numpy as np
+
+        target, used_fallback = _resolve_target_position(
+            ["disk_1", "peg_a", "peg_c"], task_cfg=None
+        )
+        np.testing.assert_array_equal(target, np.zeros(3, dtype=np.float64))
+        assert used_fallback is True
+
+    def test_resolves_destination_peg_from_task_cfg(self) -> None:
+        import numpy as np
+
+        from armdroid.config.schema import ArmTaskConfig
+
+        cfg = ArmTaskConfig(
+            num_pegs=3,
+            peg_positions=[
+                [0.21, 0.0, 0.0],
+                [0.31, 0.0, 0.0],
+                [0.41, 0.0, 0.0],
+            ],
+        )
+        target, used_fallback = _resolve_target_position(["disk_1", "peg_a", "peg_c"], task_cfg=cfg)
+        np.testing.assert_allclose(target, [0.41, 0.0, 0.0])
+        assert used_fallback is False
+
+    def test_resolves_first_peg_when_only_arg(self) -> None:
+        from armdroid.config.schema import ArmTaskConfig
+
+        cfg = ArmTaskConfig()  # default 3 pegs
+        target, used_fallback = _resolve_target_position(["peg_a"], task_cfg=cfg)
+        assert tuple(target) == tuple(cfg.peg_positions[0])
+        assert used_fallback is False
+
+    def test_resolves_basket_for_laundry_args(self) -> None:
+        from armdroid.config.schema import ArmTaskConfig
+
+        cfg = ArmTaskConfig(
+            num_baskets=3,
+            basket_positions=[
+                [0.5, -0.2, 0.0],
+                [0.6, -0.2, 0.0],
+                [0.7, -0.2, 0.0],
+            ],
+        )
+        target, used_fallback = _resolve_target_position(["shirt_1", "basket_b"], task_cfg=cfg)
+        assert tuple(target) == tuple(cfg.basket_positions[1])
+        assert used_fallback is False
+
+    def test_unrecognised_name_falls_back(self) -> None:
+        import numpy as np
+
+        from armdroid.config.schema import ArmTaskConfig
+
+        cfg = ArmTaskConfig()
+        target, used_fallback = _resolve_target_position(
+            ["mystery_object", "unknown_zone"], task_cfg=cfg
+        )
+        np.testing.assert_array_equal(target, np.zeros(3, dtype=np.float64))
+        assert used_fallback is True
+
+    def test_out_of_range_index_falls_back(self) -> None:
+        import numpy as np
+
+        from armdroid.config.schema import ArmTaskConfig
+
+        cfg = ArmTaskConfig()  # 3 pegs by default; peg_z = index 25
+        target, used_fallback = _resolve_target_position(["peg_z"], task_cfg=cfg)
+        np.testing.assert_array_equal(target, np.zeros(3, dtype=np.float64))
+        assert used_fallback is True
+
+    def test_case_insensitive_name_match(self) -> None:
+        from armdroid.config.schema import ArmTaskConfig
+
+        cfg = ArmTaskConfig()
+        # Planner emits lowercase but case-insensitive match keeps
+        # legacy callers passing "peg_C" working.
+        target_lc, used_lc = _resolve_target_position(["peg_c"], task_cfg=cfg)
+        target_uc, used_uc = _resolve_target_position(["peg_C"], task_cfg=cfg)
+        assert used_lc is False
+        assert used_uc is False
+        assert tuple(target_lc) == tuple(target_uc)
+
+    def test_destination_is_last_arg(self) -> None:
+        from armdroid.config.schema import ArmTaskConfig
+
+        cfg = ArmTaskConfig(
+            num_pegs=3,
+            peg_positions=[
+                [0.1, 0.0, 0.0],
+                [0.2, 0.0, 0.0],
+                [0.3, 0.0, 0.0],
+            ],
+        )
+        # Hanoi convention: ["disk", source, destination] - destination
+        # is last, so peg_a (source) must NOT be returned.
+        target, _ = _resolve_target_position(["disk_1", "peg_a", "peg_b"], task_cfg=cfg)
+        assert tuple(target) == tuple(cfg.peg_positions[1])
+
+    def test_returns_dtype_float64(self) -> None:
+        import numpy as np
+
+        from armdroid.config.schema import ArmTaskConfig
+
+        cfg = ArmTaskConfig()
+        target, _ = _resolve_target_position(["peg_a"], task_cfg=cfg)
         assert target.dtype == np.float64
 
 

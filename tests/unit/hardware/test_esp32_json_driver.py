@@ -164,7 +164,7 @@ async def test_state_frames_update_cache(
     drv = Esp32JsonDriver(_make_config())
     await drv.connect()
     try:
-        fake = drv._port  # type: ignore[attr-defined]
+        fake = drv._transport._port  # type: ignore[attr-defined]
         assert isinstance(fake, _FakeSerial)
         fake.emit_state_now()
         await asyncio.sleep(0.05)
@@ -184,7 +184,7 @@ async def test_malformed_lines_are_dropped(
     drv = Esp32JsonDriver(_make_config())
     await drv.connect()
     try:
-        fake = drv._port  # type: ignore[attr-defined]
+        fake = drv._transport._port  # type: ignore[attr-defined]
         assert isinstance(fake, _FakeSerial)
         with fake._lock:
             fake.inject_raw_lines.append(b"this is not json\n")
@@ -216,7 +216,7 @@ async def test_command_timeout_raises_driver_error(
     drv = Esp32JsonDriver(cfg)
     await drv.connect()
     try:
-        fake = drv._port  # type: ignore[attr-defined]
+        fake = drv._transport._port  # type: ignore[attr-defined]
         original = fake._handle_host_line
 
         def silent_for_set_joints(line: bytes) -> None:
@@ -250,7 +250,7 @@ async def test_disconnect_cancels_pending(
     )
     drv = Esp32JsonDriver(cfg)
     await drv.connect()
-    fake = drv._port  # type: ignore[attr-defined]
+    fake = drv._transport._port  # type: ignore[attr-defined]
     original = fake._handle_host_line
     fake._handle_host_line = lambda line: None  # type: ignore[method-assign]
 
@@ -497,13 +497,13 @@ async def test_encode_max_line_bytes_boundary(
 async def test_write_blocking_disconnected_raises(
     fake_serial_module: type[_FakeSerial],
 ) -> None:
-    """_write_blocking on a disconnected driver raises ArmDriverError."""
+    """SerialTransport.write_line on a disconnected transport raises ArmDriverError."""
     from armdroid.hardware.esp32 import Esp32JsonDriver
 
     drv = Esp32JsonDriver(_make_config())
-    # _port is None when not connected
+    # transport is not connected, write_line should raise
     with pytest.raises(ArmDriverError, match="not connected"):
-        drv._write_blocking(b"test\n")  # type: ignore[attr-defined]
+        await drv._transport.write_line(b"test\n")  # type: ignore[attr-defined]
 
 
 # --------------------------------------------------------------------- #
@@ -569,7 +569,7 @@ async def test_read_state_raises_when_no_state_arrives(
     await drv.connect()
     try:
         # Replace get_state handler: ACK the command but never emit a state frame.
-        fake = drv._port  # type: ignore[attr-defined]
+        fake = drv._transport._port  # type: ignore[attr-defined]
         original_handle = fake._handle_host_line
 
         def _ack_only_get_state(line: bytes) -> None:
@@ -637,12 +637,16 @@ async def test_handle_state_bad_joint_count_is_tolerated(driver: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_send_and_await_ack_write_failure_raises_driver_error(driver: Any) -> None:
-    """Lines 407-409: OSError in _write_blocking surfaces as ArmDriverError."""
-    from unittest.mock import patch
+    """Lines 407-409: transport write failure surfaces as ArmDriverError."""
+    from unittest.mock import AsyncMock, patch
 
     with (
-        patch.object(driver, "_write_blocking", side_effect=OSError("port closed")),
-        pytest.raises(ArmDriverError, match="Serial write failed"),
+        patch.object(
+            driver._transport,  # type: ignore[attr-defined]
+            "write_line",
+            AsyncMock(side_effect=ArmDriverError("port closed")),
+        ),
+        pytest.raises(ArmDriverError, match="port closed"),
     ):
         await driver.send_joint_positions((0.0,) * 6, duration_s=1.0)
 

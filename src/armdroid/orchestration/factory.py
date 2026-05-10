@@ -219,4 +219,8 @@ def build_arm_orchestrator(cfg: ArmSettings) -> ArmOrchestrator:
         controller=controller,
         environment=environment,
         driver=driver,
+        # TD-5: thread task_cfg so rollout() can resolve PDDL args
+        # (peg_a, peg_b, ...) to real Cartesian targets via
+        # task_cfg.peg_positions instead of returning zeros.
+        task_cfg=cfg.arm_task,
     )

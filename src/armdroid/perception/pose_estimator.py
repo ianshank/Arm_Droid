@@ -85,13 +85,23 @@ class PoseEstimator:
         y = (cy - cy_cam) * z / fy
 
         position = np.array([x, y, z], dtype=np.float64)
-        # Coarse orientation from bbox (placeholder — full PnP needs 3D model)
+        # TD-7: orientation is zeros until OpenCV PnP is wired up. Full
+        # PnP needs (a) per-class 3D model points (corners, keypoints
+        # extracted from the URDF / mesh), (b) corresponding 2D
+        # detections (currently we only have bbox center + corners), and
+        # (c) a calibrated camera matrix. Until those land, downstream
+        # code must treat orientation as unmeasured and rely on
+        # symbolic/grasp-pose heuristics. The structured log surfaces
+        # the gap so callers can detect the unmeasured field at runtime
+        # (e.g. for sim-only callers that don't actually need
+        # orientation, this confirms the placeholder is in effect).
         orientation = np.zeros(3, dtype=np.float64)
 
         _log.debug(
             "pose_estimated",
             object_id=detection.object_id,
             position=position.tolist(),
+            orientation_unmeasured=True,
         )
         return position, orientation
 

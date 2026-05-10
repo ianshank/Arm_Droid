@@ -59,6 +59,37 @@ class TestFactoryRegression:
         assert orch.environment is not None
         assert orch.driver is not None
 
+    def test_factory_threads_task_cfg_into_orchestrator(self) -> None:
+        """Regression for TD-5: ``build_arm_orchestrator`` must thread
+        ``cfg.arm_task`` into the orchestrator so ``rollout()`` can
+        resolve PDDL plan-step args to real Cartesian targets via
+        ``task_cfg.peg_positions`` instead of falling back to zeros.
+
+        Guards against future refactors that drop the kwarg.
+        """
+        cfg = ArmSettings(mock_hardware=True)
+        orch = build_arm_orchestrator(cfg)
+        # Private attribute by design — the orchestrator does not need to
+        # expose task_cfg on the public protocol; this regression makes the
+        # threading visible to CI.
+        assert orch._task_cfg is cfg.arm_task
+
+    def test_orchestrator_resolves_destination_peg_position(self) -> None:
+        """End-to-end TD-5 regression: a Hanoi plan step ``[disk, source,
+        dest]`` resolves to the configured peg position rather than zeros.
+        """
+        import numpy as np
+
+        from armdroid.orchestration.orchestrator import _resolve_target_position
+
+        cfg = ArmSettings(mock_hardware=True)
+        target, used_fallback = _resolve_target_position(
+            ["disk_1", "peg_a", "peg_c"],
+            task_cfg=cfg.arm_task,
+        )
+        np.testing.assert_allclose(target, cfg.arm_task.peg_positions[2])
+        assert used_fallback is False
+
 
 class TestPublicSurfaceRegression:
     """The stable public API and built-in registry surface stay importable."""

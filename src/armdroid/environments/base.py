@@ -121,12 +121,29 @@ class ArmEnvironmentBase(abc.ABC):
             return obs, reward, terminated, truncated, info
 
     def render(self) -> NDArray[np.uint8] | None:
-        """Render current state (stub — override with MuJoCo rendering).
+        """Render current state.
+
+        Default implementation is headless (returns ``None``). Subclasses
+        with a backing simulator override this — :class:`SoArmReachIsaacEnv`
+        wraps Isaac Lab's ``ManagerBasedRLEnv.render``; a future MuJoCo
+        env subclass should similarly delegate to ``mujoco.Renderer``
+        (TD-6, deferred to v0.4 — needs MJCF loading + an offscreen
+        framebuffer pipeline; tracked separately because it's
+        scope-orthogonal to the base env's numpy state model).
+
+        The base class purposefully does NOT raise: rendering is
+        optional in :class:`ArmEnvironmentProtocol`.
 
         Returns:
-            None (headless mode).
+            ``None`` (headless mode). Subclasses return RGB ``uint8`` of
+            shape ``(H, W, 3)`` when a renderer is wired up.
         """
         with get_telemetry().start_span(SPAN_ENV_RENDER):
+            _log.debug(
+                "env_render_headless",
+                env_class=type(self).__name__,
+                step_count=self._step_count,
+            )
             return None
 
     def close(self) -> None:

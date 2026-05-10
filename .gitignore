@@ -24,9 +24,11 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# Virtual environments — covers .venv, .venv311 (Python 3.11 pin for the
+# [isaac] extra), and any other suffixed sibling envs.
 .env
 .venv
+.venv*/
 env/
 venv/
 ENV/
@@ -56,6 +58,7 @@ dmypy.json
 # IDEs
 .idea/
 .vscode/
+!.vscode/extensions.json
 *.swp
 *.swo
 
@@ -116,3 +119,35 @@ assets/**/usd/*.usdc
 isaac_sim_logs/
 # Local Kit-app shader / scene caches (Isaac Sim writes under cwd or $HOME)
 *.kit-cache/
+
+# Arduino CLI build artifacts
+arduino-build/
+
+# Local secrets — never commit real credentials
+.secrets/*.env
+!.secrets/*.example
+!.secrets/.gitkeep
+
+# Firmware headers built with --secrets-file (WiFi creds + HMAC key
+# baked into C string literals). The base firmware/arm_esp32/src/
+# config_generated.h is tracked and validated by codegen-check; the
+# *_with_secrets.h variant is local-only and must never be committed.
+# scripts/gen_firmware_config.py refuses to write secrets to the
+# tracked default path; this glob is the second line of defence in
+# case someone names their secrets header by hand.
+firmware/arm_esp32/src/config_generated_with_secrets.h
+firmware/arm_esp32/src/*_with_secrets.h
+
+# Local env overrides
+*.local.env
+
+# Local-only project bundles / scratch artefacts (created by ad-hoc
+# install / packaging scripts; never committed). The pattern is broad
+# enough to keep developer-side scratchpads out of source control
+# without naming each one.
+armdroid_isaac_bundle.zip
+
+# Claude Code worktrees — when an in-progress feature uses a git
+# worktree under .claude/, the working tree itself is local-only. The
+# canonical content lives on the corresponding branch on origin.
+.claude/worktrees/

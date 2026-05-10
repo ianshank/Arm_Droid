@@ -17,6 +17,100 @@ from armdroid.logging.setup import get_logger
 
 _log = get_logger(__name__)
 
+# ---------------------------------------------------------------------------
+# Transport sub-configs (TCP, BLE, auth) — Phase 1.0 additions
+# ---------------------------------------------------------------------------
+
+
+class TcpTransportConfig(BaseModel):
+    """TCP (WiFi) transport settings for the host driver.
+
+    Connects over raw TCP to the firmware's WiFi server. The firmware
+    enforces single-client-at-a-time; additional connections are rejected.
+    """
+
+    host: str = Field(
+        default="127.0.0.1",
+        description="Hostname or IP address of the ESP32 WiFi server.",
+    )
+    port: int = Field(
+        default=3001,
+        gt=0,
+        le=65535,
+        description="TCP port the firmware WiFi server listens on.",
+    )
+    connect_timeout_s: float = Field(
+        default=5.0,
+        gt=0.0,
+        description="Timeout for the TCP handshake.",
+    )
+
+
+class BleTransportConfig(BaseModel):
+    """BLE GATT transport settings for the host driver.
+
+    Uses a custom service with two characteristics that carry the same
+    newline-delimited JSON protocol as serial/TCP.  The NUS (Nordic UART
+    Service) UUIDs are the defaults; override for a custom firmware build.
+
+    Set ``device_address = "auto"`` to scan by ``device_name``; otherwise
+    supply the exact MAC address / UUID string for the target device.
+    """
+
+    device_address: str = Field(
+        default="auto",
+        description="BLE device address (MAC / UUID) or 'auto' to scan by name.",
+    )
+    device_name: str | None = Field(
+        default="ArmDroid",
+        description="Advertised device name used for scan when device_address='auto'.",
+    )
+    service_uuid: str = Field(
+        default="6e400001-b5a3-f393-e0a9-e50e24dcca9e",
+        description="BLE service UUID (NUS default).",
+    )
+    tx_char_uuid: str = Field(
+        default="6e400003-b5a3-f393-e0a9-e50e24dcca9e",
+        description="Device→Host characteristic UUID (firmware TX / host RX).",
+    )
+    rx_char_uuid: str = Field(
+        default="6e400002-b5a3-f393-e0a9-e50e24dcca9e",
+        description="Host→Device characteristic UUID (firmware RX / host TX).",
+    )
+    scan_timeout_s: float = Field(
+        default=10.0,
+        gt=0.0,
+        description="BLE scan timeout when device_address='auto'.",
+    )
+
+
+class TransportAuthConfig(BaseModel):
+    """HMAC-SHA256 frame authentication for TCP and BLE transports.
+
+    The key is loaded from ``key_env_var`` (``ARMDROID_HMAC_KEY`` by
+    default) and must be a hex-encoded string of at least 16 bytes
+    (32 hex chars). A 32-byte key (64 hex chars) is recommended.
+    Set ``key_hex`` to override the env var at config time (test fixtures
+    only — never commit real keys in config files).
+    """
+
+    key_hex: str | None = Field(
+        default=None,
+        description="Hex-encoded HMAC key of at least 16 bytes (32 hex chars); "
+        "32 bytes (64 hex chars) recommended. Overrides key_env_var; "
+        "test fixtures only — do not commit real keys.",
+    )
+    key_env_var: str = Field(
+        default="ARMDROID_HMAC_KEY",
+        description="Env var holding a hex-encoded HMAC key of at least "
+        "16 bytes (32 hex chars); 32 bytes (64 hex chars) recommended.",
+    )
+    required: bool = Field(
+        default=True,
+        description="Reject frames missing or failing HMAC verification. "
+        "Set False only for test-only configs without a provisioned key.",
+    )
+
 
 class JointLimits(BaseModel):
     """Per-joint position and velocity limits.
@@ -96,11 +190,12 @@ class ArmTransportConfig(BaseModel):
     driver implementation is hardcoded.
     """
 
-    protocol: Literal["serial"] = Field(
+    protocol: Literal["serial", "tcp", "ble"] = Field(
         default="serial",
         description="Wire protocol used to talk to the arm microcontroller. "
         "'serial' = newline-delimited JSON over UART (PROTOCOL.md). "
-        "Future variants (e.g. 'websocket') do not require a schema change.",
+        "'tcp' = newline-delimited JSON over WiFi TCP (requires tcp block). "
+        "'ble' = newline-delimited JSON over BLE GATT (requires ble block).",
     )
     serial_port: str = Field(
         default="auto",
@@ -173,6 +268,34 @@ class ArmTransportConfig(BaseModel):
         le=32,
         description="How many candidate ports to probe in parallel during 'auto' discovery.",
     )
+
+    # ------------------------------------------------------------------
+    # Transport sub-configs (only required for the matching protocol)
+    # ------------------------------------------------------------------
+
+    tcp: TcpTransportConfig | None = Field(
+        default=None,
+        description="TCP transport settings (required when protocol='tcp').",
+    )
+    ble: BleTransportConfig | None = Field(
+        default=None,
+        description="BLE GATT transport settings (required when protocol='ble').",
+    )
+    auth: TransportAuthConfig | None = Field(
+        default=None,
+        description="HMAC-SHA256 auth settings. Strongly recommended for TCP/BLE. "
+        "Serial bypasses auth by default (physical trust).",
+    )
+
+    @model_validator(mode="after")
+    def _check_transport_sub_config(self) -> Self:
+        if self.protocol == "tcp" and self.tcp is None:
+            msg = "transport.tcp block is required when protocol='tcp'"
+            raise ValueError(msg)
+        if self.protocol == "ble" and self.ble is None:
+            msg = "transport.ble block is required when protocol='ble'"
+            raise ValueError(msg)
+        return self
 
 
 class ArmFirmwareConfig(BaseModel):
