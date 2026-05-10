@@ -24,9 +24,11 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# Virtual environments — covers .venv, .venv311 (Python 3.11 pin for the
+# [isaac] extra), and any other suffixed sibling envs.
 .env
 .venv
+.venv*/
 env/
 venv/
 ENV/
@@ -128,3 +130,14 @@ arduino-build/
 
 # Local env overrides
 *.local.env
+
+# Local-only project bundles / scratch artefacts (created by ad-hoc
+# install / packaging scripts; never committed). The pattern is broad
+# enough to keep developer-side scratchpads out of source control
+# without naming each one.
+armdroid_isaac_bundle.zip
+
+# Claude Code worktrees — when an in-progress feature uses a git
+# worktree under .claude/, the working tree itself is local-only. The
+# canonical content lives on the corresponding branch on origin.
+.claude/worktrees/

@@ -1,12 +1,65 @@
 # Next Steps
 
-This document tracks the post-PR-A roadmap for the Isaac Sim / Isaac Lab
-integration plus the broader follow-ups surfaced during the PR-A scan.
-The full multi-thousand-line implementation plan is held by the PR
-author locally (out-of-tree, not under version control); the PR review
-feedback has been folded into the relevant sections below so this
-document is self-sufficient. The PR-#10 commit-by-commit history
-(visible on GitHub) is the canonical record of what landed.
+This document tracks the roadmap from PR-A → PR-B → Phase 1.0 multi-
+transport → tech-debt cleanup, plus the follow-ups still outstanding.
+The PR-#10 (PR-A) and PR-#11 (PR-B) histories on GitHub are the
+canonical record of what landed in the Isaac integration line.
+``feature/phase-1.0-esp32-multi-transport`` is the parallel ESP32
+multi-transport line; ``feature/tech-debt-cleanup`` is the current
+follow-up that lands TD-1 / TD-4 / TD-5 / TD-6 / TD-7 cleanups on top
+of the rebased Phase 1.0 base.
+
+## Phase 1.0 + tech-debt cleanup (current branch)
+
+Landing in ``feature/tech-debt-cleanup``:
+
+* **TD-1 (HIGH)** — `mypy>=1.13` pin; the prior `>=1.5` allowed 1.11.x
+  which crashes in strict mode on `importlib.util.find_spec` callers
+  (the new probe + `telemetry/otel.py` + `ble_transport.py` all use
+  that pattern). `mypy --strict src/` is once again clean across 105
+  source files.
+* **TD-4 (MEDIUM)** — `SACAgent.build` signature tightened from
+  `env: Any` to `env: ArmEnvironmentProtocol`; SB3 boundary handled
+  by an explicit `cast` to `gym.Env`. Runtime conformance unchanged
+  (still `isinstance(SACAgent, ArmRLAgentProtocol) is True`).
+* **TD-5 (MEDIUM)** — `ArmOrchestrator` gains an optional
+  `task_cfg: ArmTaskConfig | None = None`; rollout's
+  `_resolve_target_position(args, task_cfg)` walks PDDL plan-step args
+  right-to-left (planner convention puts destination last) and looks
+  up real Cartesian XYZ from `task_cfg.peg_positions` /
+  `basket_positions` instead of always returning zeros. Backward-
+  compat: legacy callers without `task_cfg` keep working with a
+  one-time structured warning per rollout.
+* **TD-6 (deferred)** — `BaseEnv.render` is documentation-only for
+  now; real implementation needs MJCF loading + an offscreen
+  framebuffer pipeline (`mujoco.Renderer`). Tracked separately because
+  the base env is a numpy state model with no MuJoCo backing; wiring
+  it in is scope-orthogonal to the rest of this branch.
+* **TD-7 (deferred)** — `PoseEstimator` orientation stays zero until
+  OpenCV PnP is wired up; needs (a) per-class 3D model points
+  extracted from URDF / mesh, (b) corresponding 2D detections beyond
+  the current bbox center, and (c) a calibrated camera matrix.
+  Documented at the call site with `orientation_unmeasured=True` in
+  the structured log so consumers can detect the placeholder.
+* **TD-8 (audit-resolved)** — the lazy-build factory pattern
+  (`controller.build_for_env(env)` lazy on first train) was confirmed
+  intentional. The pre-rebase "RL agent classes do not yet share a
+  single Protocol" comment is now stale (PR-A added
+  `ArmRLAgentProtocol`); refreshed the registry docstring to reflect
+  the post-rebase reality.
+
+Plus the supporting work that landed alongside:
+
+* `scripts/check_isaac_install.py` — cross-platform pre-install probe
+  for the `[isaac]` extra; safe on any host; reports Python /
+  driver / per-GPU compute / package state with a name-based
+  heuristic fallback for mixed Tesla / GeForce driver layouts.
+* ESP32 Phase 1.0 multi-transport — `armdroid.hardware.esp32.transport`
+  package with `SerialTransport`, `TcpTransport`, and `BleTransport`,
+  plus `TransportAuthConfig` (HMAC-SHA256). The `[ble]` extra adds
+  `bleak>=0.22`. Worked YAML examples in `config/examples/`.
+
+## Original PR-A → PR-B roadmap
 
 > **Background note:** the original research doc
 > `docs/research/isaac-omniverse-integration.md` was merged via PR #8
