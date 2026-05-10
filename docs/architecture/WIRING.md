@@ -27,16 +27,18 @@ and regenerate the header — do **not** edit the diagrams here in isolation.
 | 4   | MG995 metal-gear servo (180°)         | Joints 0–3 (base, shoulder, elbow, wrist pitch). ~1 A peak each.      |
 | 2–3 | MG90S micro servo (180°)              | Joints 4–5 (wrist roll, wrist yaw); +1 for joint 6 gripper if fitted. |
 | 1   | ESP32 DevKitC (or equivalent ESP32)   | USB-UART bridge, 38-pin DevKitC layout assumed.                       |
-| 1   | 5 V / 5 A regulated PSU               | **Servo rail only.** Do not power servos from ESP32 5 V.              |
+| 1   | 5 V / 6 A regulated PSU (10 A preferred) | **Servo rail only.** Do not power servos from ESP32 5 V. Headroom above the ~5.8 A worst-case stall (§5). |
 | 1   | USB-A → micro-USB cable               | ESP32 power + serial to host PC.                                      |
 | —   | Dupont jumpers / JST-XH pigtails      | Servo signal harness to ESP32 GPIO header.                            |
-| 4–7 | 470 µF–1000 µF electrolytic caps       | One per servo across V+/GND, close to servo connector (anti-droop).   |
+| 6–7 | 470 µF–1000 µF electrolytic caps       | One per servo across V+/GND, close to servo connector (anti-droop).   |
 | 1   | Common-ground bus bar / terminal      | PSU GND ↔ ESP32 GND tied together.                                    |
 | —   | M2 / M3 hardware, bearings            | Per the MakerWorld kit BOM.                                           |
 
-> The 7th joint (gripper) ships in commit 7 of the ESP32 integration. The
-> default `ArmConfig.dof = 6` and the codegen still emits 6 servo pins;
-> joint 6 / GPIO 32 below is the planned wiring once the gripper is enabled.
+> The 7th joint (gripper) is **planned but not yet enabled**.
+> `ArmConfig.dof` defaults to 6 and `_default_servos_6dof` emits 6 servo
+> pins, so the current firmware does not drive GPIO 32. Joint 6 / GPIO 32
+> below is the reserved wiring for the gripper expansion; treat that row
+> as roadmap, not as live codegen output.
 
 ---
 
@@ -49,7 +51,7 @@ graph LR
     esp["ESP32 DevKitC<br/>arm-esp32-1.0.0<br/>50 Hz interpolator<br/>10 Hz state heartbeat"]
     pwm["6× PWM channels<br/>50 Hz, 500–2500 µs"]
     arm["MakerWorld 6-DoF arm<br/>+ optional gripper"]
-    psu["5 V / 5 A PSU<br/>servo rail only"]
+    psu["5 V / 6 A PSU (10 A preferred)<br/>servo rail only"]
 
     host -->|"cmd: set_joints / ping / estop"| usb
     usb -->|"ack / nak / state / evt"| host
@@ -61,15 +63,21 @@ graph LR
 ```
 
 The host never drives a servo directly. All motion goes through the
-firmware's joint-space cubic interpolator, which is why pulse calibration
-and joint limits live in the codegen header rather than in driver code.
+firmware's joint-space **linear** interpolator (see
+[`firmware/arm_esp32/src/interpolator.h`](../../firmware/arm_esp32/src/interpolator.h)),
+which is why pulse calibration and joint limits live in the codegen
+header rather than in driver code.
 
 ---
 
-## 3. ESP32 pin map (default 6-DoF + planned gripper)
+## 3. ESP32 pin map
 
-Mirrors `firmware/arm_esp32/README.md`. Row 6 is the planned 7-DoF
-gripper; the current `_default_servos_6dof` only emits rows 0–5.
+### 3.1 Codegen-driven joints (current firmware, 6-DoF)
+
+Joints 0–5 are emitted by `_default_servos_6dof()` into
+`config_generated.h` (`kNumJoints = 6`, `kServoPins = {13, 14, 27, 26,
+25, 33}`). This table is the live source of truth — change it via the
+host schema and regenerate.
 
 | Joint              | Servo  | ESP32 GPIO | Pulse (µs) min/max | Travel        |
 |--------------------|--------|------------|--------------------|---------------|
@@ -79,7 +87,18 @@ gripper; the current `_default_servos_6dof` only emits rows 0–5.
 | 3 wrist_pitch      | MG995  | **26**     | 500 / 2500         | ±π/2 rad      |
 | 4 wrist_roll       | MG90S  | **25**     | 500 / 2500         | ±π/2 rad      |
 | 5 wrist_yaw        | MG90S  | **33**     | 500 / 2500         | ±π/2 rad      |
-| 6 gripper (opt.)   | MG90S  | **32**     | 500 / 2500         | normalised 0…1 |
+
+### 3.2 Reserved for the gripper expansion (roadmap, NOT codegen output)
+
+The current firmware does **not** drive GPIO 32. The row below is the
+reserved pin assignment for the planned 7-DoF gripper; it ships when
+`ArmConfig.dof` is bumped to 7 and the schema's servo list grows. Do
+not wire a servo to GPIO 32 expecting the firmware to move it on the
+current `arm-esp32-1.0.0` build.
+
+| Joint              | Servo  | ESP32 GPIO | Pulse (µs) min/max | Travel         |
+|--------------------|--------|------------|--------------------|----------------|
+| 6 gripper (planned)| MG90S  | **32**     | 500 / 2500         | normalised 0…1 |
 
 **Pins to avoid** on ESP32 DevKitC:
 
@@ -109,7 +128,7 @@ graph LR
         usb["USB micro-B<br/>5 V logic + UART0"]
     end
 
-    subgraph PSU["5 V / 5 A PSU"]
+    subgraph PSU["5 V / 6 A PSU (10 A preferred)"]
         vbus["V+ rail"]
         gnd_p["GND rail"]
     end
@@ -162,7 +181,7 @@ floating signal and twitch / chatter.
 
 ```mermaid
 flowchart LR
-    wall["Mains AC"] --> psu["5 V / 5 A regulated PSU"]
+    wall["Mains AC"] --> psu["5 V / 6 A regulated PSU<br/>(10 A preferred)"]
     psu -->|V+| busP["+5 V servo rail<br/>(bus bar / breadboard rail)"]
     psu -->|GND| busG["GND rail"]
 
@@ -177,10 +196,10 @@ flowchart LR
 ```
 
 Sizing check: 4× MG995 @ ~1 A peak + 3× MG90S @ ~0.6 A peak ≈ **5.8 A
-worst case stall**. A 5 V / 5 A supply is sufficient for typical Tower of
-Hanoi motion (servos rarely peak simultaneously) but headroom matters —
-size up to 6–8 A if you observe brownouts or watchdog-latched e-stops
-under load.
+worst case stall** (7-DoF) / 5.2 A (6-DoF). Specify the PSU **above**
+that ceiling — a 5 A supply will brown out on a synchronised stall.
+6 A is the minimum; 10 A gives comfortable headroom for accelerated
+moves and future payload work.
 
 ---
 
