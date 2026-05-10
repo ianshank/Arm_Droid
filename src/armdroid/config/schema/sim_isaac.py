@@ -49,10 +49,6 @@ class ArmSimIsaacConfig(BaseModel):
             "Enable camera sensors during sim. Slow; enable only for perception experiments."
         ),
     )
-    enable_logging: bool = Field(
-        default=False,
-        description="Verbose Kit / Isaac logging. Defaults off to keep the CLI quiet.",
-    )
 
     # ------------------------------------------------------------------ #
     # Asset paths — defaults match the vendored SO-ARM101 layout
@@ -273,10 +269,12 @@ def _default_sim_cfg() -> ArmSimIsaacConfig:
     """Return a fresh default Isaac Sim config.
 
     Used as a fallback by ``IsaacSimDriver`` and ``SoArmReachIsaacEnv``
-    when no explicit ``sim_isaac_cfg`` is passed. Construct fresh each
-    call (not a module-level constant) so YAML / env overrides set
-    later in the process still apply via Pydantic's BaseSettings
-    re-read.
+    when no explicit ``sim_isaac_cfg`` is passed. Construct a new
+    instance on each call (rather than reusing a module-level constant)
+    so callers do not share the same config object or any mutable state
+    it may carry. This is plain ``BaseModel`` construction — it does
+    not re-read env vars or YAML overlays; per-call YAML overlays must
+    be threaded in by the caller via ``ArmSettings()``.
     """
     return ArmSimIsaacConfig()
 

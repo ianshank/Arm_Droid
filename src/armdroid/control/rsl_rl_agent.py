@@ -102,7 +102,19 @@ class RslRlPpoAgent:
                 )
                 raise ImportError(msg) from exc
 
-            raw_env = getattr(env, "_isaac_env", env)
+            # SoArmReachIsaacEnv lazy-builds _isaac_env on first reset/step;
+            # without forcing the build here, OnPolicyRunner would receive
+            # None and fail at runtime when build() is called before reset().
+            ensure_built = getattr(env, "_ensure_built", None)
+            if callable(ensure_built):
+                ensure_built()
+            raw_env = getattr(env, "_isaac_env", None) or env
+            if raw_env is None:
+                msg = (
+                    "env._isaac_env is None even after _ensure_built(); "
+                    "cannot construct OnPolicyRunner."
+                )
+                raise RuntimeError(msg)
             runner_cfg = self._build_runner_cfg()
             self._runner = OnPolicyRunner(
                 raw_env,

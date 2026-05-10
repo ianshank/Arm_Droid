@@ -106,7 +106,7 @@ class IsaacSimDriver:
             dof=self._dof,
             headless=self._sim_cfg.headless,
             num_envs=self._sim_cfg.num_envs,
-            usd_path=str(self._sim_cfg.usd_path),
+            urdf_fallback_path=str(self._sim_cfg.urdf_fallback_path),
         )
 
     @property
@@ -129,10 +129,13 @@ class IsaacSimDriver:
             return
         with get_telemetry().start_span(
             SPAN_DRIVER_CONNECT,
-            usd_path=str(self._sim_cfg.usd_path),
+            urdf_fallback_path=str(self._sim_cfg.urdf_fallback_path),
             headless=self._sim_cfg.headless,
         ):
-            _log.info("isaac_sim_driver_connecting", usd_path=str(self._sim_cfg.usd_path))
+            _log.info(
+                "isaac_sim_driver_connecting",
+                urdf_fallback_path=str(self._sim_cfg.urdf_fallback_path),
+            )
             if _app_state.is_app_launched():
                 msg = (
                     "Isaac Sim Kit already initialised in this process "
@@ -234,6 +237,16 @@ class IsaacSimDriver:
         # send_joint_positions / read_state call.
         self._sim_context.reset()
 
+    def _step_sim(self, n_steps: int) -> None:
+        """Advance physics ``n_steps`` times, refreshing articulation cache.
+
+        Synchronous helper — callers wrap in ``asyncio.to_thread`` so the
+        Kit step loop does not block the event loop.
+        """
+        for _ in range(n_steps):
+            self._sim_context.step(render=not self._sim_cfg.headless)
+            self._articulation.update(self._sim_cfg.physics_dt_s)
+
     async def disconnect(self) -> None:
         """Close Kit + release the articulation. Idempotent."""
         if not self._connected:
@@ -300,6 +313,11 @@ class IsaacSimDriver:
                     target,
                 )
                 await asyncio.to_thread(self._articulation.write_data_to_sim)
+                # Advance the sim so the PD controller actually executes
+                # the move; without stepping, set_joint_position_target +
+                # write_data_to_sim leave the articulation state unchanged.
+                n_steps = max(1, int(round(duration_s / self._sim_cfg.physics_dt_s)))
+                await asyncio.to_thread(self._step_sim, n_steps)
             except Exception as exc:
                 _log.error(
                     "isaac_sim_driver_send_failed",
@@ -349,6 +367,11 @@ class IsaacSimDriver:
                 self._articulation.set_joint_position_target,
                 zero,
             )
+            # Push the zero target to sim and step once so the e-stop
+            # actually takes effect rather than sitting in the staged
+            # buffer until the next send_joint_positions().
+            await asyncio.to_thread(self._articulation.write_data_to_sim)
+            await asyncio.to_thread(self._step_sim, 1)
 
     async def clear_emergency_stop(self) -> None:
         """Release the e-stop latch."""

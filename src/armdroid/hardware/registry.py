@@ -44,15 +44,20 @@ def _isaac_sim_factory(arm_cfg: ArmConfig) -> ArmDriverProtocol:
     without the [isaac] extra. The actual import only happens when
     ``get_driver("isaac_sim")(cfg.arm)`` is called.
 
+    ``IsaacSimDriver`` itself does not import ``isaaclab`` at module
+    load — its lazy isaaclab imports live inside ``connect()``. We
+    therefore probe ``isaaclab.app`` explicitly here so missing-[isaac]
+    failures surface a targeted ``ArmDriverError`` at registry-resolve
+    time, instead of leaking through later as a less-actionable Kit
+    error from ``IsaacSimDriver.connect()``.
+
     Raises:
         ArmDriverError: When the [isaac] extra is not installed
             (isaaclab cannot be imported), with a hint pointing at the
             install command + NVIDIA pip index URL.
     """
     try:
-        # Imports the package's lazy ``IsaacSimDriver`` via ``__getattr__``;
-        # the cast tells mypy the resolved attribute is the driver class.
-        from armdroid.hardware.isaac_sim.driver import IsaacSimDriver
+        import isaaclab.app  # noqa: F401  (probe — fails fast if [isaac] missing)
     except ImportError as exc:
         from armdroid.domain.errors import ArmDriverError
 
@@ -62,6 +67,9 @@ def _isaac_sim_factory(arm_cfg: ArmConfig) -> ArmDriverProtocol:
             "--extra-index-url https://pypi.nvidia.com`."
         )
         raise ArmDriverError(msg) from exc
+
+    from armdroid.hardware.isaac_sim.driver import IsaacSimDriver
+
     return IsaacSimDriver(arm_cfg)
 
 

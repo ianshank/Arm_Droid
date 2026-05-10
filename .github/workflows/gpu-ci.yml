@@ -53,10 +53,16 @@ jobs:
           PIP_EXTRA_INDEX_URL: https://pypi.nvidia.com
         run: pip install -e ".[dev,isaac]"
 
-      - name: Fall back to [dev] only when isaaclab fails to resolve
-        if: steps.isaac_install.outcome == 'failure'
+      - name: Fail PR runs when [dev,isaac] extras cannot be installed
+        if: github.event_name == 'pull_request' && steps.isaac_install.outcome == 'failure'
         run: |
-          echo "::warning::isaaclab failed to install (likely runner disk / network); falling back to [dev] only — isaac extras coverage skipped this run"
+          echo "::error::isaaclab failed to install on PR run; refusing to pass Isaac Sim integration validation without [dev,isaac] coverage"
+          exit 1
+
+      - name: Fall back to [dev] only when isaaclab fails to resolve (manual runs)
+        if: github.event_name == 'workflow_dispatch' && steps.isaac_install.outcome == 'failure'
+        run: |
+          echo "::warning::isaaclab failed to install during manual run (likely runner disk / network); falling back to [dev] only — isaac extras coverage skipped this run"
           pip install -e ".[dev]"
 
       - name: Verify Isaac extra import surface (no GPU)

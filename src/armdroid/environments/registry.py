@@ -37,9 +37,13 @@ def _so_arm_reach_isaac_factory(*args: object, **kwargs: object) -> ArmEnvironme
     Wrapping the import inside this function keeps the registry
     importable on default installs without the [isaac] extra. The
     actual import happens when ``get_environment("so_arm_reach_isaac")``
-    is *called* with config args — at which point ``SoArmReachIsaacEnv``
-    is the protocol-conformant wrapper that lazily boots gym /
-    isaaclab inside its first ``reset()`` / ``step()``.
+    is *called* with config args.
+
+    ``SoArmReachIsaacEnv`` itself does not import ``isaaclab`` at module
+    load — its lazy gym/isaaclab imports live inside ``_ensure_built``.
+    To surface a targeted ``ArmDriverError`` *now* (at registry-resolve
+    time) rather than later inside ``reset()`` / ``step()`` with a less
+    obvious traceback, we probe ``isaaclab.app`` explicitly here.
 
     Raises:
         ArmDriverError: When the [isaac] extra is not installed
@@ -47,7 +51,7 @@ def _so_arm_reach_isaac_factory(*args: object, **kwargs: object) -> ArmEnvironme
             install command + NVIDIA pip index URL.
     """
     try:
-        from armdroid.environments.isaac.reach import SoArmReachIsaacEnv
+        import isaaclab.app  # noqa: F401  (probe — fails fast if [isaac] missing)
     except ImportError as exc:
         from armdroid.domain.errors import ArmDriverError
 
@@ -57,6 +61,9 @@ def _so_arm_reach_isaac_factory(*args: object, **kwargs: object) -> ArmEnvironme
             "--extra-index-url https://pypi.nvidia.com`."
         )
         raise ArmDriverError(msg) from exc
+
+    from armdroid.environments.isaac.reach import SoArmReachIsaacEnv
+
     return SoArmReachIsaacEnv(*args, **kwargs)  # type: ignore[arg-type]
 
 

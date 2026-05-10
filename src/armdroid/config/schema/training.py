@@ -104,7 +104,7 @@ class RslRlPpoConfig(BaseModel):
         description="Number of minibatches the rollout is split into per epoch.",
     )
     num_learning_epochs: int = Field(
-        default=5,
+        default=8,
         ge=1,
         le=64,
         description="PPO epochs per iteration.",
@@ -163,7 +163,7 @@ class RslRlPpoConfig(BaseModel):
         description="PPO surrogate-objective clip range epsilon.",
     )
     entropy_coef: float = Field(
-        default=0.01,
+        default=0.001,
         ge=0.0,
         description="Entropy regularisation coefficient.",
     )
