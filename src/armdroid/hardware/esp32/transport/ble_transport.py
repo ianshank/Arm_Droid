@@ -314,7 +314,7 @@ class BleTransport:
         self._rx_buf.clear()
 
     async def _scan_for_device(self, ble: BleTransportConfig) -> str:
-        """Scan for a BLE device matching ``ble.device_name`` or service UUID."""
+        """Scan for a BLE device matching ``ble.device_name``."""
         from bleak import BleakScanner
 
         name = ble.device_name or "ArmDroid"

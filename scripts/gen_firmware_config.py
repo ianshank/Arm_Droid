@@ -107,6 +107,11 @@ def _load_secrets(path: Path) -> _Secrets:
         if not re.fullmatch(r"[0-9a-fA-F]+", hmac_key):
             sys.stderr.write("[gen_firmware_config] ARMDROID_HMAC_KEY is not valid hex\n")
             sys.exit(1)
+        if len(hmac_key) % 2 != 0:
+            sys.stderr.write(
+                "[gen_firmware_config] ARMDROID_HMAC_KEY must have an even number of hex chars\n"
+            )
+            sys.exit(1)
         if len(hmac_key) < 32:
             sys.stderr.write(
                 "[gen_firmware_config] ARMDROID_HMAC_KEY must be at least 32 hex chars (16 bytes)\n"

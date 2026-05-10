@@ -291,6 +291,20 @@ class TestSecretsFile:
             gen_module._load_secrets(env_file)  # type: ignore[attr-defined]
         assert exc_info.value.code == 1
 
+    def test_load_secrets_hmac_key_odd_length_exits(
+        self,
+        gen_module: object,
+        tmp_path: Path,
+    ) -> None:
+        """Odd-length hex strings cannot be decoded by bytes.fromhex()."""
+        env_file = self._write_env(
+            tmp_path,
+            "ARMDROID_HMAC_KEY=" + "ab" * 16 + "c\n",  # 33 hex chars (odd)
+        )
+        with pytest.raises(SystemExit) as exc_info:
+            gen_module._load_secrets(env_file)  # type: ignore[attr-defined]
+        assert exc_info.value.code == 1
+
     def test_load_secrets_bad_tcp_port_exits(
         self,
         gen_module: object,
