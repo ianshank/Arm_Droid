@@ -29,10 +29,12 @@ from armdroid.logging.setup import get_logger
 if TYPE_CHECKING:
     from armdroid.config.schema import ArmSettings
 
-DriverKind = Literal["mock", "esp32"]
-# v2: PR-A keeps the literal narrow. PR-B (B.2) widens this to include
-# "isaac_sim" alongside the registry registration so an explicit set of
-# arm_driver_kind="isaac_sim" cannot crash with KeyError before B merges.
+DriverKind = Literal["mock", "esp32", "isaac_sim"]
+# PR-B B.4 (atomic): widening lands together with the
+# armdroid.hardware.registry registration of ``isaac_sim``, so an
+# explicit ``arm_driver_kind="isaac_sim"`` cannot KeyError. Driver
+# instantiation requires the [isaac] extra at runtime; module imports
+# safely without it.
 
 _DEPRECATION_MSG: Final[str] = (
     "ArmSettings.mock_hardware is deprecated; set arm_driver_kind="

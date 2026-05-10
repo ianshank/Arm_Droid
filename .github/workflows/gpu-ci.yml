@@ -1,0 +1,118 @@
+name: GPU CI (Isaac Sim)
+
+# PR-B B.18 — gates Isaac Sim integration validation.
+# Triggers:
+#   * workflow_dispatch — manual run from any branch
+#   * pull_request push that touches Isaac code paths (default
+#     types: opened, synchronize, reopened — paths filter applies)
+#   * pull_request labelled "gpu" — explicit opt-in for arbitrary PRs.
+#     ``types: [..., labeled]`` is required so the labeled action
+#     reaches the workflow at all; the ``paths`` filter is then
+#     evaluated against the PR head branch.
+#
+# Runs on ubuntu-latest. The pure-Python isaac-extra unit tests
+# (gripper math, tensor adapter, configs) cover the import surface +
+# logic without a GPU. The full GPU smoke suite under tests/isaac/
+# requires a CUDA GPU + NVIDIA driver >=535 and runs locally only
+# (ARMDROID_ISAAC_RUN=1 pytest tests/isaac). See ADR-0005.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - 'src/armdroid/environments/isaac/**'
+      - 'src/armdroid/environments/_tensor_adapter.py'
+      - 'src/armdroid/hardware/isaac_sim/**'
+      - 'src/armdroid/control/rsl_rl_agent.py'
+      - 'src/armdroid/config/schema/sim_isaac.py'
+      - 'pyproject.toml'
+      - '.github/workflows/gpu-ci.yml'
+
+jobs:
+  isaac-extras:
+    name: Isaac extras compile + pure-Python tests
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'pull_request'
+          && (contains(github.event.pull_request.labels.*.name, 'gpu')
+              || github.event.action != 'labeled'))
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space for the multi-GB isaaclab wheel set
+        # isaacsim + isaaclab + CUDA runtime wheels exceed the
+        # ubuntu-latest runner's default ~14 GB free space; the previous
+        # round produced "OSError [Errno 28] No space left on device"
+        # mid-install. jlumbroso/free-disk-space@main reclaims ~30 GB by
+        # purging unused pre-installed tooling (Android SDK, .NET, dotnet
+        # caches, swap). All flags pinned via inputs to keep the action's
+        # behaviour deterministic and easy to audit.
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false  # keep Python interpreters cache
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Pin setuptools<80 in isolated build envs (flatdict needs pkg_resources)
+        # isaaclab pulls flatdict==4.0.1, whose sdist build imports
+        # pkg_resources at build time. setuptools >= 80 removed
+        # pkg_resources from the default wheel, so PEP 517 isolated
+        # builds pull setuptools-latest and break.
+        # Constraints file pins setuptools<80 inside the isolated build
+        # env (PIP_CONSTRAINT applies to all sub-pip invocations).
+        run: |
+          mkdir -p "${RUNNER_TEMP}/constraints"
+          printf 'setuptools<80\nwheel\n' > "${RUNNER_TEMP}/constraints/build.txt"
+          echo "PIP_CONSTRAINT=${RUNNER_TEMP}/constraints/build.txt" >> "$GITHUB_ENV"
+
+      - name: Install [dev,isaac] extras (NVIDIA index for isaaclab)
+        id: isaac_install
+        continue-on-error: true
+        env:
+          PIP_EXTRA_INDEX_URL: https://pypi.nvidia.com
+        run: pip install -e ".[dev,isaac]"
+
+      - name: Fail PR runs when [dev,isaac] extras cannot be installed
+        if: github.event_name == 'pull_request' && steps.isaac_install.outcome == 'failure'
+        run: |
+          echo "::error::isaaclab failed to install on PR run; refusing to pass Isaac Sim integration validation without [dev,isaac] coverage"
+          exit 1
+
+      - name: Fall back to [dev] only when isaaclab fails to resolve (manual runs)
+        if: github.event_name == 'workflow_dispatch' && steps.isaac_install.outcome == 'failure'
+        run: |
+          echo "::warning::isaaclab failed to install during manual run (likely runner disk / network); falling back to [dev] only — isaac extras coverage skipped this run"
+          pip install -e ".[dev]"
+
+      - name: Verify Isaac extra import surface (no GPU)
+        run: |
+          # Pure-Python sub-modules import on default install; full Isaac
+          # surface only when isaaclab installed.
+          python -c "from armdroid.hardware.isaac_sim import gripper"
+          python -c "from armdroid.config.schema.sim_isaac import ArmSimIsaacConfig, _default_sim_cfg"
+          python -c "from armdroid.environments._tensor_adapter import _TensorAdapter"
+          python -c "from armdroid.control.rsl_rl_agent import RslRlPpoAgent"
+
+      - name: Run pure-Python isaac-extra unit tests
+        run: |
+          python -m pytest \
+            tests/unit/hardware/isaac_sim/ \
+            tests/unit/environments/test_tensor_adapter.py \
+            tests/unit/test_config_isaac.py \
+            tests/unit/control/test_rsl_rl_ppo_config.py \
+            -v
+
+      - name: Note local smoke-test scope
+        run: |
+          echo "::notice::tests/isaac/* requires a CUDA GPU + NVIDIA driver >= 535 + Isaac Sim 5.1; run locally with ARMDROID_ISAAC_RUN=1 pytest tests/isaac"

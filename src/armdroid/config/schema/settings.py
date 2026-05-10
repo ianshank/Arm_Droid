@@ -13,8 +13,13 @@ from armdroid.config.schema.arm import ArmConfig
 from armdroid.config.schema.perception import ArmPerceptionConfig
 from armdroid.config.schema.planning import ArmPlanningConfig
 from armdroid.config.schema.sim import ArmSimConfig
+from armdroid.config.schema.sim_isaac import ArmSimIsaacConfig
 from armdroid.config.schema.task import ArmTaskConfig
-from armdroid.config.schema.training import ArmCurriculumConfig, ArmTrainingConfig
+from armdroid.config.schema.training import (
+    ArmCurriculumConfig,
+    ArmTrainingConfig,
+    RslRlPpoConfig,
+)
 
 
 class ArmSettings(BaseSettings):
@@ -34,9 +39,11 @@ class ArmSettings(BaseSettings):
 
     arm: ArmConfig = Field(default_factory=ArmConfig)
     arm_sim: ArmSimConfig = Field(default_factory=ArmSimConfig)
+    arm_sim_isaac: ArmSimIsaacConfig = Field(default_factory=ArmSimIsaacConfig)
     arm_perception: ArmPerceptionConfig = Field(default_factory=ArmPerceptionConfig)
     arm_planning: ArmPlanningConfig = Field(default_factory=ArmPlanningConfig)
     arm_training: ArmTrainingConfig = Field(default_factory=ArmTrainingConfig)
+    arm_rsl_rl_ppo: RslRlPpoConfig = Field(default_factory=RslRlPpoConfig)
     arm_curriculum: ArmCurriculumConfig = Field(default_factory=ArmCurriculumConfig)
     arm_task: ArmTaskConfig = Field(default_factory=ArmTaskConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
@@ -49,13 +56,14 @@ class ArmSettings(BaseSettings):
             "armdroid v0.4.0."
         ),
     )
-    arm_driver_kind: Literal["mock", "esp32"] | None = Field(
+    arm_driver_kind: Literal["mock", "esp32", "isaac_sim"] | None = Field(
         default=None,
         description=(
             "Explicit driver discriminator. When set, takes precedence over "
             "the legacy ``mock_hardware`` bool. When ``None``, falls back to "
             "``mock_hardware`` (with a once-per-process deprecation warning). "
-            "PR-B widens this Literal to include 'isaac_sim'."
+            "``isaac_sim`` requires the [isaac] extra installed at runtime; "
+            "without it, ``build_arm_driver`` raises ``ArmDriverError``."
         ),
     )
 

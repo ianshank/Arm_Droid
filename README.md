@@ -134,11 +134,12 @@ pip install -e ".[anthropic]"
 # OpenTelemetry observability backend (zero-overhead by default)
 pip install -e ".[telemetry]"
 
-# NVIDIA Isaac Sim 5.1 / Isaac Lab 2.3 backend (lands in PR-B; the
-# scaffolding for the [isaac] extra ships in PR-A — vendored URDF +
-# MJCF + STL assets, arm_driver_kind discriminator, ArmRLAgentProtocol,
-# env + agent telemetry spans). Requires a CUDA GPU; ~9 GB install.
-# pip install -e ".[isaac]"   # available after PR-B merges
+# NVIDIA Isaac Sim 5.1 / Isaac Lab 2.3 backend (PR-B). Requires a CUDA
+# GPU + NVIDIA driver >=535 + the NVIDIA pip index. ~8-10 GB install.
+# isaaclab is hosted on https://pypi.nvidia.com (NOT PyPI), so the
+# extra index URL is REQUIRED — without it pip fails with "no matching
+# distribution found for isaacsim".
+pip install -e ".[isaac]" --extra-index-url https://pypi.nvidia.com
 
 # Install everything (default-CI-compatible subset)
 pip install -e ".[dev,hardware,realsense,anthropic,telemetry]"

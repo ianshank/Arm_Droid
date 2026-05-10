@@ -11,6 +11,75 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **Isaac Sim / Isaac Lab runtime integration (PR-B, opt-in `[isaac]` extra)** —
+  the actual NVIDIA Isaac Sim 5.1 / Isaac Lab 2.3 runtime code, behind
+  the `armdroid[isaac]` extra. Default install (`pip install -e ".[dev]"`)
+  is unchanged. ADR-0005 records the architectural decisions.
+  - **`armdroid.config.schema.sim_isaac.ArmSimIsaacConfig`** — 40+ Pydantic
+    fields covering every Isaac Sim numeric / string knob (PD gains, init
+    pose, env id, joint names, gripper conversion). No hardcoded values
+    in downstream consumers. Also exports `_default_sim_cfg()` factory.
+  - **`armdroid.config.schema.training.RslRlPpoConfig`** — RSL-RL PPO
+    hyperparameters as Pydantic fields with bounds.
+  - **`ArmTrainingConfig.algorithm`** Literal extended to include
+    `"rsl_rl_ppo"`. **`ArmTaskConfig.task_type`** Literal extended to
+    include `"so_arm_reach_isaac"`. **`arm_driver_kind`** Literal +
+    `DriverKind` widened to include `"isaac_sim"`.
+  - **`armdroid.hardware.isaac_sim`** — `IsaacSimDriver` (full
+    `ArmDriverProtocol` impl using Isaac Lab 2.3's singular
+    `set_joint_position_target` API; lazy isaaclab/torch imports;
+    AppLauncher process-singleton guard), `gripper.py` (pure
+    conversion functions, single source of truth for the
+    URDF-radians ↔ armdroid-normalised rescale-and-invert),
+    `articulation.py` (vendored `ArticulationCfg` builder, every PD
+    gain parametrised on `ArmSimIsaacConfig`).
+  - **`armdroid.environments.isaac`** — `SoArmReachIsaacEnv`
+    (`ArmEnvironmentProtocol` wrapper around Isaac Lab
+    `ManagerBasedRLEnv`); `_TensorAdapter` at
+    `armdroid.environments._tensor_adapter` (defensive `.reshape(-1)[0]`
+    for Isaac Lab's `(num_envs,)` reward shape; raises on `num_envs > 1`).
+    Vendored `tasks/reach/*` from MuammerBay/isaac_so_arm101 (BSD-3,
+    pinned `e4624dea075b00a36dbc66bebd531d191c92e8cd`).
+  - **`armdroid.control.rsl_rl_agent.RslRlPpoAgent`** — RSL-RL
+    `OnPolicyRunner` wrapper conforming to `ArmRLAgentProtocol`.
+    Lazy `from rsl_rl.runners import OnPolicyRunner` inside
+    `build()`. `predict()` does numpy↔torch conversion at the
+    protocol boundary. Reaches through `env._isaac_env` for the raw
+    vec-env (RSL-RL requires torch tensors, not numpy scalars).
+  - **`build_arm_controller` branch** — `algorithm == "rsl_rl_ppo"`
+    instantiates `RslRlPpoAgent(ppo_cfg=cfg.arm_rsl_rl_ppo,
+    training_cfg=cfg.arm_training)` directly rather than via the
+    registry's `Callable[..., ArmRLAgentProtocol]` factory; avoids
+    dropping YAML overlays via `ArmSettings()` re-read (peer-review C-1).
+  - **NVIDIA index URL** — README + `gpu-ci.yml` document
+    `pip install -e ".[isaac]" --extra-index-url https://pypi.nvidia.com`.
+    `isaaclab[all,isaacsim]==2.3.0` is hosted on `pypi.nvidia.com`,
+    not PyPI. NO torch/torchvision pin in `[isaac]` (R2-safe).
+  - **`tests/isaac/`** smoke suite — `tests/isaac/conftest.py` mirrors
+    `tests/hardware/conftest.py`'s env-var-gated pattern
+    (`ARMDROID_ISAAC_RUN=1`); auto-marks every test `@pytest.mark.isaac`
+    + `@pytest.mark.gpu`. `test_smoke_isaac_driver.py` covers the full
+    driver lifecycle; `test_smoke_isaac_env.py` covers reset → step×5
+    → close. Local-only (CI doesn't install isaaclab).
+  - **`.github/workflows/gpu-ci.yml`** — manual-dispatch + `gpu` PR
+    label + Isaac path-trigger. `ubuntu-latest` runner installs
+    `[dev,isaac]` (~8-10 GB), asserts the import surface, runs the
+    pure-Python isaac-extra unit tests. The actual GPU-bound smoke
+    suite runs locally only.
+  - **`config/tower_of_hanoi_isaac.yaml`** — overlay flipping the path
+    from MuJoCo + ESP32 to Isaac Sim + RSL-RL PPO.
+  - **`tests/property/test_arm_env_invariants.py`** — extended
+    `_BUILTIN_ENVS` with `"so_arm_reach_isaac"` gated on
+    `importlib.util.find_spec("isaaclab")` (no import side-effects).
+  - **THIRD_PARTY_NOTICES.md** — indexed MuammerBay vendored content
+    alongside the existing TheRobotStudio entry, with import-rewrite
+    documentation.
+  - **ADR-0005** — `docs/architecture/ADR/ADR-0005-isaac-sim-backend.md`
+    records 10 decisions (extras pattern, singular API, _TensorAdapter
+    `num_envs == 1`, gripper convention preserved, RslRlPpoAgent
+    factory branch, vendored BSD-3 attribution, AppLauncher singleton,
+    no torch pin, USD as build artefact, GPU CI manual-dispatch).
+
 - **Isaac Sim / Isaac Lab integration scaffolding (PR-A, no runtime dep)** —
   groundwork for an opt-in NVIDIA Isaac Sim 5.1 / Isaac Lab 2.3 backend
   behind a future `armdroid[isaac]` extra. Closes 4 reviewer-flagged

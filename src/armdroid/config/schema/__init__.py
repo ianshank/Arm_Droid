@@ -34,8 +34,13 @@ from armdroid.config.schema.perception import ArmPerceptionConfig
 from armdroid.config.schema.planning import ArmPlanningConfig
 from armdroid.config.schema.settings import ArmSettings, load_settings
 from armdroid.config.schema.sim import ArmSimConfig
+from armdroid.config.schema.sim_isaac import ArmSimIsaacConfig
 from armdroid.config.schema.task import ArmTaskConfig
-from armdroid.config.schema.training import ArmCurriculumConfig, ArmTrainingConfig
+from armdroid.config.schema.training import (
+    ArmCurriculumConfig,
+    ArmTrainingConfig,
+    RslRlPpoConfig,
+)
 
 __all__ = [
     "ArmConfig",
@@ -46,10 +51,12 @@ __all__ = [
     "ArmServoConfig",
     "ArmSettings",
     "ArmSimConfig",
+    "ArmSimIsaacConfig",
     "ArmTaskConfig",
     "ArmTrainingConfig",
     "ArmTransportConfig",
     "JointLimits",
     "LLMReplannerConfig",
+    "RslRlPpoConfig",
     "load_settings",
 ]
