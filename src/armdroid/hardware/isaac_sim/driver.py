@@ -294,10 +294,46 @@ class IsaacSimDriver:
         if duration_s <= 0.0:
             msg = f"duration_s must be > 0; got {duration_s}"
             raise ArmCommandRejected(msg)
+        gripper_idx = self._sim_cfg.gripper_joint_index
+        if not (0 <= gripper_idx < self._dof):
+            # Pydantic schema clamps gripper_joint_index to [0, 11], but
+            # nothing reconciles it against cfg.dof. A misconfig (dof=6,
+            # gripper_index=8) would otherwise raise IndexError deep in
+            # normalised_vector_to_radians; reject up front instead.
+            msg = (
+                f"sim_cfg.gripper_joint_index={gripper_idx} out of range "
+                f"for dof={self._dof}; must satisfy 0 <= idx < dof."
+            )
+            raise ArmCommandRejected(msg)
         for i, p in enumerate(positions):
             if not np.isfinite(p):
                 msg = f"position[{i}]={p} is not finite"
                 raise ArmCommandRejected(msg)
+            if i == gripper_idx:
+                # Gripper inputs are armdroid-normalised (0=open, 1=closed
+                # by default). Validate against the configured normalised
+                # window so a stray scale (e.g. callers passing radians)
+                # is caught here rather than producing unphysical commands
+                # after normalised_vector_to_radians.
+                lo = min(
+                    self._sim_cfg.gripper_normalised_open,
+                    self._sim_cfg.gripper_normalised_closed,
+                )
+                hi = max(
+                    self._sim_cfg.gripper_normalised_open,
+                    self._sim_cfg.gripper_normalised_closed,
+                )
+                if not (lo <= p <= hi):
+                    msg = f"gripper position[{i}]={p} outside normalised window [{lo}, {hi}]."
+                    raise ArmCommandRejected(msg)
+            else:
+                limits = self._cfg.joint_limits[i]
+                if not (limits.min_rad <= p <= limits.max_rad):
+                    msg = (
+                        f"position[{i}]={p} rad outside joint limits "
+                        f"[{limits.min_rad}, {limits.max_rad}]."
+                    )
+                    raise ArmCommandRejected(msg)
 
         with get_telemetry().start_span(
             SPAN_DRIVER_SEND,

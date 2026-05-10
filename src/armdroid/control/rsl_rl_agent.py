@@ -92,7 +92,7 @@ class RslRlPpoAgent:
         """
         with get_telemetry().start_span(SPAN_AGENT_BUILD, device=self._device):
             try:
-                from rsl_rl.runners import OnPolicyRunner
+                from rsl_rl.runners import OnPolicyRunner  # pyright: ignore[reportMissingImports]
             except ImportError as exc:
                 _log.error("rsl_rl_ppo_build_failed", error=str(exc))
                 msg = (
@@ -180,11 +180,19 @@ class RslRlPpoAgent:
             try:
                 import torch
 
-                obs_t = {k: torch.from_numpy(v).to(self._device) for k, v in observation.items()}
+                # torch.as_tensor is a public API but pyright's bundled
+                # stubs do not list it in torch's __all__, so add an
+                # explicit ignore for reportPrivateImportUsage.
+                obs_t = {
+                    k: torch.as_tensor(v).to(self._device)  # pyright: ignore[reportPrivateImportUsage]
+                    for k, v in observation.items()
+                }
                 policy = self._runner.get_inference_policy(device=self._device)
                 with torch.no_grad():
                     action_t = policy(obs_t)
-                action_np = action_t.cpu().numpy().astype(np.float64)
+                # torch tensor methods are typed Any; the explicit variable
+                # annotation locks the declared NDArray[np.float64] return shape.
+                action_np: NDArray[np.float64] = action_t.cpu().numpy().astype(np.float64)
                 # RSL-RL's policy returns shape (num_envs, action_dim);
                 # ArmRLAgentProtocol.predict() (matching SACAgent / the
                 # ActionPrimitives path) expects a flat (action_dim,)
@@ -259,7 +267,7 @@ class RslRlPpoAgent:
         PR-11 review fix C3 (gemini #3): the previous flat-dict return
         would have crashed at runtime on the first ``build()`` call.
         """
-        from isaaclab_rl.rsl_rl import (
+        from isaaclab_rl.rsl_rl import (  # pyright: ignore[reportMissingImports]
             RslRlOnPolicyRunnerCfg,
             RslRlPpoActorCriticCfg,
             RslRlPpoAlgorithmCfg,
