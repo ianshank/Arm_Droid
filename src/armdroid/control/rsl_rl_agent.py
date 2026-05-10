@@ -226,41 +226,64 @@ class RslRlPpoAgent:
     def _build_runner_cfg(self) -> Any:
         """Build the RSL-RL ``OnPolicyRunnerCfg`` from PPO + training fields.
 
-        RSL-RL's RunnerCfg is a dataclass-like object; we keep the cfg
-        construction local to this method so the import stays inside
-        ``build()`` (not at module top).
+        RSL-RL >= 2.0 (the version Isaac Lab 2.3 ships with) requires a
+        typed config object with nested ``policy`` and ``algorithm``
+        attribute groups — a flat dict raises ``AttributeError`` on the
+        first access inside ``OnPolicyRunner.__init__``.
+
+        The shape mirrors the vendored ``ReachPPORunnerCfg`` at
+        ``armdroid.environments.isaac.tasks.reach.agents.rsl_rl_ppo_cfg``;
+        every numeric/string knob is sourced from :class:`RslRlPpoConfig`
+        (no hardcoded defaults here).
+
+        PR-11 review fix C3 (gemini #3): the previous flat-dict return
+        would have crashed at runtime on the first ``build()`` call.
         """
-        # Lazy import — RSL-RL only available with [isaac] extra.
-        # NB: we import the exact OnPolicyRunner config class lazily;
-        # the field set comes from RslRlPpoConfig (B.3) which mirrors
-        # MuammerBay's ReachPPORunnerCfg.
+        from isaaclab_rl.rsl_rl import (
+            RslRlOnPolicyRunnerCfg,
+            RslRlPpoActorCriticCfg,
+            RslRlPpoAlgorithmCfg,
+        )
+
         ppo = self._ppo_cfg
-        # Construct via plain dict + attribute setting since RSL-RL's
-        # cfg dataclass is upstream (lazy-imported above the type cast).
-        return {
-            "seed": self._training_cfg.seed,
-            "device": self._device,
-            "num_steps_per_env": ppo.num_steps_per_env,
-            "num_learning_epochs": ppo.num_learning_epochs,
-            "num_mini_batches": ppo.num_mini_batches,
-            "learning_rate": ppo.learning_rate,
-            "schedule": ppo.schedule,
-            "gamma": ppo.gamma,
-            "lam": ppo.gae_lambda,
-            "entropy_coef": ppo.entropy_coef,
-            "value_loss_coef": ppo.value_loss_coef,
-            "use_clipped_value_loss": ppo.use_clipped_value_loss,
-            "clip_param": ppo.clip_param,
-            "max_grad_norm": ppo.max_grad_norm,
-            "desired_kl": ppo.desired_kl,
-            "save_interval": ppo.save_interval,
-            "experiment_name": ppo.experiment_name,
-            "run_name": ppo.run_name,
-            "actor_hidden_dims": list(ppo.actor_hidden_dims),
-            "critic_hidden_dims": list(ppo.critic_hidden_dims),
-            "activation": ppo.activation,
-            "init_noise_std": ppo.init_noise_std,
-        }
+
+        policy = RslRlPpoActorCriticCfg(
+            init_noise_std=ppo.init_noise_std,
+            actor_hidden_dims=list(ppo.actor_hidden_dims),
+            critic_hidden_dims=list(ppo.critic_hidden_dims),
+            activation=ppo.activation,
+        )
+        algorithm = RslRlPpoAlgorithmCfg(
+            value_loss_coef=ppo.value_loss_coef,
+            use_clipped_value_loss=ppo.use_clipped_value_loss,
+            clip_param=ppo.clip_param,
+            entropy_coef=ppo.entropy_coef,
+            num_learning_epochs=ppo.num_learning_epochs,
+            num_mini_batches=ppo.num_mini_batches,
+            learning_rate=ppo.learning_rate,
+            schedule=ppo.schedule,
+            gamma=ppo.gamma,
+            lam=ppo.gae_lambda,
+            desired_kl=ppo.desired_kl,
+            max_grad_norm=ppo.max_grad_norm,
+        )
+
+        # RslRlOnPolicyRunnerCfg is a configclass (Isaac Lab @configclass);
+        # construct via no-arg + attribute assignment, which is the
+        # idiomatic upstream pattern (see ReachPPORunnerCfg).
+        runner_cfg = RslRlOnPolicyRunnerCfg()
+        runner_cfg.seed = self._training_cfg.seed
+        runner_cfg.device = self._device
+        runner_cfg.num_steps_per_env = ppo.num_steps_per_env
+        runner_cfg.max_iterations = ppo.num_iterations
+        runner_cfg.save_interval = ppo.save_interval
+        runner_cfg.experiment_name = ppo.experiment_name
+        runner_cfg.run_name = ppo.run_name
+        runner_cfg.resume = False
+        runner_cfg.empirical_normalization = False
+        runner_cfg.policy = policy
+        runner_cfg.algorithm = algorithm
+        return runner_cfg
 
 
 __all__ = ["RslRlPpoAgent"]

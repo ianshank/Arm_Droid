@@ -11,9 +11,12 @@ The plural form is on the legacy ``omni.isaac.core.articulations.Articulation``
 which we do not use. ADR-0005 records the verification.
 
 AppLauncher process-singleton: Isaac Sim's Kit cannot be launched twice
-in the same process. The module-level ``_app_launched`` flag enforces
-this with a clear ``ArmDriverError`` rather than letting the second
-call produce inscrutable Kit double-init errors (peer-review N-3).
+in the same process. The shared ``_app_state`` module enforces this
+with a clear ``ArmDriverError`` rather than letting the second call
+produce inscrutable Kit double-init errors. The state is shared across
+the driver, env, and any future Isaac-runtime entry points so an
+env-first init does not cause a driver-second double-launch crash.
+(Peer-review N-3 + PR-11 review fix C2.)
 
 Coverage-omit: this module is in ``[tool.coverage.run].omit``. Tests
 live under ``tests/isaac/`` and only run with ``ARMDROID_ISAAC_RUN=1``
@@ -32,6 +35,7 @@ from numpy.typing import NDArray
 
 from armdroid.domain.errors import ArmCommandRejected, ArmDriverError
 from armdroid.domain.state import ArmState
+from armdroid.hardware.isaac_sim import _app_state
 from armdroid.hardware.isaac_sim.gripper import (
     normalised_vector_to_radians,
     radians_vector_to_normalised,
@@ -50,18 +54,14 @@ if TYPE_CHECKING:
 
 _log = get_logger(__name__)
 
-# Module-level singleton guard. Kit's AppLauncher cannot be initialised
-# twice in the same Python process; the second call produces inscrutable
-# Kit double-init traceback. Set to True on first successful connect();
-# subsequent connect() raises ArmDriverError with a clear message.
-# (Peer-review N-3.)
-_app_launched: bool = False
-
 
 def _reset_app_launched_for_tests() -> None:
-    """Reset the once-per-process AppLauncher guard. Tests only."""
-    global _app_launched
-    _app_launched = False
+    """Reset the once-per-process AppLauncher guard. Tests only.
+
+    Kept as a thin shim over :func:`_app_state.reset_for_tests` for
+    backwards compatibility with existing test fixtures.
+    """
+    _app_state.reset_for_tests()
 
 
 class IsaacSimDriver:
@@ -97,6 +97,7 @@ class IsaacSimDriver:
         self._sim_cfg = sim_cfg
         self._dof = cfg.dof
         self._articulation: Any = None
+        self._sim_context: Any = None
         self._app_launcher: Any = None
         self._connected = False
         self._estop_latched = False
@@ -124,7 +125,6 @@ class IsaacSimDriver:
 
     async def connect(self) -> None:
         """Boot Kit + load the SO-ARM articulation. Idempotent."""
-        global _app_launched
         if self._connected:
             return
         with get_telemetry().start_span(
@@ -133,10 +133,11 @@ class IsaacSimDriver:
             headless=self._sim_cfg.headless,
         ):
             _log.info("isaac_sim_driver_connecting", usd_path=str(self._sim_cfg.usd_path))
-            if _app_launched:
+            if _app_state.is_app_launched():
                 msg = (
-                    "Isaac Sim AppLauncher already initialised in this process; "
-                    "can only run one IsaacSimDriver per process."
+                    "Isaac Sim Kit already initialised in this process "
+                    "(by an earlier driver, env, or out-of-band AppLauncher); "
+                    "Kit cannot be launched twice per process."
                 )
                 _log.error("isaac_sim_driver_app_launcher_failed", error=msg)
                 raise ArmDriverError(msg)
@@ -155,7 +156,7 @@ class IsaacSimDriver:
                 raise ArmDriverError(msg) from exc
 
             await asyncio.to_thread(self._launch_kit_and_articulation)
-            _app_launched = True
+            _app_state.mark_launched()
             self._connected = True
             _log.info(
                 "isaac_sim_driver_connected",
@@ -164,16 +165,33 @@ class IsaacSimDriver:
             )
 
     def _launch_kit_and_articulation(self) -> None:
-        """Synchronous Kit boot + articulation construction.
+        """Synchronous Kit boot + SimulationContext + runtime Articulation construction.
 
         Run inside ``asyncio.to_thread`` because Kit's runtime is
         synchronous. ``connect()`` awaits this method.
+
+        Sequence (Isaac Lab 2.3):
+          1. ``AppLauncher`` boots Kit + Omniverse extensions.
+          2. ``SimulationContext`` creates the physics scene (must
+             happen AFTER Kit; ``isaaclab.sim`` cannot be imported
+             until Kit is live).
+          3. Minimal stage scaffolding (ground plane + dome light) is
+             spawned — required for the physics step to converge.
+          4. The articulation prim is spawned at ``/World/SO_ARM100``.
+          5. ``Articulation(cfg)`` wraps the spawned prim with the
+             runtime API (``set_joint_position_target``,
+             ``write_data_to_sim``, ``.data.joint_pos``).
+          6. ``sim.reset()`` commits the spawn so the runtime asset is
+             queryable.
+
+        PR-11 review fix C1 (gemini #1, #2, copilot #11): previously
+        this method stored the ``ArticulationCfg`` in
+        ``self._articulation`` instead of instantiating the runtime
+        ``Articulation`` — every subsequent call to
+        ``set_joint_position_target`` / ``write_data_to_sim`` /
+        ``.data.*`` would have raised ``AttributeError``.
         """
         from isaaclab.app import AppLauncher
-
-        from armdroid.hardware.isaac_sim.articulation import (
-            build_so_arm100_articulation_cfg,
-        )
 
         self._app_launcher = AppLauncher(
             launcher_args={
@@ -181,14 +199,40 @@ class IsaacSimDriver:
                 "enable_cameras": self._sim_cfg.enable_cameras,
             }
         )
-        # The articulation is built once; subsequent send_joint_positions
-        # calls reuse this instance.
+
+        # Kit-dependent imports MUST happen after AppLauncher boots —
+        # isaaclab.sim wires into omni.kit on import.
+        import isaaclab.sim as sim_utils
+        from isaaclab.assets import Articulation
+        from isaaclab.sim import SimulationCfg, SimulationContext
+
+        from armdroid.hardware.isaac_sim.articulation import (
+            build_so_arm100_articulation_cfg,
+        )
+
+        sim_cfg = SimulationCfg(
+            dt=self._sim_cfg.physics_dt_s,
+            render_interval=self._sim_cfg.decimation,
+        )
+        self._sim_context = SimulationContext(sim_cfg)
+
+        # Minimal stage scaffolding — physics step needs a ground plane;
+        # the dome light only matters when not headless but is cheap.
+        ground_cfg = sim_utils.GroundPlaneCfg()
+        ground_cfg.func("/World/ground", ground_cfg)
+        light_cfg = sim_utils.DomeLightCfg(intensity=2000.0)
+        light_cfg.func("/World/light", light_cfg)
+
+        # Build the cfg, attach the prim path, then instantiate the
+        # runtime Articulation. The runtime object exposes the joint
+        # API the rest of this driver depends on.
         articulation_cfg = build_so_arm100_articulation_cfg(self._sim_cfg, self._cfg)
-        # NB: actual Articulation construction requires a SimulationContext
-        # which is only available after AppLauncher boots; the smoke test
-        # in tests/isaac/test_smoke_isaac_driver.py exercises the full
-        # path under a real GPU. CI's pure-Python coverage stops here.
-        self._articulation = articulation_cfg
+        articulation_cfg = articulation_cfg.replace(prim_path="/World/SO_ARM100")
+        self._articulation = Articulation(cfg=articulation_cfg)
+
+        # Commit the spawn so the runtime asset is queryable on first
+        # send_joint_positions / read_state call.
+        self._sim_context.reset()
 
     async def disconnect(self) -> None:
         """Close Kit + release the articulation. Idempotent."""
