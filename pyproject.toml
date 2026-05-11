@@ -44,7 +44,7 @@ telemetry = [
 # [project.dependencies]; isaaclab's transitive resolution handles the
 # rest. (Closes PR #8 R2, peer-review C-3.)
 isaac = [
-    "isaaclab[all,isaacsim]==2.3.0",
+    "isaaclab[all,isaacsim]==2.3.2.post1",
     "rsl-rl-lib>=2.0",
 ]
 ble = [
