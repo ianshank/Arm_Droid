@@ -7,7 +7,7 @@
 .DESCRIPTION
     Uses `pip download` with the NVIDIA pip index to grab wheels for:
       - armdroid base + [dev] + [isaac] dependency closure
-      - isaaclab[all,isaacsim]==2.3.0
+      - isaaclab[all,isaacsim]==2.3.2.post1
       - rsl-rl-lib>=2.0
       - torch / numpy / pydantic / ... transitively
     Total size: ~10-15 GB (mostly isaaclab + torch + CUDA libs).
@@ -133,7 +133,7 @@ Section "Downloading [isaac] extras (isaaclab + rsl-rl + torch closure)"
 Write-Host "Using NVIDIA pip index for isaacsim wheels: https://pypi.nvidia.com"
 Push-Location $RepoRoot
 try {
-    & cmd /c "$PythonExe -m pip download -d `"$CacheDir`" `"isaaclab[all,isaacsim]==2.3.0`" `"rsl-rl-lib>=2.0`" --extra-index-url https://pypi.nvidia.com $($xplat -join ' ')"
+    & cmd /c "$PythonExe -m pip download -d `"$CacheDir`" `"isaaclab[all,isaacsim]==2.3.2.post1`" `"rsl-rl-lib>=2.0`" --extra-index-url https://pypi.nvidia.com $($xplat -join ' ')"
     if ($LASTEXITCODE -ne 0) {
         Write-Warning "isaaclab download failed. Common causes:"
         Write-Warning "  1. Pascal-class GPU detected and you'd rather use the MuJoCo path. That's fine -- the [dev] download above is enough."

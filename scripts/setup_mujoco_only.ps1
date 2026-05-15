@@ -5,10 +5,11 @@
     [isaac] extra is overkill or unwanted.
 
 .DESCRIPTION
-    Uses the existing .venv (Python 3.13) or creates one on the version
-    you point at via -PythonExe. Installs `armdroid[dev]` only -- no
-    isaaclab, no NVIDIA pip index. Then runs the standard non-isaac /
-    non-gpu pytest gate. Total install <500 MB.
+    Reuses the existing .venv if one is present, otherwise creates a new
+    one on the Python version you point at via -PythonExe (default
+    "py -3.11" — matches the project's CI and the Isaac venv). Installs
+    `armdroid[dev]` only — no isaaclab, no NVIDIA pip index. Then runs
+    the standard non-isaac / non-gpu pytest gate. Total install <500 MB.
 
     Use this on cards where Isaac Sim 5.x will not run (sm < 7.5) or
     where the user does not need photoreal rendering / Isaac Lab
