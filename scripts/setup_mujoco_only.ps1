@@ -76,6 +76,12 @@ if (-not $SkipInstall) {
 
 if (-not $SkipTests) {
     Section "Running default test gate (no isaac, no gpu markers)"
+    # Initialize $rc to a sentinel BEFORE the try block. Under
+    # Set-StrictMode -Version Latest, if the pytest invocation throws
+    # before $rc is set (e.g. $VenvPython not executable), reading $rc
+    # after the finally block would raise VariableIsUndefined and mask
+    # the original failure.
+    $rc = -1
     Push-Location $RepoRoot
     try {
         & $VenvPython -m pytest -m "not isaac and not gpu" -x --no-header -q

@@ -69,17 +69,24 @@ Write-Host "Wheels:    $cachedCount cached files"
 
 # Classify GPU. Pre-Turing (compute < 7.0) steers toward -DevOnly;
 # Blackwell (>= 12.0) gets a heads-up about the torch>=2.6 requirement.
+# Force an array result, take the first row, and guard the parse so a
+# multi-GPU host or 'N/A' compute_cap doesn't crash strict-mode.
 if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) {
-    $gpuLine = & nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader
+    $gpuLines = @(& nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader)
+    $gpuLine  = $gpuLines | Select-Object -First 1
     Write-Host "GPU:       $gpuLine"
-    $compute = ($gpuLine -split ',')[1].Trim()
-    $computeNum = [double]$compute
-    if ($computeNum -lt 7.0 -and -not $DevOnly) {
-        Write-Warning "Pre-Turing GPU (compute $compute). Isaac Sim 5.x requires sm_75+."
+    $computeStr = ($gpuLine -split ',')[1].Trim()
+    $computeNum = 0.0
+    if (-not [double]::TryParse($computeStr, [ref]$computeNum)) {
+        Write-Warning "Could not parse compute capability '$computeStr' from nvidia-smi; skipping GPU-class advisory."
+        $computeNum = 0.0
+    }
+    if ($computeNum -gt 0.0 -and $computeNum -lt 7.0 -and -not $DevOnly) {
+        Write-Warning "Pre-Turing GPU (compute $computeStr). Isaac Sim 5.x requires sm_75+."
         Write-Warning "Recommend: re-run with -DevOnly for the MuJoCo path. Continuing anyway since you didn't pass -DevOnly."
     }
     elseif ($computeNum -ge 12.0 -and -not $DevOnly) {
-        Write-Host "Blackwell GPU (compute $compute) — needs torch>=2.6 / CUDA 12.8 in the cache." -ForegroundColor Cyan
+        Write-Host "Blackwell GPU (compute $computeStr) — needs torch>=2.6 / CUDA 12.8 in the cache." -ForegroundColor Cyan
         Write-Host "See docs/GPU_BLACKWELL.md for the driver/CUDA matrix." -ForegroundColor Cyan
     }
 }
@@ -99,6 +106,9 @@ if (-not (Test-Path $VenvPython)) { throw "Venv python missing at $VenvPython" }
 Section "Upgrading pip / wheel / setuptools (offline)"
 & $VenvPython -m pip install --no-index --find-links "$CacheDir" --upgrade pip wheel setuptools
 # This may exit nonzero if those wheels weren't cached — not fatal, continue.
+# Reset $LASTEXITCODE so the next call's check isn't tainted by this one's
+# intentionally-ignored exit code.
+$global:LASTEXITCODE = 0
 
 Section "Installing armdroid (offline)"
 $extras = if ($DevOnly) { "[dev]" } else { "[dev,isaac]" }

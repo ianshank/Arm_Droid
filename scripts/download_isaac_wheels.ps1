@@ -83,7 +83,6 @@ $constraintsFile = Join-Path $env:TEMP "armdroid_pip_constraints.txt"
     "setuptools<70"
     "wheel<0.42"
 ) | Set-Content -Path $constraintsFile -Encoding ASCII
-$env:PIP_CONSTRAINT = $constraintsFile
 Write-Host "Build-env pin: setuptools<70  (PIP_CONSTRAINT=$constraintsFile)"
 
 # Cross-platform flags (lock to win_amd64 + Python 3.11 ABI).
@@ -99,50 +98,68 @@ if ($CrossPlatform) {
     Write-Host "Cross-platform mode: locking win_amd64 + cp311."
 }
 
-Section "Downloading build backend (hatchling, pip, wheel, setuptools, editables)"
-# These are needed to install armdroid in editable mode offline -- pip needs
-# to be able to invoke the build backend even for `pip install -e .` because
-# pyproject.toml's [build-system] requires hatchling.
-Push-Location $RepoRoot
+# Wrap every pip-download invocation in a single try/finally so we restore
+# (or unset) the previous PIP_CONSTRAINT on the parent process environment.
+# Without this, a re-run of setup_isaac.ps1 (or any pip command) in the same
+# session would silently inherit the setuptools<70 cap and produce
+# confusing build failures.
+$prevPipConstraint = $env:PIP_CONSTRAINT
+$env:PIP_CONSTRAINT = $constraintsFile
 try {
-    & cmd /c "$PythonExe -m pip download -d `"$CacheDir`" pip wheel setuptools hatchling editables $($xplat -join ' ')"
-    if ($LASTEXITCODE -ne 0) { throw "pip download (build backend) failed" }
-} finally {
-    Pop-Location
-}
+    Section "Downloading build backend (hatchling, pip, wheel, setuptools, editables)"
+    # These are needed to install armdroid in editable mode offline -- pip needs
+    # to be able to invoke the build backend even for `pip install -e .` because
+    # pyproject.toml's [build-system] requires hatchling.
+    Push-Location $RepoRoot
+    try {
+        & cmd /c "$PythonExe -m pip download -d `"$CacheDir`" pip wheel setuptools hatchling editables $($xplat -join ' ')"
+        if ($LASTEXITCODE -ne 0) { throw "pip download (build backend) failed" }
+    } finally {
+        Pop-Location
+    }
 
-Section "Downloading armdroid[dev] dependency closure"
-# Note: NO -e here. `pip download` does not support editable mode (it makes
-# no sense -- there's nothing to download for a local editable install).
-# Instead we download the dependency closure of `.[dev]`. The local armdroid
-# package itself doesn't need to be in the cache because the offline install
-# uses `pip install -e .` against the local source tree.
-Push-Location $RepoRoot
-try {
-    & cmd /c "$PythonExe -m pip download -d `"$CacheDir`" `".[dev]`" $($xplat -join ' ')"
-    if ($LASTEXITCODE -ne 0) { throw "pip download (dev) failed" }
-} finally {
-    Pop-Location
-}
+    Section "Downloading armdroid[dev] dependency closure"
+    # Note: NO -e here. `pip download` does not support editable mode (it makes
+    # no sense -- there's nothing to download for a local editable install).
+    # Instead we download the dependency closure of `.[dev]`. The local armdroid
+    # package itself doesn't need to be in the cache because the offline install
+    # uses `pip install -e .` against the local source tree.
+    Push-Location $RepoRoot
+    try {
+        & cmd /c "$PythonExe -m pip download -d `"$CacheDir`" `".[dev]`" $($xplat -join ' ')"
+        if ($LASTEXITCODE -ne 0) { throw "pip download (dev) failed" }
+    } finally {
+        Pop-Location
+    }
 
-if ($Mujoco) {
-    Section "MuJoCo-only deps already covered by [dev]; skipping separate pass."
-}
+    if ($Mujoco) {
+        Section "MuJoCo-only deps already covered by [dev]; skipping separate pass."
+    }
 
-Section "Downloading [isaac] extras (isaaclab + rsl-rl + torch closure)"
-Write-Host "Using NVIDIA pip index for isaacsim wheels: https://pypi.nvidia.com"
-Push-Location $RepoRoot
-try {
-    & cmd /c "$PythonExe -m pip download -d `"$CacheDir`" `"isaaclab[all,isaacsim]==2.3.2.post1`" `"rsl-rl-lib>=2.0`" --extra-index-url https://pypi.nvidia.com $($xplat -join ' ')"
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "isaaclab download failed. Common causes:"
-        Write-Warning "  1. Pascal-class GPU detected and you'd rather use the MuJoCo path. That's fine -- the [dev] download above is enough."
-        Write-Warning "  2. Network hiccup. Re-run; pip download is resumable for already-fetched wheels."
-        Write-Warning "  3. NVIDIA index temporarily down. Retry in a few minutes."
-        throw "pip download (isaac) failed"
+    Section "Downloading [isaac] extras (isaaclab + rsl-rl + torch closure)"
+    Write-Host "Using NVIDIA pip index for isaacsim wheels: https://pypi.nvidia.com"
+    Push-Location $RepoRoot
+    try {
+        & cmd /c "$PythonExe -m pip download -d `"$CacheDir`" `"isaaclab[all,isaacsim]==2.3.2.post1`" `"rsl-rl-lib>=2.0`" --extra-index-url https://pypi.nvidia.com $($xplat -join ' ')"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "isaaclab download failed. Common causes:"
+            Write-Warning "  1. Pre-Turing GPU detected and you'd rather use the MuJoCo path. That's fine -- the [dev] download above is enough."
+            Write-Warning "  2. Network hiccup. Re-run; pip download is resumable for already-fetched wheels."
+            Write-Warning "  3. NVIDIA index temporarily down. Retry in a few minutes."
+            throw "pip download (isaac) failed"
+        }
+    } finally {
+        Pop-Location
     }
 } finally {
-    Pop-Location
+    # Restore the previous PIP_CONSTRAINT so it doesn't leak into the rest
+    # of the user's PowerShell session. If it was unset before, unset it
+    # again; otherwise restore the prior value.
+    if ($null -eq $prevPipConstraint) {
+        Remove-Item env:PIP_CONSTRAINT -ErrorAction SilentlyContinue
+    } else {
+        $env:PIP_CONSTRAINT = $prevPipConstraint
+    }
 }
 
 Section "Summary"

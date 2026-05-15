@@ -69,13 +69,19 @@ function Test-Command($name) {
 Write-Section "Pre-flight checks"
 
 # Resolve the project root (script is at <repo>/scripts/setup_isaac.ps1).
-$RepoRoot = Resolve-Path "$PSScriptRoot\.."
-$VenvPath = Resolve-Path -Path $VenvPath -ErrorAction SilentlyContinue
-if (-not $VenvPath) {
-    $VenvPath = Join-Path $RepoRoot ".venv-isaac"
+# Keep $VenvPath as the bound parameter; assign the resolved location to a
+# separate string ($ResolvedVenv) so downstream calls always see a string,
+# not the PathInfo that Resolve-Path returns. Type drift under StrictMode
+# Latest has bitten us before.
+$RepoRoot = (Resolve-Path "$PSScriptRoot\..").Path
+$ResolvedVenvInfo = Resolve-Path -Path $VenvPath -ErrorAction SilentlyContinue
+if ($ResolvedVenvInfo) {
+    $ResolvedVenv = $ResolvedVenvInfo.Path
+} else {
+    $ResolvedVenv = Join-Path $RepoRoot ".venv-isaac"
 }
 Write-Host "Repo root:  $RepoRoot"
-Write-Host "Venv path:  $VenvPath"
+Write-Host "Venv path:  $ResolvedVenv"
 
 # Confirm Python 3.11 is available via the launcher.
 $pyVersion = & cmd /c "$PythonExe -V" 2>&1
@@ -93,13 +99,26 @@ Write-Host "Python:     $pyVersion"
 #             the install will appear to work until the first GPU op.
 #   else    -> Turing/Ampere/Ada/Hopper. No special handling needed.
 if (Test-Command nvidia-smi) {
-    $gpuLine = & nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv,noheader
+    # nvidia-smi emits one CSV row per GPU; on multi-GPU hosts $gpuLine
+    # would be an array and the column index split would be wrong. Force
+    # an array and take the first row only.
+    $gpuLines = @(& nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv,noheader)
+    $gpuLine  = $gpuLines | Select-Object -First 1
     Write-Host "GPU:        $gpuLine"
-    $compute = ($gpuLine -split ',')[3].Trim()
-    $computeNum = [double]$compute
-    if ($computeNum -lt 7.0) {
+    if ($gpuLines.Count -gt 1) {
+        Write-Host "            ($($gpuLines.Count) GPUs total; using first for compute-cap classification — set CUDA_VISIBLE_DEVICES if you want a different one)"
+    }
+    # Guard the parse: nvidia-smi can return 'N/A' for very old or VM-passthrough
+    # cards, and StrictMode would crash on the cast.
+    $computeStr = ($gpuLine -split ',')[3].Trim()
+    $computeNum = 0.0
+    if (-not [double]::TryParse($computeStr, [ref]$computeNum)) {
+        Write-Warning "Could not parse compute capability '$computeStr' from nvidia-smi. Skipping GPU-class advisories; install will continue."
+        $computeNum = 0.0
+    }
+    if ($computeNum -gt 0.0 -and $computeNum -lt 7.0) {
         Write-Host ""
-        Write-Host "  !!! Pre-Turing GPU detected (compute capability $compute)." -ForegroundColor Yellow
+        Write-Host "  !!! Pre-Turing GPU detected (compute capability $computeStr)." -ForegroundColor Yellow
         Write-Host "  !!! Isaac Sim 5.x requires sm_75 (Turing) or newer." -ForegroundColor Yellow
         Write-Host "  !!! Recommended path on this card:" -ForegroundColor Yellow
         Write-Host "  !!!     .\scripts\setup_mujoco_only.ps1   (MuJoCo path; proven)" -ForegroundColor Yellow
@@ -120,7 +139,7 @@ if (Test-Command nvidia-smi) {
     }
     elseif ($computeNum -ge 12.0) {
         Write-Host ""
-        Write-Host "  Blackwell-class GPU detected (compute capability $compute)." -ForegroundColor Cyan
+        Write-Host "  Blackwell-class GPU detected (compute capability $computeStr)." -ForegroundColor Cyan
         Write-Host "  Requires torch >= 2.6 with CUDA 12.8 binaries for sm_120 kernels."
         Write-Host "  pyproject pins isaaclab==2.3.2.post1, which pulls torch>=2.7 — good."
         Write-Host "  See docs/GPU_BLACKWELL.md for VRAM-tuned num_envs guidance"
@@ -131,27 +150,30 @@ if (Test-Command nvidia-smi) {
     throw "nvidia-smi not on PATH. Install/repair the NVIDIA driver before continuing."
 }
 
-# Confirm at least 20 GB free on the install drive.
-$venvDrive  = (Split-Path -Qualifier $VenvPath).TrimEnd(':') + ':'
+# Confirm at least 20 GB free on the install drive. The Isaac install itself
+# is ~9-10 GB on disk, but pip needs another ~5-10 GB of working space for
+# wheel unpacking, build isolation, and caching during the resolution pass.
+# 20 GB is the documented requirement in the .NOTES header.
+$venvDrive  = (Split-Path -Qualifier $ResolvedVenv).TrimEnd(':') + ':'
 $driveInfo  = Get-PSDrive -Name $venvDrive.TrimEnd(':') -ErrorAction Stop
 $freeGB     = [math]::Round($driveInfo.Free/1GB, 1)
-Write-Host "Free space: $freeGB GB on $venvDrive (need ~10 GB headroom)"
-if ($freeGB -lt 15) {
-    Write-Warning "Less than 15 GB free on $venvDrive. Isaac install is ~9-10 GB; consider freeing space first."
+Write-Host "Free space: $freeGB GB on $venvDrive (need ~20 GB headroom)"
+if ($freeGB -lt 20) {
+    Write-Warning "Less than 20 GB free on $venvDrive. Isaac install needs ~9-10 GB plus pip working space; consider freeing space first."
 }
 
 # --- Venv creation ------------------------------------------------------------
 if (-not $SkipInstall) {
-    Write-Section "Creating venv at $VenvPath"
-    if (Test-Path $VenvPath) {
+    Write-Section "Creating venv at $ResolvedVenv"
+    if (Test-Path $ResolvedVenv) {
         Write-Host "Venv already exists; reusing."
     } else {
-        & cmd /c "$PythonExe -m venv `"$VenvPath`""
+        & cmd /c "$PythonExe -m venv `"$ResolvedVenv`""
         if ($LASTEXITCODE -ne 0) { throw "venv creation failed" }
     }
 }
 
-$VenvPython = Join-Path $VenvPath "Scripts\python.exe"
+$VenvPython = Join-Path $ResolvedVenv "Scripts\python.exe"
 if (-not (Test-Path $VenvPython)) {
     throw "Venv python missing at $VenvPython"
 }
@@ -245,7 +267,7 @@ if ($smokeExit -eq 0) {
     Write-Host "Smoke imports passed." -ForegroundColor Green
     Write-Host ""
     Write-Host "Activate the venv and train:"
-    Write-Host "    & '$VenvPath\Scripts\Activate.ps1'"
+    Write-Host "    & '$ResolvedVenv\Scripts\Activate.ps1'"
     Write-Host "    python -m armdroid --config config/tower_of_hanoi_isaac.yaml train"
     Write-Host ""
     Write-Host "Run the GPU smoke suite (single-env, requires GPU):"
