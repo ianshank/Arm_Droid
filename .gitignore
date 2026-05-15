@@ -147,7 +147,7 @@ firmware/arm_esp32/src/*_with_secrets.h
 # without naming each one.
 armdroid_isaac_bundle.zip
 
-# Claude Code worktrees — when an in-progress feature uses a git
-# worktree under .claude/, the working tree itself is local-only. The
-# canonical content lives on the corresponding branch on origin.
-.claude/worktrees/
+# Claude Code session metadata — worktrees, plans, settings, hook state.
+# All of .claude/ is local-only; the canonical content lives on the
+# corresponding branch on origin.
+.claude/
