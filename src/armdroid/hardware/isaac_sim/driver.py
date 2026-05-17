@@ -172,7 +172,20 @@ class IsaacSimDriver:
                 )
                 raise ArmDriverError(msg) from exc
 
-            await asyncio.to_thread(self._launch_kit_and_articulation)
+            # Kit boot MUST run on the main thread of the main interpreter.
+            # ``isaacsim.simulation_app.SimulationApp.__init__`` calls
+            # ``signal.signal(SIGINT, ...)`` which Python only allows from
+            # the main thread; ``asyncio.to_thread`` schedules work on the
+            # default ThreadPoolExecutor and trips
+            # ``ValueError: signal only works in main thread of the main
+            # interpreter``. The bootstrap is a one-shot per process
+            # (Kit's AppLauncher singleton, see _app_state) so the
+            # ~10-20 s blocking call against the event loop is acceptable
+            # — runtime motion still uses ``asyncio.to_thread`` for
+            # ``set_joint_position_target`` / ``write_data_to_sim`` /
+            # the ``_step_sim`` loop, where the main-thread requirement
+            # does not apply.
+            self._launch_kit_and_articulation()
             _app_state.mark_launched()
             self._connected = True
             _log.info(
@@ -184,10 +197,22 @@ class IsaacSimDriver:
     def _launch_kit_and_articulation(self) -> None:
         """Synchronous Kit boot + SimulationContext + runtime Articulation construction.
 
-        Run inside ``asyncio.to_thread`` because Kit's runtime is
-        synchronous. ``connect()`` awaits this method.
+        Called directly from ``connect()`` (NOT via ``asyncio.to_thread``)
+        because Isaac Sim's ``SimulationApp.__init__`` registers a
+        ``SIGINT`` handler via ``signal.signal``, which Python's signal
+        module rejects when called off the main thread of the main
+        interpreter. ``connect()`` awaits this method synchronously; the
+        event loop pause for the ~10-20 s Kit bootstrap is acceptable
+        because Kit is a process-singleton (see ``_app_state``) and the
+        boot fires at most once per process lifetime. Runtime motion
+        APIs (``set_joint_position_target`` / ``write_data_to_sim`` /
+        ``_step_sim``) still use ``asyncio.to_thread`` because that
+        constraint applies only to ``signal.signal`` registration.
 
         Sequence (Isaac Lab 2.3):
+          0. (Caller) ``connect()`` invokes this on the main thread —
+             see the docstring above for the SIGINT-on-main-thread
+             reasoning.
           1. ``AppLauncher`` boots Kit + Omniverse extensions.
           2. ``SimulationContext`` creates the physics scene (must
              happen AFTER Kit; ``isaaclab.sim`` cannot be imported
