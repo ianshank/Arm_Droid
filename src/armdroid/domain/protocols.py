@@ -15,6 +15,7 @@ from armdroid.domain.state import ArmState, DetectedObject, PlanStep, SymbolicSt
 
 if TYPE_CHECKING:
     import numpy as np
+    import torch
     from numpy.typing import NDArray
 
 
@@ -363,6 +364,118 @@ class ArmRLAgentProtocol(Protocol):
         ...
 
 
+@runtime_checkable
+class VecArmEnvironmentProtocol(Protocol):
+    """Vectorised environment interface for parallel training (``num_envs > 1``).
+
+    Sibling to :class:`ArmEnvironmentProtocol`. Returns batched torch
+    tensors rather than the per-step numpy scalars of the single-env
+    protocol. The companion :meth:`as_runner_env` accessor exposes the
+    underlying RL-runner-compatible env (typically Isaac Lab's
+    ``ManagerBasedRLEnv``) without forcing consumers to reach through
+    private attributes on the env wrapper.
+
+    Permits ``num_envs >= 1`` so callers may adopt the vec protocol
+    unconditionally; the orchestration factory still routes
+    ``num_envs == 1`` to the single-env path by default.
+    """
+
+    @property
+    def num_envs(self) -> int:
+        """Number of parallel environments. Must be ``>= 1``."""
+        ...
+
+    def reset(
+        self, *, seed: int | None = None,
+    ) -> tuple[dict[str, torch.Tensor], dict[str, Any]]:
+        """Reset all parallel envs.
+
+        Returns:
+            Tuple ``(obs_dict, info)``. Every value in ``obs_dict`` has
+            leading dim equal to :attr:`num_envs`.
+        """
+        ...
+
+    def step(
+        self, action: torch.Tensor,
+    ) -> tuple[
+        dict[str, torch.Tensor],
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        dict[str, Any],
+    ]:
+        """Step all parallel envs.
+
+        Args:
+            action: Tensor of shape ``(num_envs, action_dim)``.
+
+        Returns:
+            Tuple ``(obs, reward, terminated, truncated, info)`` with
+            ``reward`` / ``terminated`` / ``truncated`` each shape
+            ``(num_envs,)``.
+        """
+        ...
+
+    def close(self) -> None:
+        """Release all parallel envs."""
+        ...
+
+    def as_runner_env(self) -> Any:
+        """Return the underlying RL-runner-compatible env.
+
+        Replacement for the legacy ``env._isaac_env`` reach-through.
+        Returns the raw ``ManagerBasedRLEnv`` (or analogue) so RL-runner
+        backends (RSL-RL's ``OnPolicyRunner``) can consume it directly.
+        """
+        ...
+
+
+@runtime_checkable
+class VecArmRLAgentProtocol(Protocol):
+    """RL agent contract for vectorised training.
+
+    Sibling to :class:`ArmRLAgentProtocol`. Agents may implement both
+    surfaces (single-env via ``build`` / ``train`` and vec via
+    ``build_vec`` / ``train_vec``); the orchestration layer picks the
+    right call site based on the env type and
+    ``cfg.arm_sim_isaac.num_envs``.
+    """
+
+    def build_vec(self, env: VecArmEnvironmentProtocol) -> None:
+        """Build the underlying runner around a vec env. Idempotent."""
+        ...
+
+    def train_vec(self, total_timesteps: int | None = None) -> None:
+        """Run vectorised training to completion."""
+        ...
+
+    def predict(
+        self,
+        observation: dict[str, NDArray[np.float64]],
+    ) -> NDArray[np.float64]:
+        """Single-step inference. Inputs / outputs stay numpy at the boundary."""
+        ...
+
+    def save(self, path: str | None = None) -> Path:
+        """Persist trained weights."""
+        ...
+
+    def load(self, path: str) -> None:
+        """Load trained weights."""
+        ...
+
+    @property
+    def is_trained(self) -> bool:
+        """Whether ``train_vec`` has completed at least once."""
+        ...
+
+    @property
+    def is_built(self) -> bool:
+        """Whether ``build_vec`` has bound a runner."""
+        ...
+
+
 __all__ = [
     "ArmControllerProtocol",
     "ArmDriverProtocol",
@@ -370,4 +483,6 @@ __all__ = [
     "ArmPerceptionProtocol",
     "ArmPlannerProtocol",
     "ArmRLAgentProtocol",
+    "VecArmEnvironmentProtocol",
+    "VecArmRLAgentProtocol",
 ]
