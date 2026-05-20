@@ -31,8 +31,10 @@ from armdroid.domain.protocols import (
     ArmPerceptionProtocol,
     ArmPlannerProtocol,
     ArmRLAgentProtocol,
+    VecArmEnvironmentProtocol,
 )
 from armdroid.environments.registry import get_environment
+from armdroid.environments.registry_vec import get_vec_environment
 from armdroid.hardware.registry import get_driver
 from armdroid.logging.setup import get_logger
 from armdroid.orchestration._driver_kind import resolve_driver_kind
@@ -44,6 +46,28 @@ if TYPE_CHECKING:
     from armdroid.config.schema import ArmSettings
 
 _log = get_logger(__name__)
+
+
+# Algorithms that consume the vec env path via VecArmRLAgentProtocol.
+# RSL-RL PPO is currently the only one; future vec-capable algorithms
+# (skrl, JAX/Brax, etc.) add their key here.
+_VEC_CAPABLE_ALGORITHMS: frozenset[str] = frozenset({"rsl_rl_ppo"})
+
+
+# Task types whose vec env is registered under the vec env registry.
+# Only the Isaac SO-ARM reach task today; other tasks would add their
+# corresponding "<name>_vec" registry entry here.
+_VEC_CAPABLE_TASKS: frozenset[str] = frozenset({"so_arm_reach_isaac"})
+
+
+def _should_use_vec(cfg: ArmSettings) -> bool:
+    """Return True iff the config asks for a vectorised env path.
+
+    Decoupled from algorithm validation; ``build_arm_environment``
+    cross-checks the algorithm separately and raises ``ValueError``
+    when the combination is invalid.
+    """
+    return cfg.arm_sim_isaac.num_envs > 1
 
 
 def build_arm_driver(cfg: ArmSettings) -> ArmDriverProtocol:
@@ -89,7 +113,9 @@ def build_arm_planner(cfg: ArmSettings) -> ArmPlannerProtocol:
     return SymbolicPlanner(cfg.arm_planning, cfg.arm_task)
 
 
-def build_arm_environment(cfg: ArmSettings) -> ArmEnvironmentProtocol:
+def build_arm_environment(
+    cfg: ArmSettings,
+) -> ArmEnvironmentProtocol | VecArmEnvironmentProtocol:
     """Build the Gymnasium environment for arm training.
 
     The ``so_arm_reach_isaac`` env requires ``ArmSimIsaacConfig`` in
@@ -108,6 +134,38 @@ def build_arm_environment(cfg: ArmSettings) -> ArmEnvironmentProtocol:
     """
     dof = cfg.arm.dof
     task_type = cfg.arm_task.task_type
+
+    # F1 vec dispatch: num_envs > 1 + Isaac-task + vec-capable algorithm
+    # routes through the sibling vec env registry; everything else falls
+    # back to the single-env path (byte-identical to pre-F1 behaviour).
+    if _should_use_vec(cfg):
+        algo = cfg.arm_training.algorithm
+        if algo not in _VEC_CAPABLE_ALGORITHMS:
+            msg = (
+                f"num_envs > 1 requires one of "
+                f"{sorted(_VEC_CAPABLE_ALGORITHMS)} (got {algo!r}); "
+                "set arm_sim_isaac.num_envs=1 or change algorithm."
+            )
+            raise ValueError(msg)
+        if task_type not in _VEC_CAPABLE_TASKS:
+            msg = (
+                f"vec env path requires one of "
+                f"{sorted(_VEC_CAPABLE_TASKS)} (got task_type={task_type!r}); "
+                "set arm_sim_isaac.num_envs=1 or change task_type."
+            )
+            raise ValueError(msg)
+        _log.info(
+            "arm_env_built_vec",
+            task_type=task_type,
+            num_envs=cfg.arm_sim_isaac.num_envs,
+        )
+        vec_factory = get_vec_environment(f"{task_type}_vec")
+        return vec_factory(
+            task_cfg=cfg.arm_task,
+            training_cfg=cfg.arm_training,
+            sim_isaac_cfg=cfg.arm_sim_isaac,
+        )
+
     _log.info("arm_env_built", task_type=task_type)
     factory = get_environment(task_type)
     if task_type == "so_arm_reach_isaac":

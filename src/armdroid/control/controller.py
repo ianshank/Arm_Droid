@@ -13,12 +13,15 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
-from armdroid.domain.protocols import ArmRLAgentProtocol
+from armdroid.domain.protocols import (
+    ArmEnvironmentProtocol,
+    ArmRLAgentProtocol,
+    VecArmEnvironmentProtocol,
+)
 from armdroid.logging.setup import get_logger
 
 if TYPE_CHECKING:
     from armdroid.control.primitives import ActionPrimitives
-    from armdroid.domain.protocols import ArmEnvironmentProtocol
 
 _log = get_logger(__name__)
 
@@ -47,6 +50,7 @@ class ArmController:
         """
         self._agent = agent
         self._primitives = primitives
+        self._is_vec_path: bool = False
         _log.info("arm_controller_init", is_trained=agent.is_trained)
 
     @property
@@ -83,18 +87,48 @@ class ArmController:
                 "info": {"error": "action_execution_failed"},
             }
 
-    def build_for_env(self, env: ArmEnvironmentProtocol) -> None:
-        """Bind the SAC agent to an environment if not already built.
+    def build_for_env(
+        self, env: ArmEnvironmentProtocol | VecArmEnvironmentProtocol,
+    ) -> None:
+        """Bind the underlying RL agent to an environment if not already built.
+
+        Dispatches between the single-env :meth:`ArmRLAgentProtocol.build`
+        and the vec :meth:`VecArmRLAgentProtocol.build_vec` based on the
+        runtime protocol type of ``env`` (F1). For backwards-compat,
+        agents that do not implement ``build_vec`` fall back to the
+        single-env path.
 
         Args:
-            env: Gymnasium-compatible environment for SAC+HER training.
+            env: Single-env or vec-env conforming to the relevant
+                protocol. Vec envs are detected via
+                :class:`VecArmEnvironmentProtocol`'s ``num_envs``
+                attribute.
         """
-        if not self._agent.is_built:
-            _log.info("arm_controller_building_agent")
-            self._agent.build(env)
+        if self._agent.is_built:
+            return
+        build_vec = getattr(self._agent, "build_vec", None)
+        if isinstance(env, VecArmEnvironmentProtocol) and callable(build_vec):
+            _log.info(
+                "arm_controller_building_agent_vec",
+                num_envs=env.num_envs,
+            )
+            build_vec(env)
+            self._is_vec_path = True
+            return
+        _log.info("arm_controller_building_agent")
+        # Narrow: at this point env is not a VecArmEnvironmentProtocol (or
+        # the agent does not support the vec path), so it must satisfy
+        # the single-env protocol for the agent.build() call below.
+        single_env: ArmEnvironmentProtocol = env  # type: ignore[assignment]
+        self._agent.build(single_env)
 
     def train_policy(self, total_timesteps: int | None = None) -> Path:
-        """Train the SAC+HER policy and save a checkpoint.
+        """Train the policy and save a checkpoint.
+
+        Dispatches to :meth:`VecArmRLAgentProtocol.train_vec` if the
+        agent was previously bound via the vec path
+        (:meth:`build_for_env` with a :class:`VecArmEnvironmentProtocol`).
+        Otherwise falls back to the single-env :meth:`train`.
 
         Args:
             total_timesteps: Override config total_timesteps (None = use config).
@@ -102,7 +136,11 @@ class ArmController:
         Returns:
             Path of the saved policy checkpoint.
         """
-        self._agent.train(total_timesteps)
+        train_vec = getattr(self._agent, "train_vec", None)
+        if self._is_vec_path and callable(train_vec):
+            train_vec(total_timesteps)
+        else:
+            self._agent.train(total_timesteps)
         return self._agent.save()
 
     async def execute_primitive(self, primitive_name: str, target: NDArray[np.float64]) -> bool:

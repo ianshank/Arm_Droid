@@ -229,13 +229,19 @@ class ArmControllerProtocol(Protocol):
         """
         ...
 
-    def build_for_env(self, env: ArmEnvironmentProtocol) -> None:
+    def build_for_env(
+        self,
+        env: ArmEnvironmentProtocol | VecArmEnvironmentProtocol,
+    ) -> None:
         """Bind the internal RL model to an environment (lazy wiring).
 
-        Safe to call multiple times — only builds if not already built.
+        Safe to call multiple times - only builds if not already built.
+        Accepts either a single-env or vec env; concrete controllers
+        dispatch internally based on the runtime protocol type.
 
         Args:
-            env: Gymnasium-compatible environment for SAC+HER.
+            env: Gymnasium-compatible environment for the configured
+                training algorithm.
         """
         ...
 
