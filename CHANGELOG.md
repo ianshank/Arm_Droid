@@ -39,7 +39,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   - **`armdroid.orchestration.factory`** — `build_arm_environment`
     dispatches on `cfg.arm_sim_isaac.num_envs > 1` via
     `_VEC_CAPABLE_ALGORITHMS` (`{"rsl_rl_ppo"}`) and
-    `_VEC_CAPABLE_TASKS` (`{"so_arm_reach_isaac"}`) allow-lists.
+    `_VEC_TASK_REGISTRY_NAMES` (`{"so_arm_reach_isaac": "so_arm_reach_isaac_vec"}`)
+    mapping.
     `num_envs > 1` with a non-vec algorithm or non-Isaac task raises
     `ValueError` with an actionable message.
   - **`armdroid.control.controller.ArmController.build_for_env`** —

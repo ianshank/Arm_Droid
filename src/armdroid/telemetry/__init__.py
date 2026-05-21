@@ -68,7 +68,7 @@ SPAN_ENV_RENDER: str = "armdroid.env.render"
 SPAN_ENV_CLOSE: str = "armdroid.env.close"
 
 # Agent span constants — emitted by every ArmRLAgentProtocol implementation
-# (SACAgent today; PR-B's RslRlPpoAgent next).
+# (SACAgent and RslRlPpoAgent). Vec-path span constants live below.
 
 #: Span covering :meth:`ArmRLAgentProtocol.build` (model construction).
 SPAN_AGENT_BUILD: str = "armdroid.agent.build"

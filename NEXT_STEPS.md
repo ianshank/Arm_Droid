@@ -150,7 +150,7 @@ exceeds runner disk quota in practice, the workflow falls back to
   the `env._isaac_env` reach-through cleanly via
   `VecArmEnvironmentProtocol.as_runner_env()`. The factory routes on
   `cfg.arm_sim_isaac.num_envs > 1` via `_VEC_CAPABLE_ALGORITHMS` and
-  `_VEC_CAPABLE_TASKS` allow-lists. Single-env path is byte-identical.
+  `_VEC_TASK_REGISTRY_NAMES` allow-list mapping. Single-env path is byte-identical.
   See [docs/architecture/ADR/ADR-0006-vec-env-protocol.md](docs/architecture/ADR/ADR-0006-vec-env-protocol.md).
 
 ## Follow-ups (post PR-B)

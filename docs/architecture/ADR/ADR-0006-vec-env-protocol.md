@@ -39,7 +39,7 @@ pointed users at a vec path that did not yet exist.
    the agent-method dispatch (`build` vs `build_vec`) happens when the
    controller binds. Both axes are decoupled, both default to
    single-env when `num_envs == 1`. Module constants
-   `_VEC_CAPABLE_ALGORITHMS` and `_VEC_CAPABLE_TASKS` pin the allow-list.
+   `_VEC_CAPABLE_ALGORITHMS` and `_VEC_TASK_REGISTRY_NAMES` pin the allow-list.
 5. **`num_envs >= 1` permitted on the vec env.** The vec env accepts
    `num_envs == 1` as a degenerate case so callers may adopt the vec
    protocol unconditionally. Factory dispatch still routes
@@ -111,6 +111,6 @@ pointed users at a vec path that did not yet exist.
 - `src/armdroid/control/rsl_rl_agent.py` - the new `build_vec` /
   `train_vec` methods + extracted `_iterations_for` helper.
 - `src/armdroid/orchestration/factory.py` - `_should_use_vec` +
-  `_VEC_CAPABLE_ALGORITHMS` / `_VEC_CAPABLE_TASKS`.
+  `_VEC_CAPABLE_ALGORITHMS` / `_VEC_TASK_REGISTRY_NAMES`.
 - `src/armdroid/control/controller.py` - protocol-type dispatch in
   `build_for_env` / `train_policy`.
