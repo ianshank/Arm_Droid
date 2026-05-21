@@ -66,16 +66,25 @@ def _so_arm_reach_isaac_vec_factory(
         )
         raise ArmDriverError(msg) from exc
 
-    from armdroid.environments.isaac.reach_vec import SoArmReachIsaacVecEnv
-
     # The factory is intentionally untyped at the *args / **kwargs boundary
     # (mirrors the single-env _so_arm_reach_isaac_factory) so registry
     # callers can pass through arbitrary keyword configs from YAML
     # overlays. The orchestration factory threads the typed configs in.
-    env: VecArmEnvironmentProtocol = SoArmReachIsaacVecEnv(
+    # We runtime-validate the result satisfies VecArmEnvironmentProtocol
+    # so plugin authors can't quietly return the wrong shape.
+    from armdroid.domain.protocols import VecArmEnvironmentProtocol as _Proto
+    from armdroid.environments.isaac.reach_vec import SoArmReachIsaacVecEnv
+
+    env = SoArmReachIsaacVecEnv(
         *args,  # type: ignore[arg-type]
         **kwargs,  # type: ignore[arg-type]
     )
+    if not isinstance(env, _Proto):  # pragma: no cover - guard
+        msg = (
+            f"factory returned {type(env).__name__!r} which does not satisfy "
+            "VecArmEnvironmentProtocol"
+        )
+        raise TypeError(msg)
     return env
 
 

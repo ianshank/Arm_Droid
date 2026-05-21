@@ -65,3 +65,51 @@ def test_iterations_for_helper_extraction_preserves_behaviour() -> None:
     # Explicit total_timesteps path: floor division by num_steps_per_env.
     expected = int(50_000 // agent._ppo_cfg.num_steps_per_env)
     assert agent._iterations_for(50_000) == expected
+
+
+def test_iterations_for_floor_divides_when_not_evenly_divisible() -> None:
+    """Non-evenly-divisible total_timesteps must floor-divide (no rounding up).
+
+    Pins the truncation behaviour: a caller passing 1001 with
+    num_steps_per_env=24 gets ``41`` iterations (24*41 = 984 < 1001),
+    not 42 (24*42 = 1008 > 1001). Mirrors RSL-RL's iteration semantics.
+    """
+    from armdroid.config.schema.training import ArmTrainingConfig, RslRlPpoConfig
+    from armdroid.control.rsl_rl_agent import RslRlPpoAgent
+
+    agent = RslRlPpoAgent(
+        ppo_cfg=RslRlPpoConfig(num_steps_per_env=24),
+        training_cfg=ArmTrainingConfig(algorithm="rsl_rl_ppo"),
+        device="cpu",
+    )
+    # 1001 // 24 == 41 (24 * 41 = 984; remainder 17)
+    assert agent._iterations_for(1001) == 41
+    # Edge case: total < num_steps_per_env -> 0 iterations (caller's responsibility)
+    assert agent._iterations_for(10) == 0
+    # Exact multiple
+    assert agent._iterations_for(240) == 10
+
+
+def test_rsl_rl_ppo_agent_device_sourced_from_config() -> None:
+    """Constructing without an explicit device kwarg uses ppo_cfg.device.
+
+    Regression: F1 tech-debt cleanup moved the hardcoded "cuda:0"
+    default into RslRlPpoConfig.device so it is overridable via YAML
+    overlay without touching the agent constructor.
+    """
+    from armdroid.config.schema.training import ArmTrainingConfig, RslRlPpoConfig
+    from armdroid.control.rsl_rl_agent import RslRlPpoAgent
+
+    agent = RslRlPpoAgent(
+        ppo_cfg=RslRlPpoConfig(device="cpu"),
+        training_cfg=ArmTrainingConfig(algorithm="rsl_rl_ppo"),
+    )
+    assert agent._device == "cpu"
+
+    # Explicit kwarg overrides the config default.
+    agent_override = RslRlPpoAgent(
+        ppo_cfg=RslRlPpoConfig(device="cuda:1"),
+        training_cfg=ArmTrainingConfig(algorithm="rsl_rl_ppo"),
+        device="cpu",
+    )
+    assert agent_override._device == "cpu"

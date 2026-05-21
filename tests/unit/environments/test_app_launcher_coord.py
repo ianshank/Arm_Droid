@@ -3,29 +3,13 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
-import torch
 
 from armdroid.config.schema.sim_isaac import ArmSimIsaacConfig
 from armdroid.config.schema.task import ArmTaskConfig
 from armdroid.config.schema.training import ArmTrainingConfig
-
-
-def _fake_isaac_env(num_envs: int) -> Any:
-    env = MagicMock()
-    env.num_envs = num_envs
-    obs = {"observation": torch.zeros(num_envs, 6, dtype=torch.float32)}
-    env.reset.return_value = (obs, {})
-    env.step.return_value = (
-        obs,
-        torch.zeros(num_envs, dtype=torch.float32),
-        torch.zeros(num_envs, dtype=torch.bool),
-        torch.zeros(num_envs, dtype=torch.bool),
-        {},
-    )
-    return env
+from tests.helpers.fake_isaac_env import make_fake_isaac_env
 
 
 @pytest.fixture
@@ -46,7 +30,7 @@ def test_vec_env_marks_kit_launched_when_first(
 
     monkeypatch.setattr(
         reach_vec, "_build_isaac_env",
-        lambda *_a, **_kw: _fake_isaac_env(num_envs=4),
+        lambda *_a, **_kw: make_fake_isaac_env(num_envs=4),
     )
     env = reach_vec.SoArmReachIsaacVecEnv(
         task_cfg=ArmTaskConfig(),
@@ -67,7 +51,7 @@ def test_vec_env_observes_already_launched_kit(
     fresh_app_state.mark_launched()  # simulate driver-first ordering
     monkeypatch.setattr(
         reach_vec, "_build_isaac_env",
-        lambda *_a, **_kw: _fake_isaac_env(num_envs=4),
+        lambda *_a, **_kw: make_fake_isaac_env(num_envs=4),
     )
     env = reach_vec.SoArmReachIsaacVecEnv(
         task_cfg=ArmTaskConfig(),
@@ -94,7 +78,7 @@ def test_vec_env_kit_boot_span_emitted(
     try:
         monkeypatch.setattr(
             reach_vec, "_build_isaac_env",
-            lambda *_a, **_kw: _fake_isaac_env(num_envs=2),
+            lambda *_a, **_kw: make_fake_isaac_env(num_envs=2),
         )
         env = reach_vec.SoArmReachIsaacVecEnv(
             task_cfg=ArmTaskConfig(),

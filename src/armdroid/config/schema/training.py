@@ -209,6 +209,15 @@ class RslRlPpoConfig(BaseModel):
         default=None,
         description="Resume from this checkpoint when set; else start fresh.",
     )
+    device: str = Field(
+        default="cuda:0",
+        min_length=1,
+        description=(
+            "Torch device string for the RSL-RL runner. Use 'cpu' on hosts "
+            "without CUDA; 'cuda:N' to pin a specific GPU. Threaded through "
+            "RslRlPpoAgent so callers do not pass it as a kwarg."
+        ),
+    )
 
 
 __all__ = ["ArmCurriculumConfig", "ArmTrainingConfig", "RslRlPpoConfig"]

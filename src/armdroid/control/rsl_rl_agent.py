@@ -82,11 +82,13 @@ class RslRlPpoAgent:
         ppo_cfg: RslRlPpoConfig,
         training_cfg: ArmTrainingConfig,
         *,
-        device: str = "cuda:0",
+        device: str | None = None,
     ) -> None:
         self._ppo_cfg = ppo_cfg
         self._training_cfg = training_cfg
-        self._device = device
+        # Device sourced from config by default; explicit kwarg overrides
+        # (tests pass device="cpu" without touching YAML).
+        self._device = device if device is not None else ppo_cfg.device
         self._runner: Any = None
         self._is_trained = False
         _log.info(

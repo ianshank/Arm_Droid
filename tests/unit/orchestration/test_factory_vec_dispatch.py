@@ -18,6 +18,7 @@ from armdroid.config.schema.task import ArmTaskConfig
 from armdroid.config.schema.training import ArmTrainingConfig
 from armdroid.orchestration.factory import (
     _VEC_CAPABLE_ALGORITHMS,
+    _VEC_TASK_REGISTRY_NAMES,
     _should_use_vec,
     build_arm_environment,
 )
@@ -43,6 +44,11 @@ def test_should_use_vec_true_when_num_envs_gt_one() -> None:
 def test_vec_capable_algorithms_pinned() -> None:
     """rsl_rl_ppo is currently the only vec-capable algorithm."""
     assert "rsl_rl_ppo" in _VEC_CAPABLE_ALGORITHMS
+
+
+def test_vec_task_registry_mapping_pinned() -> None:
+    """The so_arm_reach_isaac task maps to the so_arm_reach_isaac_vec registry."""
+    assert _VEC_TASK_REGISTRY_NAMES["so_arm_reach_isaac"] == "so_arm_reach_isaac_vec"
 
 
 def test_build_arm_environment_routes_to_vec_for_num_envs_gt_one(

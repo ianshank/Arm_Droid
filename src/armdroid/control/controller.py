@@ -115,12 +115,18 @@ class ArmController:
             build_vec(env)
             self._is_vec_path = True
             return
+        # Single-env fallback - explicit runtime check so the cast below
+        # cannot silently accept an unsupported env shape (e.g. a vec env
+        # paired with an agent that does not implement build_vec).
+        if not isinstance(env, ArmEnvironmentProtocol):
+            msg = (
+                f"env {type(env).__name__!r} satisfies neither "
+                "ArmEnvironmentProtocol nor (VecArmEnvironmentProtocol + "
+                "agent.build_vec); cannot bind agent."
+            )
+            raise TypeError(msg)
         _log.info("arm_controller_building_agent")
-        # Narrow: at this point env is not a VecArmEnvironmentProtocol (or
-        # the agent does not support the vec path), so it must satisfy
-        # the single-env protocol for the agent.build() call below.
-        single_env: ArmEnvironmentProtocol = env  # type: ignore[assignment]
-        self._agent.build(single_env)
+        self._agent.build(env)
 
     def train_policy(self, total_timesteps: int | None = None) -> Path:
         """Train the policy and save a checkpoint.

@@ -54,10 +54,13 @@ _log = get_logger(__name__)
 _VEC_CAPABLE_ALGORITHMS: frozenset[str] = frozenset({"rsl_rl_ppo"})
 
 
-# Task types whose vec env is registered under the vec env registry.
-# Only the Isaac SO-ARM reach task today; other tasks would add their
-# corresponding "<name>_vec" registry entry here.
-_VEC_CAPABLE_TASKS: frozenset[str] = frozenset({"so_arm_reach_isaac"})
+# Task type -> vec env registry name mapping. Single source of truth
+# for which tasks have a registered vec variant. Adding a new vec env
+# is a two-line change: register the factory in registry_vec.py, then
+# add ``"<task>": "<task>_vec"`` here.
+_VEC_TASK_REGISTRY_NAMES: dict[str, str] = {
+    "so_arm_reach_isaac": "so_arm_reach_isaac_vec",
+}
 
 
 def _should_use_vec(cfg: ArmSettings) -> bool:
@@ -147,10 +150,11 @@ def build_arm_environment(
                 "set arm_sim_isaac.num_envs=1 or change algorithm."
             )
             raise ValueError(msg)
-        if task_type not in _VEC_CAPABLE_TASKS:
+        vec_registry_name = _VEC_TASK_REGISTRY_NAMES.get(task_type)
+        if vec_registry_name is None:
             msg = (
                 f"vec env path requires one of "
-                f"{sorted(_VEC_CAPABLE_TASKS)} (got task_type={task_type!r}); "
+                f"{sorted(_VEC_TASK_REGISTRY_NAMES)} (got task_type={task_type!r}); "
                 "set arm_sim_isaac.num_envs=1 or change task_type."
             )
             raise ValueError(msg)
@@ -159,7 +163,7 @@ def build_arm_environment(
             task_type=task_type,
             num_envs=cfg.arm_sim_isaac.num_envs,
         )
-        vec_factory = get_vec_environment(f"{task_type}_vec")
+        vec_factory = get_vec_environment(vec_registry_name)
         return vec_factory(
             task_cfg=cfg.arm_task,
             training_cfg=cfg.arm_training,

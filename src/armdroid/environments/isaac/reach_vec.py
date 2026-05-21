@@ -59,7 +59,7 @@ def _build_isaac_env(
     return gym.make(
         sim_isaac_cfg.reach_env_id,
         num_envs=sim_isaac_cfg.num_envs,
-        disable_env_checker=True,
+        disable_env_checker=sim_isaac_cfg.disable_env_checker,
     )
 
 
