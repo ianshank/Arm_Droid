@@ -73,34 +73,46 @@ def test_build_for_env_dispatches_to_build_when_single_env() -> None:
 
 
 def test_build_for_env_rejects_vec_env_when_agent_lacks_build_vec() -> None:
-    """Vec env paired with a single-only agent must raise TypeError.
+    """Vec env paired with a single-only agent must raise ValueError.
 
     The runtime hardening guard refuses to silently degrade to
     ``agent.build()`` because the vec env's torch-tensor returns are
     incompatible with the single-env protocol's numpy contract.
-    Callers must either configure a vec-capable agent or set
-    ``num_envs == 1`` to use the single-env path.
+    Callers must either configure a vec-capable agent (rsl_rl_ppo) or
+    set ``num_envs == 1`` to use the single-env path.
+    (Updated per Gemini Code Assist review: isinstance-based check.)
     """
     agent = _single_only_agent()
     controller = ArmController(agent=agent, primitives=MagicMock())
     vec_env = _vec_env(num_envs=2)
 
-    with pytest.raises(TypeError, match="satisfies neither"):
+    with pytest.raises(
+        ValueError,
+        match=r"does not implement VecArmRLAgentProtocol",
+    ):
         controller.build_for_env(vec_env)
     agent.build.assert_not_called()
 
 
-def test_build_for_env_raises_when_neither_protocol_satisfied() -> None:
-    """An env that satisfies neither protocol triggers an explicit TypeError."""
+def test_build_for_env_passes_non_vec_env_to_single_env_build() -> None:
+    """An env that's not a vec env falls through to ``agent.build(env)``.
+
+    The controller trusts duck-typing on the single-env path: any
+    object that isn't isinstance(env, VecArmEnvironmentProtocol) is
+    handed to ``agent.build(env)`` and the agent surfaces any structural
+    mismatch from there. This mirrors the pre-F1 contract.
+    """
     agent = _vec_agent()
     controller = ArmController(agent=agent, primitives=MagicMock())
-    # Plain object - no Mock spec, no protocol conformance.
 
-    class _NotAnEnv:
-        pass
+    class _PlainEnv:
+        """Plain object - not a Mock spec, not a protocol member."""
 
-    with pytest.raises(TypeError, match="satisfies neither"):
-        controller.build_for_env(_NotAnEnv())
+    plain_env = _PlainEnv()
+    controller.build_for_env(plain_env)
+
+    agent.build.assert_called_once_with(plain_env)
+    agent.build_vec.assert_not_called()
 
 
 def test_build_for_env_idempotent_when_already_built() -> None:

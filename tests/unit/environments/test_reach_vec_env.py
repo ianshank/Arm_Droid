@@ -59,7 +59,7 @@ def test_vec_env_reset_step_close(monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(info, dict)
 
     action = torch.zeros(4, 6, dtype=torch.float32)
-    next_obs, reward, term, trunc, info2 = env.step(action)
+    _next_obs, reward, term, trunc, _info2 = env.step(action)
     assert reward.shape == (4,)
     assert term.shape == (4,)
     assert trunc.shape == (4,)

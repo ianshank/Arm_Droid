@@ -57,10 +57,16 @@ class TestBuildForEnv:
     def test_build_for_env_builds_agent(self) -> None:
         from unittest.mock import MagicMock, patch
 
+        from armdroid.domain.protocols import ArmEnvironmentProtocol
+
         ctrl = _make_controller()
         assert not ctrl.agent.is_built
 
-        mock_env = MagicMock()
+        # spec= pins the mock to the single-env protocol; without it
+        # bare MagicMock ambiguously satisfies BOTH single-env AND
+        # VecArmEnvironmentProtocol (every attribute auto-exists), which
+        # would trip the vec dispatch path against a non-vec SAC agent.
+        mock_env = MagicMock(spec=ArmEnvironmentProtocol)
         with (
             patch("armdroid.control.sac_agent.SAC") as mock_sac_cls,
             patch("armdroid.control.sac_agent.HerReplayBuffer"),
@@ -73,8 +79,10 @@ class TestBuildForEnv:
     def test_build_for_env_idempotent(self) -> None:
         from unittest.mock import MagicMock, patch
 
+        from armdroid.domain.protocols import ArmEnvironmentProtocol
+
         ctrl = _make_controller()
-        mock_env = MagicMock()
+        mock_env = MagicMock(spec=ArmEnvironmentProtocol)
         with (
             patch("armdroid.control.sac_agent.SAC") as mock_sac_cls,
             patch("armdroid.control.sac_agent.HerReplayBuffer"),
@@ -92,8 +100,10 @@ class TestTrainPolicy:
         from pathlib import Path
         from unittest.mock import MagicMock, patch
 
+        from armdroid.domain.protocols import ArmEnvironmentProtocol
+
         ctrl = _make_controller()
-        mock_env = MagicMock()
+        mock_env = MagicMock(spec=ArmEnvironmentProtocol)
         with (
             patch("armdroid.control.sac_agent.SAC") as mock_sac_cls,
             patch("armdroid.control.sac_agent.HerReplayBuffer"),

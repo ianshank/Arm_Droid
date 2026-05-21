@@ -17,6 +17,7 @@ from armdroid.domain.protocols import (
     ArmEnvironmentProtocol,
     ArmRLAgentProtocol,
     VecArmEnvironmentProtocol,
+    VecArmRLAgentProtocol,
 )
 from armdroid.logging.setup import get_logger
 
@@ -106,25 +107,26 @@ class ArmController:
         """
         if self._agent.is_built:
             return
-        build_vec = getattr(self._agent, "build_vec", None)
-        if isinstance(env, VecArmEnvironmentProtocol) and callable(build_vec):
+        if isinstance(env, VecArmEnvironmentProtocol):
+            # Vec env REQUIRES a vec-capable agent; falling back to
+            # agent.build() would silently feed torch tensors into a
+            # single-env policy expecting numpy scalars. Refuse the
+            # mismatch explicitly. (Gemini Code Assist review fix.)
+            if not isinstance(self._agent, VecArmRLAgentProtocol):
+                msg = (
+                    f"agent {type(self._agent).__name__!r} does not "
+                    "implement VecArmRLAgentProtocol but env is "
+                    "vectorised; choose a vec-capable algorithm "
+                    "(e.g. rsl_rl_ppo) or set arm_sim_isaac.num_envs == 1."
+                )
+                raise ValueError(msg)
             _log.info(
                 "arm_controller_building_agent_vec",
                 num_envs=env.num_envs,
             )
-            build_vec(env)
+            self._agent.build_vec(env)
             self._is_vec_path = True
             return
-        # Single-env fallback - explicit runtime check so the cast below
-        # cannot silently accept an unsupported env shape (e.g. a vec env
-        # paired with an agent that does not implement build_vec).
-        if not isinstance(env, ArmEnvironmentProtocol):
-            msg = (
-                f"env {type(env).__name__!r} satisfies neither "
-                "ArmEnvironmentProtocol nor (VecArmEnvironmentProtocol + "
-                "agent.build_vec); cannot bind agent."
-            )
-            raise TypeError(msg)
         _log.info("arm_controller_building_agent")
         self._agent.build(env)
 
@@ -142,9 +144,14 @@ class ArmController:
         Returns:
             Path of the saved policy checkpoint.
         """
-        train_vec = getattr(self._agent, "train_vec", None)
-        if self._is_vec_path and callable(train_vec):
-            train_vec(total_timesteps)
+        # _is_vec_path flips True only in build_for_env after a successful
+        # build_vec call, which itself guards on
+        # isinstance(self._agent, VecArmRLAgentProtocol). The isinstance
+        # check here is belt-and-braces - it also lets mypy narrow the
+        # agent type so the train_vec call type-checks cleanly.
+        # (Gemini Code Assist review fix.)
+        if self._is_vec_path and isinstance(self._agent, VecArmRLAgentProtocol):
+            self._agent.train_vec(total_timesteps)
         else:
             self._agent.train(total_timesteps)
         return self._agent.save()
