@@ -73,6 +73,15 @@ Next: PyBullet / Drake remain as future env-registry entries; their
 seam is the same. GR00T / foundation-model integration is the next
 stretch axis.
 
+**F1 vec env path landed** (see
+[ADR-0006](ADR/ADR-0006-vec-env-protocol.md) and
+`feature/f1-vec-env-protocol`): `VecArmEnvironmentProtocol` and
+`VecArmRLAgentProtocol` are sibling protocols supporting `num_envs > 1`
+Isaac Sim training. The orchestration factory routes
+`cfg.arm_sim_isaac.num_envs > 1` through the sibling
+`armdroid.environments.registry_vec` registry; the default single-env
+path is byte-identical to pre-F1 behaviour.
+
 ## Axis 5 — Distributed / accelerated training (Planned)
 
 Current: SB3 SAC single-process.

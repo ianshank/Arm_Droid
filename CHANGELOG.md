@@ -11,6 +11,59 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **F1: Vectorised env path (`num_envs > 1`)** — landed via
+  [ADR-0006](docs/architecture/ADR/ADR-0006-vec-env-protocol.md) on
+  `feature/f1-vec-env-protocol`. Introduces `VecArmEnvironmentProtocol`
+  and `VecArmRLAgentProtocol` (siblings to the existing protocols,
+  not generic parameters) so RSL-RL PPO can train against parallel
+  Isaac Sim environments without reaching through to private
+  attributes. Touches:
+  - **`armdroid.domain.protocols`** — two new `@runtime_checkable`
+    Protocols, `torch` imported under `TYPE_CHECKING` only.
+  - **`armdroid.environments.registry_vec`** — sibling
+    `Registry[VecEnvironmentFactory]` under entry-point group
+    `armdroid.vec_environments`; `register_vec_environment` /
+    `get_vec_environment` / `available_vec_environments` /
+    `load_vec_environment_plugins` mirror the single-env helpers.
+  - **`armdroid.environments.isaac.reach_vec.SoArmReachIsaacVecEnv`** —
+    owns `ManagerBasedRLEnv` directly (no `_TensorAdapter`), permits
+    `num_envs >= 1`, coordinates with
+    `armdroid.hardware.isaac_sim._app_state` so Kit is never
+    double-booted. Exposes `as_runner_env()` for RL-runner backends.
+  - **`armdroid.control.rsl_rl_agent`** — adds `build_vec(env)` /
+    `train_vec(total_timesteps)` consuming the vec protocol; extracts
+    `_import_on_policy_runner()` for monkeypatching and
+    `_iterations_for()` so `train` and `train_vec` share one
+    conversion. The existing single-env `build()` body is intentionally
+    untouched.
+  - **`armdroid.orchestration.factory`** — `build_arm_environment`
+    dispatches on `cfg.arm_sim_isaac.num_envs > 1` via
+    `_VEC_CAPABLE_ALGORITHMS` (`{"rsl_rl_ppo"}`) and
+    `_VEC_CAPABLE_TASKS` (`{"so_arm_reach_isaac"}`) allow-lists.
+    `num_envs > 1` with a non-vec algorithm or non-Isaac task raises
+    `ValueError` with an actionable message.
+  - **`armdroid.control.controller.ArmController.build_for_env`** —
+    dispatches between `agent.build()` and `agent.build_vec()` based
+    on the runtime protocol type of the env. `train_policy` mirrors
+    with `train_vec`.
+  - **`armdroid.telemetry`** — six new SPAN constants
+    (`SPAN_AGENT_BUILD_VEC`, `SPAN_AGENT_TRAIN_VEC`,
+    `SPAN_ENV_VEC_RESET`/`STEP`/`CLOSE`, and `SPAN_ENV_VEC_KIT_BOOT`
+    for the AppLauncher coordination span).
+  - **`tests/property/_vec_invariants.py`** — shared `assert_reset_shape`
+    / `assert_step_shapes` helpers so future vec env property tests
+    share one contract surface.
+  - **`tests/property/test_vec_env_invariants.py`** — runs by default
+    (`_build_isaac_env` monkeypatched, isaaclab never imported);
+    Hypothesis explores `num_envs` in `[1, 8]`.
+  - **`tests/isaac/test_smoke_isaac_vec_env.py`** — gated on
+    `ARMDROID_ISAAC_RUN=1` + isaaclab importable; runs the full
+    lifecycle at `num_envs=2` on a real GPU.
+  - **`tests/regression/test_vec_backwards_compat.py`** — pins the
+    backwards-compat invariants: `_TensorAdapter` still rejects
+    `num_envs > 1`, single-env `build()` body still reach-throughs to
+    `env._isaac_env` (no deprecation warning added; the attribute is
+    private).
 - **ESP32 Phase 1.0 multi-transport** — `armdroid.hardware.esp32.transport`
   package adds three pluggable transports behind a common
   ``ArmTransport`` base: ``SerialTransport`` (legacy USB-UART, default),
