@@ -1,8 +1,14 @@
 """ArmController dispatch between single-env build() and vec build_vec() (F1).
 
 Covers the vec-path branches in ``ArmController.build_for_env`` and
-``ArmController.train_policy`` plus the runtime ``TypeError`` guard
-against unsupported env shapes.
+``ArmController.train_policy`` plus the runtime ``ValueError`` raised
+when a vec env is paired with a non-vec agent.
+
+Uses concrete test-double classes rather than ``MagicMock(spec=...)``
+because Python 3.12's stricter ``runtime_checkable`` Protocol semantics
+do not always recognise bare or spec'd MagicMocks as protocol members.
+The doubles satisfy the protocols structurally and expose ``MagicMock``
+sub-attributes for call-count / argument assertions.
 """
 
 from __future__ import annotations
@@ -11,41 +17,117 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
 
 from armdroid.control.controller import ArmController
 from armdroid.domain.protocols import (
     ArmEnvironmentProtocol,
     VecArmEnvironmentProtocol,
+    VecArmRLAgentProtocol,
 )
 
 
-def _vec_env(num_envs: int = 4) -> Any:
-    env = MagicMock(spec=VecArmEnvironmentProtocol)
-    env.num_envs = num_envs
-    env.as_runner_env.return_value = MagicMock(num_envs=num_envs)
-    return env
+class _SingleEnvDouble:
+    """Concrete double for :class:`ArmEnvironmentProtocol`."""
+
+    def reset(self, *, seed: int | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+        return {}, {}
+
+    def step(
+        self, action: NDArray[np.float64],
+    ) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
+        return {}, 0.0, False, False, {}
+
+    def render(self) -> NDArray[np.uint8] | None:
+        return None
+
+    def close(self) -> None:
+        return None
 
 
-def _single_env() -> Any:
-    return MagicMock(spec=ArmEnvironmentProtocol)
+class _VecEnvDouble:
+    """Concrete double for :class:`VecArmEnvironmentProtocol`."""
+
+    def __init__(self, num_envs: int = 4) -> None:
+        self._num_envs = num_envs
+        self.as_runner_env_mock = MagicMock(return_value=MagicMock(num_envs=num_envs))
+
+    @property
+    def num_envs(self) -> int:
+        return self._num_envs
+
+    def reset(self, *, seed: int | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+        return {}, {}
+
+    def step(
+        self, action: Any,
+    ) -> tuple[dict[str, Any], Any, Any, Any, dict[str, Any]]:
+        return {}, None, None, None, {}
+
+    def close(self) -> None:
+        return None
+
+    def as_runner_env(self) -> Any:
+        return self.as_runner_env_mock()
 
 
-def _vec_agent() -> Any:
-    """Agent satisfying both ArmRLAgentProtocol and VecArmRLAgentProtocol."""
-    agent = MagicMock()
-    agent.is_built = False
-    agent.is_trained = False
-    return agent
+class _SingleOnlyAgentDouble:
+    """Single-env agent - satisfies ArmRLAgentProtocol only, NOT vec."""
+
+    def __init__(self) -> None:
+        self.build = MagicMock()
+        self.train = MagicMock()
+        self.predict = MagicMock(return_value=np.zeros(6, dtype=np.float64))
+        self.save = MagicMock(return_value=Path("weights.pt"))
+        self.load = MagicMock()
+        self.is_built = False
+        self.is_trained = False
 
 
-def _single_only_agent() -> Any:
-    """Agent that does NOT implement build_vec (single-env only)."""
-    agent = MagicMock(spec=["build", "train", "predict", "save", "load",
-                            "is_built", "is_trained"])
-    agent.is_built = False
-    agent.is_trained = False
-    return agent
+class _VecCapableAgentDouble:
+    """Agent satisfying BOTH ArmRLAgentProtocol and VecArmRLAgentProtocol."""
+
+    def __init__(self) -> None:
+        self.build = MagicMock()
+        self.build_vec = MagicMock()
+        self.train = MagicMock()
+        self.train_vec = MagicMock()
+        self.predict = MagicMock(return_value=np.zeros(6, dtype=np.float64))
+        self.save = MagicMock(return_value=Path("weights.pt"))
+        self.load = MagicMock()
+        self.is_built = False
+        self.is_trained = False
+
+
+def _vec_env(num_envs: int = 4) -> _VecEnvDouble:
+    return _VecEnvDouble(num_envs=num_envs)
+
+
+def _single_env() -> _SingleEnvDouble:
+    return _SingleEnvDouble()
+
+
+def _vec_agent() -> _VecCapableAgentDouble:
+    return _VecCapableAgentDouble()
+
+
+def _single_only_agent() -> _SingleOnlyAgentDouble:
+    return _SingleOnlyAgentDouble()
+
+
+def test_test_doubles_satisfy_their_protocols() -> None:
+    """Sanity check the test doubles match the runtime_checkable protocols.
+
+    If a future protocol change adds a member, this test fails fast
+    with a clear "doesn't satisfy" error instead of obscure dispatch
+    failures in the other tests below.
+    """
+    assert isinstance(_single_env(), ArmEnvironmentProtocol)
+    assert isinstance(_vec_env(), VecArmEnvironmentProtocol)
+    assert isinstance(_vec_agent(), VecArmRLAgentProtocol)
+    assert not isinstance(_single_only_agent(), VecArmRLAgentProtocol)
 
 
 def test_build_for_env_dispatches_to_build_vec_when_vec_env() -> None:
