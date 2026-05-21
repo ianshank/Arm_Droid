@@ -48,15 +48,15 @@ class TestIsaacOptionalExtra:
 
     def test_isaac_extra_pins_isaaclab_2_3(self, pyproject: dict[str, Any]) -> None:
         deps = pyproject["project"]["optional-dependencies"]["isaac"]
-        assert any(
-            _ISAACLAB_VERSION_RE.match(d) for d in deps
-        ), f"[isaac] must pin isaaclab[...]==2.3.X. Got: {deps!r}"
+        assert any(_ISAACLAB_VERSION_RE.match(d) for d in deps), (
+            f"[isaac] must pin isaaclab[...]==2.3.X. Got: {deps!r}"
+        )
 
     def test_isaac_extra_pins_rsl_rl(self, pyproject: dict[str, Any]) -> None:
         deps = pyproject["project"]["optional-dependencies"]["isaac"]
-        assert any(
-            _RSL_RL_VERSION_RE.match(d) for d in deps
-        ), f"[isaac] must pin rsl-rl-lib>=2.X. Got: {deps!r}"
+        assert any(_RSL_RL_VERSION_RE.match(d) for d in deps), (
+            f"[isaac] must pin rsl-rl-lib>=2.X. Got: {deps!r}"
+        )
 
     def test_isaac_extra_does_not_pin_torch(
         self,
@@ -69,9 +69,9 @@ class TestIsaacOptionalExtra:
         risk version conflicts.
         """
         deps = pyproject["project"]["optional-dependencies"]["isaac"]
-        assert not any(
-            d.startswith("torch") for d in deps
-        ), f"[isaac] must NOT pin torch / torchvision. Got: {deps!r}"
+        assert not any(d.startswith("torch") for d in deps), (
+            f"[isaac] must NOT pin torch / torchvision. Got: {deps!r}"
+        )
 
 
 class TestNvidiaIndexUrlDocumented:

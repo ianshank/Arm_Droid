@@ -26,9 +26,9 @@ def assert_reset_shape(
     assert isinstance(obs, dict)
     assert isinstance(info, dict)
     for key, value in obs.items():
-        assert (
-            value.shape[0] == num_envs
-        ), f"obs[{key!r}] leading dim {value.shape[0]} != num_envs {num_envs}"
+        assert value.shape[0] == num_envs, (
+            f"obs[{key!r}] leading dim {value.shape[0]} != num_envs {num_envs}"
+        )
 
 
 def assert_step_shapes(
@@ -47,9 +47,9 @@ def assert_step_shapes(
     assert terminated.shape == (num_envs,), f"terminated.shape {terminated.shape} != ({num_envs},)"
     assert truncated.shape == (num_envs,), f"truncated.shape {truncated.shape} != ({num_envs},)"
     for key, value in obs.items():
-        assert (
-            value.shape[0] == num_envs
-        ), f"obs[{key!r}] leading dim {value.shape[0]} != num_envs {num_envs}"
+        assert value.shape[0] == num_envs, (
+            f"obs[{key!r}] leading dim {value.shape[0]} != num_envs {num_envs}"
+        )
 
 
 __all__ = ["assert_reset_shape", "assert_step_shapes"]

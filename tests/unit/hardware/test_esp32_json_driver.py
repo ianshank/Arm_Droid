@@ -378,9 +378,9 @@ async def test_keepalive_pings_when_idle(
         # Wait 3x the keepalive interval — at least one ping should fire.
         await asyncio.sleep(0.18)
         ping_count_after = drv._next_id  # type: ignore[attr-defined]
-        assert (
-            ping_count_after > ping_count_before
-        ), "Expected at least one keepalive ping to be sent"
+        assert ping_count_after > ping_count_before, (
+            "Expected at least one keepalive ping to be sent"
+        )
     finally:
         await drv.disconnect()
 
@@ -444,9 +444,9 @@ async def test_encode_max_line_bytes_boundary(
     base_line, _ = drv._encode("ping", {"_pad": ""})  # type: ignore[attr-defined]
     base_content_len = len(base_line.encode("ascii")) - 1  # exclude '\n'
     pad_needed = max_bytes - base_content_len
-    assert (
-        pad_needed >= 0
-    ), f"base frame ({base_content_len} bytes) already exceeds max_bytes={max_bytes}"
+    assert pad_needed >= 0, (
+        f"base frame ({base_content_len} bytes) already exceeds max_bytes={max_bytes}"
+    )
 
     # Exactly max_bytes content bytes — must NOT raise.
     drv._next_id = 0  # type: ignore[attr-defined]
@@ -478,9 +478,9 @@ async def test_encode_max_line_bytes_boundary(
     base_line, _ = drv._encode("ping", {"_pad": ""})  # type: ignore[attr-defined]
     base_content_len = len(base_line.encode("ascii")) - 1  # exclude '\n'
     pad_needed = max_bytes - base_content_len
-    assert (
-        pad_needed >= 0
-    ), f"base frame ({base_content_len} bytes) already exceeds max_bytes={max_bytes}"
+    assert pad_needed >= 0, (
+        f"base frame ({base_content_len} bytes) already exceeds max_bytes={max_bytes}"
+    )
 
     # Exactly max_bytes content bytes — must NOT raise.
     drv._next_id = 0  # type: ignore[attr-defined]

@@ -114,15 +114,15 @@ class TestEnvProtocolInvariants:
         obs, reward, terminated, truncated, info = result
         # Documented shape per ArmEnvironmentProtocol.step:
         assert isinstance(obs, dict)
-        assert isinstance(
-            reward, float
-        ), f"reward should be Python float, got {type(reward).__name__}"
-        assert isinstance(
-            terminated, bool
-        ), f"terminated should be Python bool, got {type(terminated).__name__}"
-        assert isinstance(
-            truncated, bool
-        ), f"truncated should be Python bool, got {type(truncated).__name__}"
+        assert isinstance(reward, float), (
+            f"reward should be Python float, got {type(reward).__name__}"
+        )
+        assert isinstance(terminated, bool), (
+            f"terminated should be Python bool, got {type(terminated).__name__}"
+        )
+        assert isinstance(truncated, bool), (
+            f"truncated should be Python bool, got {type(truncated).__name__}"
+        )
         assert isinstance(info, dict)
 
     def test_step_count_monotonic_until_reset(self, name: str) -> None:

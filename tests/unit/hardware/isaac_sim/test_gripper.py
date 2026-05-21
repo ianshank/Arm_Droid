@@ -56,9 +56,9 @@ class TestRoundTrip:
     def test_round_trip_over_linspace(self, cfg: ArmSimIsaacConfig) -> None:
         for x in np.linspace(0, 1, 11):
             rt = radians_to_normalised(normalised_to_radians(float(x), cfg), cfg)
-            assert math.isclose(
-                rt, float(x), abs_tol=1e-9
-            ), f"round-trip lost precision at x={x}: rt={rt}"
+            assert math.isclose(rt, float(x), abs_tol=1e-9), (
+                f"round-trip lost precision at x={x}: rt={rt}"
+            )
 
     @given(x=st.floats(min_value=0.0, max_value=1.0, allow_nan=False))
     @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
