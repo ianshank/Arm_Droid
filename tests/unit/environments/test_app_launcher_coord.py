@@ -23,13 +23,15 @@ def fresh_app_state() -> Any:
 
 
 def test_vec_env_marks_kit_launched_when_first(
-    fresh_app_state: Any, monkeypatch: pytest.MonkeyPatch,
+    fresh_app_state: Any,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """When Kit is not yet booted, the vec env marks it launched after build."""
     from armdroid.environments.isaac import reach_vec
 
     monkeypatch.setattr(
-        reach_vec, "_build_isaac_env",
+        reach_vec,
+        "_build_isaac_env",
         lambda *_a, **_kw: make_fake_isaac_env(num_envs=4),
     )
     env = reach_vec.SoArmReachIsaacVecEnv(
@@ -43,14 +45,16 @@ def test_vec_env_marks_kit_launched_when_first(
 
 
 def test_vec_env_observes_already_launched_kit(
-    fresh_app_state: Any, monkeypatch: pytest.MonkeyPatch,
+    fresh_app_state: Any,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """When Kit was already booted (e.g. by the driver), vec env reuses it."""
     from armdroid.environments.isaac import reach_vec
 
     fresh_app_state.mark_launched()  # simulate driver-first ordering
     monkeypatch.setattr(
-        reach_vec, "_build_isaac_env",
+        reach_vec,
+        "_build_isaac_env",
         lambda *_a, **_kw: make_fake_isaac_env(num_envs=4),
     )
     env = reach_vec.SoArmReachIsaacVecEnv(
@@ -66,7 +70,8 @@ def test_vec_env_observes_already_launched_kit(
 
 
 def test_vec_env_kit_boot_span_emitted(
-    fresh_app_state: Any, monkeypatch: pytest.MonkeyPatch,
+    fresh_app_state: Any,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The ``SPAN_ENV_VEC_KIT_BOOT`` span fires around the lazy build."""
     from armdroid import telemetry as tel_mod
@@ -77,7 +82,8 @@ def test_vec_env_kit_boot_span_emitted(
     tel_mod.configure_telemetry(recorder)
     try:
         monkeypatch.setattr(
-            reach_vec, "_build_isaac_env",
+            reach_vec,
+            "_build_isaac_env",
             lambda *_a, **_kw: make_fake_isaac_env(num_envs=2),
         )
         env = reach_vec.SoArmReachIsaacVecEnv(

@@ -93,7 +93,8 @@ def test_so_arm_reach_isaac_vec_factory_success_path_returns_vec_env(
     from tests.helpers.fake_isaac_env import make_fake_isaac_env
 
     monkeypatch.setattr(
-        reach_vec, "_build_isaac_env",
+        reach_vec,
+        "_build_isaac_env",
         lambda *_a, **_kw: make_fake_isaac_env(num_envs=2),
     )
 

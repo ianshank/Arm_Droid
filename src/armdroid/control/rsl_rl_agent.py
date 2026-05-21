@@ -63,6 +63,7 @@ def _import_on_policy_runner() -> type:
 
     return OnPolicyRunner
 
+
 _log = get_logger(__name__)
 
 
@@ -277,7 +278,9 @@ class RslRlPpoAgent:
             env: Vec env exposing ``num_envs`` and :meth:`as_runner_env`.
         """
         with get_telemetry().start_span(
-            SPAN_AGENT_BUILD_VEC, device=self._device, num_envs=env.num_envs,
+            SPAN_AGENT_BUILD_VEC,
+            device=self._device,
+            num_envs=env.num_envs,
         ):
             runner_cls = _import_on_policy_runner()
             runner_env = env.as_runner_env()
@@ -319,9 +322,7 @@ class RslRlPpoAgent:
             self._is_trained = True
             _log.info(
                 "rsl_rl_ppo_training_vec_complete",
-                total_timesteps_completed=(
-                    iterations * self._ppo_cfg.num_steps_per_env
-                ),
+                total_timesteps_completed=(iterations * self._ppo_cfg.num_steps_per_env),
             )
 
     # ------------------------------------------------------------------ #

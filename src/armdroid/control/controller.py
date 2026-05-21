@@ -89,7 +89,8 @@ class ArmController:
             }
 
     def build_for_env(
-        self, env: ArmEnvironmentProtocol | VecArmEnvironmentProtocol,
+        self,
+        env: ArmEnvironmentProtocol | VecArmEnvironmentProtocol,
     ) -> None:
         """Bind the underlying RL agent to an environment if not already built.
 

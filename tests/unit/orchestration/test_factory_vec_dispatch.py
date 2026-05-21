@@ -65,7 +65,9 @@ def test_build_arm_environment_routes_to_vec_for_num_envs_gt_one(
         return MagicMock(num_envs=4)
 
     monkeypatch.setattr(
-        factory_mod, "get_vec_environment", lambda _name: _fake_vec_factory,
+        factory_mod,
+        "get_vec_environment",
+        lambda _name: _fake_vec_factory,
     )
 
     env = build_arm_environment(_settings(num_envs=4))
@@ -101,7 +103,9 @@ def test_build_arm_environment_single_env_path_untouched_for_isaac(
         raise AssertionError("vec factory must not be invoked for num_envs == 1")
 
     monkeypatch.setattr(
-        factory_mod, "get_environment", lambda _name: _fake_factory,
+        factory_mod,
+        "get_environment",
+        lambda _name: _fake_factory,
     )
     monkeypatch.setattr(factory_mod, "get_vec_environment", _vec_must_not_fire)
 

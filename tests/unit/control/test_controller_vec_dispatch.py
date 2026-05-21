@@ -36,7 +36,8 @@ class _SingleEnvDouble:
         return {}, {}
 
     def step(
-        self, action: NDArray[np.float64],
+        self,
+        action: NDArray[np.float64],
     ) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
         return {}, 0.0, False, False, {}
 
@@ -62,7 +63,8 @@ class _VecEnvDouble:
         return {}, {}
 
     def step(
-        self, action: Any,
+        self,
+        action: Any,
     ) -> tuple[dict[str, Any], Any, Any, Any, dict[str, Any]]:
         return {}, None, None, None, {}
 

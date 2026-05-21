@@ -30,7 +30,8 @@ def _vec_env(num_envs: int = 4) -> Any:
 
 
 def test_build_vec_uses_as_runner_env(
-    monkeypatch: pytest.MonkeyPatch, recording_tel: RecordingTelemetry,
+    monkeypatch: pytest.MonkeyPatch,
+    recording_tel: RecordingTelemetry,
 ) -> None:
     """``build_vec`` must call ``env.as_runner_env`` and instantiate the runner."""
     fake_runner = MagicMock()
@@ -59,7 +60,8 @@ def test_build_vec_uses_as_runner_env(
 
 
 def test_train_vec_calls_runner_learn(
-    monkeypatch: pytest.MonkeyPatch, recording_tel: RecordingTelemetry,
+    monkeypatch: pytest.MonkeyPatch,
+    recording_tel: RecordingTelemetry,
 ) -> None:
     """``train_vec`` delegates to ``runner.learn`` and flips ``is_trained``."""
     fake_runner = MagicMock()

@@ -165,9 +165,9 @@ def test_driver_span_recorded_in_exporter(
         pass
     finished = exporter.get_finished_spans()
     span_names = [s.name for s in finished]
-    assert span_name in span_names, (
-        f"Expected span '{span_name}' to appear in exported spans; got: {span_names}"
-    )
+    assert (
+        span_name in span_names
+    ), f"Expected span '{span_name}' to appear in exported spans; got: {span_names}"
 
 
 # ---------------------------------------------------------------------------

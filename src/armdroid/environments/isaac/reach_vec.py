@@ -124,7 +124,9 @@ class SoArmReachIsaacVecEnv:
             kit_already_launched=already_launched,
         ):
             self._isaac_env = _build_isaac_env(
-                self._task_cfg, self._training_cfg, self._sim_cfg,
+                self._task_cfg,
+                self._training_cfg,
+                self._sim_cfg,
             )
             if not already_launched:
                 _app_state.mark_launched()
@@ -141,17 +143,22 @@ class SoArmReachIsaacVecEnv:
         return self._sim_cfg.num_envs
 
     def reset(
-        self, *, seed: int | None = None,
+        self,
+        *,
+        seed: int | None = None,
     ) -> tuple[dict[str, torch.Tensor], dict[str, Any]]:
         """Reset all parallel envs."""
         with get_telemetry().start_span(
-            SPAN_ENV_VEC_RESET, num_envs=self.num_envs, seed=seed,
+            SPAN_ENV_VEC_RESET,
+            num_envs=self.num_envs,
+            seed=seed,
         ):
             self._ensure_built()
             return self._isaac_env.reset(seed=seed)
 
     def step(
-        self, action: torch.Tensor,
+        self,
+        action: torch.Tensor,
     ) -> tuple[
         dict[str, torch.Tensor],
         torch.Tensor,
@@ -161,7 +168,8 @@ class SoArmReachIsaacVecEnv:
     ]:
         """Step all parallel envs."""
         with get_telemetry().start_span(
-            SPAN_ENV_VEC_STEP, num_envs=self.num_envs,
+            SPAN_ENV_VEC_STEP,
+            num_envs=self.num_envs,
         ):
             self._ensure_built()
             return self._isaac_env.step(action)

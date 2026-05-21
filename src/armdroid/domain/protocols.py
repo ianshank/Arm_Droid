@@ -392,7 +392,9 @@ class VecArmEnvironmentProtocol(Protocol):
         ...
 
     def reset(
-        self, *, seed: int | None = None,
+        self,
+        *,
+        seed: int | None = None,
     ) -> tuple[dict[str, torch.Tensor], dict[str, Any]]:
         """Reset all parallel envs.
 
@@ -403,7 +405,8 @@ class VecArmEnvironmentProtocol(Protocol):
         ...
 
     def step(
-        self, action: torch.Tensor,
+        self,
+        action: torch.Tensor,
     ) -> tuple[
         dict[str, torch.Tensor],
         torch.Tensor,

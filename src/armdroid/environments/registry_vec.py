@@ -41,7 +41,8 @@ _VEC_ENVIRONMENTS: Registry[VecEnvironmentFactory] = Registry(
 
 
 def _so_arm_reach_isaac_vec_factory(
-    *args: object, **kwargs: object,
+    *args: object,
+    **kwargs: object,
 ) -> VecArmEnvironmentProtocol:
     """Lazy factory for ``SoArmReachIsaacVecEnv`` (F1).
 
@@ -89,7 +90,8 @@ def _so_arm_reach_isaac_vec_factory(
 
 
 _VEC_ENVIRONMENTS.register(
-    "so_arm_reach_isaac_vec", _so_arm_reach_isaac_vec_factory,
+    "so_arm_reach_isaac_vec",
+    _so_arm_reach_isaac_vec_factory,
 )
 
 

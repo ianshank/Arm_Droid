@@ -32,7 +32,9 @@ def test_vec_env_satisfies_protocol(monkeypatch: pytest.MonkeyPatch) -> None:
     from armdroid.environments.isaac import reach_vec
 
     monkeypatch.setattr(
-        reach_vec, "_build_isaac_env", lambda *_a, **_kw: make_fake_isaac_env(num_envs=4),
+        reach_vec,
+        "_build_isaac_env",
+        lambda *_a, **_kw: make_fake_isaac_env(num_envs=4),
     )
     env = reach_vec.SoArmReachIsaacVecEnv(
         task_cfg=ArmTaskConfig(),
@@ -98,7 +100,9 @@ def test_vec_env_default_sim_cfg(monkeypatch: pytest.MonkeyPatch) -> None:
     from armdroid.environments.isaac import reach_vec
 
     monkeypatch.setattr(
-        reach_vec, "_build_isaac_env", lambda *_a, **_kw: make_fake_isaac_env(num_envs=1),
+        reach_vec,
+        "_build_isaac_env",
+        lambda *_a, **_kw: make_fake_isaac_env(num_envs=1),
     )
     env = reach_vec.SoArmReachIsaacVecEnv(
         task_cfg=ArmTaskConfig(),

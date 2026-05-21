@@ -54,7 +54,9 @@ class TestVecProtocolSurface:
 
         # The runtime_checkable decorator sets _is_runtime_protocol.
         assert getattr(
-            VecArmEnvironmentProtocol, "_is_runtime_protocol", False,
+            VecArmEnvironmentProtocol,
+            "_is_runtime_protocol",
+            False,
         )
 
     def test_vec_arm_environment_protocol_required_members(self) -> None:
@@ -70,15 +72,22 @@ class TestVecProtocolSurface:
 
         assert issubclass(VecArmRLAgentProtocol, Protocol)
         assert getattr(
-            VecArmRLAgentProtocol, "_is_runtime_protocol", False,
+            VecArmRLAgentProtocol,
+            "_is_runtime_protocol",
+            False,
         )
 
     def test_vec_arm_rl_agent_protocol_required_members(self) -> None:
         from armdroid.domain.protocols import VecArmRLAgentProtocol
 
         required = {
-            "build_vec", "train_vec", "predict",
-            "save", "load", "is_built", "is_trained",
+            "build_vec",
+            "train_vec",
+            "predict",
+            "save",
+            "load",
+            "is_built",
+            "is_trained",
         }
         assert required.issubset(set(dir(VecArmRLAgentProtocol)))
 
@@ -154,9 +163,7 @@ class TestVecFactoryDispatch:
     def test_vec_task_registry_names_mapping(self) -> None:
         from armdroid.orchestration.factory import _VEC_TASK_REGISTRY_NAMES
 
-        assert _VEC_TASK_REGISTRY_NAMES["so_arm_reach_isaac"] == (
-            "so_arm_reach_isaac_vec"
-        )
+        assert _VEC_TASK_REGISTRY_NAMES["so_arm_reach_isaac"] == ("so_arm_reach_isaac_vec")
 
     def test_should_use_vec_helper_importable(self) -> None:
         from armdroid.orchestration.factory import _should_use_vec
@@ -215,9 +222,14 @@ class _MinimalVecEnv(Protocol):
     def reset(self) -> tuple[dict[str, object], dict[str, object]]: ...
 
     def step(
-        self, action: object,
+        self,
+        action: object,
     ) -> tuple[
-        dict[str, object], object, object, object, dict[str, object],
+        dict[str, object],
+        object,
+        object,
+        object,
+        dict[str, object],
     ]: ...
 
     def close(self) -> None: ...
@@ -289,7 +301,8 @@ class TestVecEnvConcreteSurface:
 
         # num_envs is declared as a @property on the concrete class.
         assert isinstance(
-            SoArmReachIsaacVecEnv.__dict__.get("num_envs"), property,
+            SoArmReachIsaacVecEnv.__dict__.get("num_envs"),
+            property,
         )
 
 
@@ -306,9 +319,14 @@ class TestVecProtocolStructuralConformance:
                 return {}, {}
 
             def step(
-                self, action: object,
+                self,
+                action: object,
             ) -> tuple[
-                dict[str, object], object, object, object, dict[str, object],
+                dict[str, object],
+                object,
+                object,
+                object,
+                dict[str, object],
             ]:
                 return {}, 0.0, False, False, {}
 

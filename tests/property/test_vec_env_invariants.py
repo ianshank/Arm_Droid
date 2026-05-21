@@ -40,7 +40,8 @@ def _reset_app_state() -> Any:
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
 def test_vec_env_shapes_consistent_with_num_envs(
-    num_envs: int, monkeypatch: pytest.MonkeyPatch,
+    num_envs: int,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Reset + step shapes must match the configured num_envs (including 1)."""
     from armdroid.environments.isaac import reach_vec
