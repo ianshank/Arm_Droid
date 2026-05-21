@@ -12,6 +12,7 @@ import argparse
 import asyncio
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -19,6 +20,9 @@ from armdroid.config.schema import ArmSettings, load_settings
 from armdroid.domain.state import SymbolicState
 from armdroid.logging.setup import configure_logging, get_logger
 from armdroid.orchestration.factory import build_arm_orchestrator
+
+if TYPE_CHECKING:
+    from armdroid.domain.protocols import ArmEnvironmentProtocol
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -157,7 +161,10 @@ def _sim(cfg: ArmSettings, episodes: int) -> None:  # pragma: no cover
     """
     orch = build_arm_orchestrator(cfg)
     log = get_logger(__name__)
-    env = orch.environment
+    # ``sim`` is a single-env CLI convenience and never triggers the vec
+    # dispatch (which requires num_envs > 1 + rsl_rl_ppo). Narrow at the
+    # boundary so the loop below talks numpy / Python scalars.
+    env = cast("ArmEnvironmentProtocol", orch.environment)
     total_reward = 0.0
     try:
         for ep in range(episodes):

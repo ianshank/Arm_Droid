@@ -68,7 +68,14 @@ def _so_arm_reach_isaac_vec_factory(
 
     from armdroid.environments.isaac.reach_vec import SoArmReachIsaacVecEnv
 
-    env: VecArmEnvironmentProtocol = SoArmReachIsaacVecEnv(*args, **kwargs)
+    # The factory is intentionally untyped at the *args / **kwargs boundary
+    # (mirrors the single-env _so_arm_reach_isaac_factory) so registry
+    # callers can pass through arbitrary keyword configs from YAML
+    # overlays. The orchestration factory threads the typed configs in.
+    env: VecArmEnvironmentProtocol = SoArmReachIsaacVecEnv(
+        *args,  # type: ignore[arg-type]
+        **kwargs,  # type: ignore[arg-type]
+    )
     return env
 
 
