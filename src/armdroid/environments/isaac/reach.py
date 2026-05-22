@@ -99,7 +99,7 @@ class SoArmReachIsaacEnv:
         self._isaac_env = gym.make(
             self._sim_cfg.reach_env_id,
             num_envs=self._sim_cfg.num_envs,
-            disable_env_checker=True,
+            disable_env_checker=self._sim_cfg.disable_env_checker,
         )
         _log.info("so_arm_reach_isaac_built", env_id=self._sim_cfg.reach_env_id)
 

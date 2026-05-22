@@ -68,7 +68,7 @@ SPAN_ENV_RENDER: str = "armdroid.env.render"
 SPAN_ENV_CLOSE: str = "armdroid.env.close"
 
 # Agent span constants — emitted by every ArmRLAgentProtocol implementation
-# (SACAgent today; PR-B's RslRlPpoAgent next).
+# (SACAgent and RslRlPpoAgent). Vec-path span constants live below.
 
 #: Span covering :meth:`ArmRLAgentProtocol.build` (model construction).
 SPAN_AGENT_BUILD: str = "armdroid.agent.build"
@@ -84,6 +84,28 @@ SPAN_AGENT_SAVE: str = "armdroid.agent.save"
 
 #: Span covering :meth:`ArmRLAgentProtocol.load`.
 SPAN_AGENT_LOAD: str = "armdroid.agent.load"
+
+# Vec-path span constants (F1) — emitted by VecArmEnvironmentProtocol
+# implementations and VecArmRLAgentProtocol agents.
+
+#: Span covering :meth:`VecArmRLAgentProtocol.build_vec`.
+SPAN_AGENT_BUILD_VEC: str = "armdroid.agent.build_vec"
+
+#: Span covering :meth:`VecArmRLAgentProtocol.train_vec`.
+SPAN_AGENT_TRAIN_VEC: str = "armdroid.agent.train_vec"
+
+#: Span covering :meth:`VecArmEnvironmentProtocol.reset`.
+SPAN_ENV_VEC_RESET: str = "armdroid.env.vec_reset"
+
+#: Span covering :meth:`VecArmEnvironmentProtocol.step`.
+SPAN_ENV_VEC_STEP: str = "armdroid.env.vec_step"
+
+#: Span covering :meth:`VecArmEnvironmentProtocol.close`.
+SPAN_ENV_VEC_CLOSE: str = "armdroid.env.vec_close"
+
+#: Span covering the AppLauncher coordination + ``ManagerBasedRLEnv`` boot
+#: inside :meth:`SoArmReachIsaacVecEnv._ensure_built`.
+SPAN_ENV_VEC_KIT_BOOT: str = "armdroid.env.vec_kit_boot"
 
 
 # ---------------------------------------------------------------------------
@@ -195,10 +217,12 @@ def get_telemetry() -> TelemetryProvider:
 
 __all__ = [
     "SPAN_AGENT_BUILD",
+    "SPAN_AGENT_BUILD_VEC",
     "SPAN_AGENT_LOAD",
     "SPAN_AGENT_PREDICT",
     "SPAN_AGENT_SAVE",
     "SPAN_AGENT_TRAIN",
+    "SPAN_AGENT_TRAIN_VEC",
     "SPAN_DRIVER_CONNECT",
     "SPAN_DRIVER_DISCONNECT",
     "SPAN_DRIVER_SEND",
@@ -206,6 +230,10 @@ __all__ = [
     "SPAN_ENV_RENDER",
     "SPAN_ENV_RESET",
     "SPAN_ENV_STEP",
+    "SPAN_ENV_VEC_CLOSE",
+    "SPAN_ENV_VEC_KIT_BOOT",
+    "SPAN_ENV_VEC_RESET",
+    "SPAN_ENV_VEC_STEP",
     "NullTelemetry",
     "TelemetryProvider",
     "configure_telemetry",

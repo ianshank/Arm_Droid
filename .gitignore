@@ -42,8 +42,10 @@ ENV/
 .pytest_cache/
 .hypothesis/
 htmlcov/
+coverage_html_report/
 nosetests.xml
 coverage.xml
+coverage_output.txt
 *.cover
 *.py,cover
 

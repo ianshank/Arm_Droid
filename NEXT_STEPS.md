@@ -139,11 +139,24 @@ exceeds runner disk quota in practice, the workflow falls back to
   list; pure-Python siblings (gripper math, configs) are explicitly
   covered.
 
+## Landed in `feature/f1-vec-env-protocol`
+
+* **F1 (Vectorised env path, `num_envs > 1`)** — landed via ADR-0006.
+  Introduces `VecArmEnvironmentProtocol` and `VecArmRLAgentProtocol`
+  as siblings to the existing protocols (not generic parameters).
+  `SoArmReachIsaacVecEnv` owns `ManagerBasedRLEnv` directly and
+  coordinates with `armdroid.hardware.isaac_sim._app_state` so Kit is
+  never double-booted. `RslRlPpoAgent.build_vec` / `train_vec` replace
+  the `env._isaac_env` reach-through cleanly via
+  `VecArmEnvironmentProtocol.as_runner_env()`. The factory routes on
+  `cfg.arm_sim_isaac.num_envs > 1` via `_VEC_CAPABLE_ALGORITHMS` and
+  `_VEC_TASK_REGISTRY_NAMES` allow-list mapping. Single-env path is byte-identical.
+  See [docs/architecture/ADR/ADR-0006-vec-env-protocol.md](docs/architecture/ADR/ADR-0006-vec-env-protocol.md).
+
 ## Follow-ups (post PR-B)
 
 | ID | Description | Notes |
 | --- | --- | --- |
-| **F1** | Vectorised env path (`num_envs > 1`) bypassing `ArmEnvironmentProtocol`. | New `VecArmEnvironmentProtocol` in v0.4. The `_TensorAdapter` already raises `RuntimeError` with an informative message when `num_envs > 1`. |
 | **F2** | GR00T / foundation-model integration. | Documented in PHASES.md Stretch axis. |
 | **F3** | Real-time Isaac Sim GUI viewer. | Currently headless only. |
 | **F4** | Domain-randomisation parity between MuJoCo and Isaac. | Mass / friction / lighting ranges currently MuJoCo-only. |

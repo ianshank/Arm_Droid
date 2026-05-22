@@ -249,6 +249,15 @@ class ArmSimIsaacConfig(BaseModel):
             "the same asset-consistency reason as reach_env_id."
         ),
     )
+    disable_env_checker: bool = Field(
+        default=True,
+        description=(
+            "Pass disable_env_checker to gym.make. Default True matches "
+            "Isaac Lab's recommendation for ManagerBasedRLEnv (the "
+            "checker doesn't understand its tensor-batched returns). "
+            "Set False only when debugging env-API drift."
+        ),
+    )
 
     # ------------------------------------------------------------------ #
     # Joint names — used by ImplicitActuatorCfg.joint_names_expr regexes

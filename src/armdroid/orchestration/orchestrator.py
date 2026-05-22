@@ -41,6 +41,7 @@ if TYPE_CHECKING:
         ArmEnvironmentProtocol,
         ArmPerceptionProtocol,
         ArmPlannerProtocol,
+        VecArmEnvironmentProtocol,
     )
     from armdroid.domain.state import PlanStep, SymbolicState
 
@@ -79,7 +80,7 @@ class ArmOrchestrator:
         perception: ArmPerceptionProtocol,
         planner: ArmPlannerProtocol,
         controller: ArmControllerProtocol,
-        environment: ArmEnvironmentProtocol,
+        environment: ArmEnvironmentProtocol | VecArmEnvironmentProtocol,
         driver: ArmDriverProtocol,
         task_cfg: ArmTaskConfig | None = None,
     ) -> None:
@@ -123,8 +124,8 @@ class ArmOrchestrator:
         return self._controller
 
     @property
-    def environment(self) -> ArmEnvironmentProtocol:
-        """Return the Gymnasium environment."""
+    def environment(self) -> ArmEnvironmentProtocol | VecArmEnvironmentProtocol:
+        """Return the Gymnasium environment (single-env or vec env)."""
         return self._environment
 
     @property

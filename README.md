@@ -3,7 +3,7 @@
 **Robot arm manipulation platform — MakerWorld 6-DoF arm + ESP32, MuJoCo simulation, SAC+HER RL, and PDDL planning.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/ianshank/Arm_Droid/ci.yml?branch=main&label=CI)](https://github.com/ianshank/Arm_Droid/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)](https://github.com/ianshank/Arm_Droid/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen)](https://github.com/ianshank/Arm_Droid/actions/workflows/ci.yml)
 [![mypy](https://img.shields.io/badge/mypy-strict-blue)](https://mypy.readthedocs.io/en/stable/command_line.html#cmdoption-mypy-strict)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org/downloads/)
 
@@ -71,6 +71,20 @@ seam without reintroducing hard-coded factory branching.
 All subsystem boundaries remain `@runtime_checkable Protocol` interfaces. The composition root in
 `armdroid.orchestration.factory` resolves named implementations and shares the driver instance
 across the controller and orchestrator.
+
+### Vectorised Isaac Sim training (F1)
+
+For parallel Isaac Sim training (`num_envs > 1`), the env-protocol surface has a sibling
+[`VecArmEnvironmentProtocol`](src/armdroid/domain/protocols.py) (batched torch-tensor returns
+rather than per-step numpy scalars) alongside the single-env protocol. The
+[`armdroid.environments.registry_vec`](src/armdroid/environments/registry_vec.py) registry mirrors
+the single-env one and exposes `so_arm_reach_isaac_vec` out of the box. `RslRlPpoAgent`
+implements both `ArmRLAgentProtocol` (single-env) and `VecArmRLAgentProtocol` (vec) and
+consumes the vec env through a documented `as_runner_env()` accessor instead of reaching
+through to private attributes. The factory dispatches on `cfg.arm_sim_isaac.num_envs` so the
+default single-env path is byte-identical to pre-F1 behaviour; users opt into vec by setting
+`arm_sim_isaac.num_envs > 1` in their YAML overlay. See
+[ADR-0006](docs/architecture/ADR/ADR-0006-vec-env-protocol.md) for the architectural decisions.
 
 ---
 
@@ -246,6 +260,29 @@ python -m armdroid --config config/tower_of_hanoi.yaml --config config/training.
 python -m armdroid --config config/tower_of_hanoi.yaml train --total-timesteps 100000
 ```
 
+### train — vectorised Isaac Sim path (F1, opt-in)
+
+When `cfg.arm_sim_isaac.num_envs > 1` and `cfg.arm_training.algorithm == "rsl_rl_ppo"`,
+`build_arm_environment` routes through the vec env registry and `ArmController.build_for_env`
+dispatches to `RslRlPpoAgent.build_vec(env)` instead of `build()`. The vec env owns Isaac Lab's
+`ManagerBasedRLEnv` directly and exposes a documented `as_runner_env()` accessor to the runner.
+Kit's `AppLauncher` singleton is shared via
+[`armdroid.hardware.isaac_sim._app_state`](src/armdroid/hardware/isaac_sim/_app_state.py) so a
+driver and the vec env can coexist in the same process without double-booting.
+
+```bash
+# Requires the [isaac] extra installed + a CUDA GPU + ARMDROID_ISAAC_RUN=1
+# Override num_envs and algorithm via env var without touching YAML:
+ARMDROID_ARM_SIM_ISAAC__NUM_ENVS=4096 \
+ARMDROID_ARM_TRAINING__ALGORITHM=rsl_rl_ppo \
+ARMDROID_ARM_TASK__TASK_TYPE=so_arm_reach_isaac \
+ARMDROID_ARM_DRIVER_KIND=isaac_sim \
+python -m armdroid --config config/tower_of_hanoi_isaac.yaml train
+```
+
+Setting `num_envs > 1` with a non-vec-capable algorithm or non-Isaac task raises
+`ValueError` with an actionable message rather than silently degrading.
+
 ### rollout — plan and execute a Tower of Hanoi solve
 
 Generates a PDDL plan for the configured number of disks and executes each step via the
@@ -387,15 +424,22 @@ tests/
 
 ## Roadmap / Next steps
 
+> **Recently landed (`feature/f1-vec-env-protocol`):** the vectorised env path
+> (`VecArmEnvironmentProtocol` + `VecArmRLAgentProtocol`) is now in place. The default
+> single-env path is byte-identical to pre-F1 behaviour. See
+> [ADR-0006](docs/architecture/ADR/ADR-0006-vec-env-protocol.md) and
+> [NEXT_STEPS.md](NEXT_STEPS.md) for the full landed scope.
+
 1. **Real arm validation across all transports** — run the decomposed ESP32 driver on the
    physical MakerWorld arm over USB-UART, Wi-Fi (TCP), and BLE; calibrate joint limits and
    home pose; validate emergency-stop / reconnect / HMAC-auth behaviour for each transport.
 
-2. **Isaac Sim sim-to-real bridge** — install `[isaac]` on Ampere+ hardware (the probe at
-   `scripts/check_isaac_install.py` reports readiness), train PPO via `RslRlPpoAgent`,
-   add domain randomisation over PD gains / friction / mass, and validate zero-shot
-   transfer to the real arm. Tower of Hanoi as an Isaac task (currently only the reach
-   primitive is wired) is part of this.
+2. **Isaac Sim sim-to-real bridge** — with the vec path now landed (F1), install `[isaac]`
+   on Ampere+ hardware (the probe at `scripts/check_isaac_install.py` reports readiness),
+   train PPO via `RslRlPpoAgent.train_vec` at `num_envs >> 1`, add domain randomisation
+   over PD gains / friction / mass, and validate zero-shot transfer to the real arm.
+   Tower of Hanoi as an Isaac task (currently only the reach primitive is wired) is part
+   of this.
 
 3. **MuJoCo render + perception PnP** — implement
    `BaseEnv.render` against `mujoco.Renderer` (TD-6) and replace the bbox-derived

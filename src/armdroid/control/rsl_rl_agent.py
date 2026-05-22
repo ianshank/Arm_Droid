@@ -35,16 +35,34 @@ from numpy.typing import NDArray
 from armdroid.logging.setup import get_logger
 from armdroid.telemetry import (
     SPAN_AGENT_BUILD,
+    SPAN_AGENT_BUILD_VEC,
     SPAN_AGENT_LOAD,
     SPAN_AGENT_PREDICT,
     SPAN_AGENT_SAVE,
     SPAN_AGENT_TRAIN,
+    SPAN_AGENT_TRAIN_VEC,
     get_telemetry,
 )
 
 if TYPE_CHECKING:
     from armdroid.config.schema.training import ArmTrainingConfig, RslRlPpoConfig
-    from armdroid.domain.protocols import ArmEnvironmentProtocol
+    from armdroid.domain.protocols import (
+        ArmEnvironmentProtocol,
+        VecArmEnvironmentProtocol,
+    )
+
+
+def _import_on_policy_runner() -> type:
+    """Return RSL-RL's ``OnPolicyRunner`` class.
+
+    Extracted so tests can monkeypatch the import without touching
+    site-packages. Lazy: keeps the module importable on default
+    installs without the ``[isaac]`` extra.
+    """
+    from rsl_rl.runners import OnPolicyRunner  # pyright: ignore[reportMissingImports]
+
+    return OnPolicyRunner
+
 
 _log = get_logger(__name__)
 
@@ -65,11 +83,13 @@ class RslRlPpoAgent:
         ppo_cfg: RslRlPpoConfig,
         training_cfg: ArmTrainingConfig,
         *,
-        device: str = "cuda:0",
+        device: str | None = None,
     ) -> None:
         self._ppo_cfg = ppo_cfg
         self._training_cfg = training_cfg
-        self._device = device
+        # Device sourced from config by default; explicit kwarg overrides
+        # (tests pass device="cpu" without touching YAML).
+        self._device = device if device is not None else ppo_cfg.device
         self._runner: Any = None
         self._is_trained = False
         _log.info(
@@ -140,11 +160,7 @@ class RslRlPpoAgent:
             msg = "Runner not built. Call build(env) first."
             raise RuntimeError(msg)
 
-        iterations = (
-            int(total_timesteps // self._ppo_cfg.num_steps_per_env)
-            if total_timesteps is not None
-            else self._ppo_cfg.num_iterations
-        )
+        iterations = self._iterations_for(total_timesteps)
 
         with get_telemetry().start_span(
             SPAN_AGENT_TRAIN,
@@ -248,8 +264,82 @@ class RslRlPpoAgent:
         return self._runner is not None
 
     # ------------------------------------------------------------------ #
+    # VecArmRLAgentProtocol surface (F1)
+    # ------------------------------------------------------------------ #
+
+    def build_vec(self, env: VecArmEnvironmentProtocol) -> None:
+        """Build the OnPolicyRunner against a vec env (F1).
+
+        Clean alternative to the single-env :meth:`build` reach-through
+        to ``env._isaac_env``. The single-env path is intentionally
+        unchanged for backwards-compat.
+
+        Args:
+            env: Vec env exposing ``num_envs`` and :meth:`as_runner_env`.
+        """
+        with get_telemetry().start_span(
+            SPAN_AGENT_BUILD_VEC,
+            device=self._device,
+            num_envs=env.num_envs,
+        ):
+            runner_cls = _import_on_policy_runner()
+            runner_env = env.as_runner_env()
+            runner_cfg = self._build_runner_cfg()
+            self._runner = runner_cls(
+                runner_env,
+                runner_cfg,
+                log_dir=None,
+                device=self._device,
+            )
+            _log.info(
+                "rsl_rl_ppo_agent_built_vec",
+                experiment_name=self._ppo_cfg.experiment_name,
+                num_envs=env.num_envs,
+            )
+
+    def train_vec(self, total_timesteps: int | None = None) -> None:
+        """Run the RSL-RL training loop on the vec env (F1).
+
+        Args:
+            total_timesteps: Override config total. ``None`` uses
+                ``ppo_cfg.num_iterations`` (the upstream RSL-RL count).
+        """
+        if self._runner is None:
+            msg = "Runner not built. Call build_vec(env) first."
+            raise RuntimeError(msg)
+        iterations = self._iterations_for(total_timesteps)
+        with get_telemetry().start_span(
+            SPAN_AGENT_TRAIN_VEC,
+            total_timesteps=total_timesteps,
+            num_iterations=iterations,
+        ):
+            _log.info(
+                "rsl_rl_ppo_training_vec_start",
+                total_timesteps=total_timesteps,
+                num_iterations=iterations,
+            )
+            self._runner.learn(num_learning_iterations=iterations)
+            self._is_trained = True
+            _log.info(
+                "rsl_rl_ppo_training_vec_complete",
+                total_timesteps_completed=(iterations * self._ppo_cfg.num_steps_per_env),
+            )
+
+    # ------------------------------------------------------------------ #
     # Internal helpers
     # ------------------------------------------------------------------ #
+
+    def _iterations_for(self, total_timesteps: int | None) -> int:
+        """Convert ``total_timesteps`` into RSL-RL iteration count.
+
+        Pure extraction of the previously-inline computation from
+        :meth:`train`. Used by both :meth:`train` and :meth:`train_vec`
+        so the conversion is in one place. Behaviour is byte-identical
+        to the old inline version.
+        """
+        if total_timesteps is None:
+            return self._ppo_cfg.num_iterations
+        return int(total_timesteps // self._ppo_cfg.num_steps_per_env)
 
     def _build_runner_cfg(self) -> Any:
         """Build the RSL-RL ``OnPolicyRunnerCfg`` from PPO + training fields.
