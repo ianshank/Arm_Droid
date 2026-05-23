@@ -31,10 +31,24 @@ from armdroid.domain.protocols import (
     ArmEnvironmentProtocol,
     ArmPerceptionProtocol,
     ArmPlannerProtocol,
+    HighLevelPlannerProtocol,
+    InteractionSessionProtocol,
+    SafetyGuardProtocol,
+    VisionLanguageAgentProtocol,
 )
-from armdroid.domain.state import ArmState, DetectedObject, PlanStep, SymbolicState
+from armdroid.domain.state import (
+    ArmAction,
+    ArmState,
+    DetectedObject,
+    InteractionEvent,
+    PlanStep,
+    SceneInsight,
+    SymbolicState,
+    Verdict,
+)
 
 __all__ = [
+    "ArmAction",
     "ArmCommandRejected",
     "ArmControllerProtocol",
     "ArmDriverError",
@@ -46,8 +60,15 @@ __all__ = [
     "ArmState",
     "ConfigError",
     "DetectedObject",
+    "HighLevelPlannerProtocol",
+    "InteractionEvent",
+    "InteractionSessionProtocol",
     "PerceptionError",
     "PlanStep",
     "PlanningError",
+    "SafetyGuardProtocol",
+    "SceneInsight",
     "SymbolicState",
+    "Verdict",
+    "VisionLanguageAgentProtocol",
 ]

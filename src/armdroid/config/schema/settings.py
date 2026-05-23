@@ -10,8 +10,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from armdroid.config.logging import LoggingConfig
 from armdroid.config.schema.arm import ArmConfig
+from armdroid.config.schema.interaction import ArmInteractionConfig
 from armdroid.config.schema.perception import ArmPerceptionConfig
 from armdroid.config.schema.planning import ArmPlanningConfig
+from armdroid.config.schema.safety import ArmSafetyConfig
 from armdroid.config.schema.sim import ArmSimConfig
 from armdroid.config.schema.sim_isaac import ArmSimIsaacConfig
 from armdroid.config.schema.task import ArmTaskConfig
@@ -20,6 +22,7 @@ from armdroid.config.schema.training import (
     ArmTrainingConfig,
     RslRlPpoConfig,
 )
+from armdroid.config.schema.vla import ArmVlaConfig
 
 
 class ArmSettings(BaseSettings):
@@ -46,6 +49,9 @@ class ArmSettings(BaseSettings):
     arm_rsl_rl_ppo: RslRlPpoConfig = Field(default_factory=RslRlPpoConfig)
     arm_curriculum: ArmCurriculumConfig = Field(default_factory=ArmCurriculumConfig)
     arm_task: ArmTaskConfig = Field(default_factory=ArmTaskConfig)
+    arm_vla: ArmVlaConfig = Field(default_factory=ArmVlaConfig)
+    arm_safety: ArmSafetyConfig = Field(default_factory=ArmSafetyConfig)
+    arm_interaction: ArmInteractionConfig = Field(default_factory=ArmInteractionConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     mock_hardware: bool = Field(
         default=False,

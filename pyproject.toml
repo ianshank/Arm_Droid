@@ -32,6 +32,20 @@ realsense = [
 anthropic = [
     "anthropic>=0.40",
 ]
+# Gemini Robotics ER 1.6 integration (ADRs 0007-0009). Three extras so
+# operators can opt into perception/replanner/VLA paths without pulling
+# the Live API audio surface, and vice versa. ``google-genai`` is
+# pre-1.0 — pin floor only and let the contract tests catch shape drift
+# (plan §11 R-G1).
+gemini = [
+    "google-genai>=0.5",
+]
+gemini-live = [
+    "google-genai>=0.5",
+]
+gemini-vla = [
+    "google-genai>=0.5",
+]
 telemetry = [
     "opentelemetry-api>=1.27",
     "opentelemetry-sdk>=1.27",
@@ -117,6 +131,13 @@ rsl_rl_ppo = "armdroid.control.rsl_rl_agent:RslRlPpoAgent"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/armdroid"]
+# Phase F (ADR-0009) will ship ``assets/safety/neiss_corpus.json`` so the
+# Asimov-style guard finds its rule corpus inside an installed wheel.
+# Declared as a force-include path so the project-root ``assets/`` tree
+# (kept out of the package import path for layout clarity) is still
+# copied into the wheel under ``armdroid/safety/data/``.
+[tool.hatch.build.targets.wheel.force-include]
+"assets/safety" = "armdroid/safety/data"
 
 [tool.ruff]
 target-version = "py311"
@@ -227,6 +248,11 @@ markers = [
 addopts = "-v --tb=short"
 
 [tool.coverage.run]
+# Branch coverage in addition to line coverage. Catches missed
+# else-branches and short-circuited boolean paths that pure line
+# coverage silently lets through. Enabled in Phase A of the Gemini ER
+# 1.6 integration as part of the broader tech-debt sweep.
+branch = true
 source = ["src/armdroid"]
 omit = [
     "*/tests/*",
