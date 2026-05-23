@@ -32,9 +32,11 @@ from armdroid.config.schema.arm import (
     TcpTransportConfig,
     TransportAuthConfig,
 )
+from armdroid.config.schema.interaction import ArmInteractionConfig
 from armdroid.config.schema.llm import LLMReplannerConfig
 from armdroid.config.schema.perception import ArmPerceptionConfig
 from armdroid.config.schema.planning import ArmPlanningConfig
+from armdroid.config.schema.safety import ArmSafetyConfig
 from armdroid.config.schema.settings import ArmSettings, load_settings
 from armdroid.config.schema.sim import ArmSimConfig
 from armdroid.config.schema.sim_isaac import ArmSimIsaacConfig
@@ -44,13 +46,16 @@ from armdroid.config.schema.training import (
     ArmTrainingConfig,
     RslRlPpoConfig,
 )
+from armdroid.config.schema.vla import ArmVlaConfig
 
 __all__ = [
     "ArmConfig",
     "ArmCurriculumConfig",
     "ArmFirmwareConfig",
+    "ArmInteractionConfig",
     "ArmPerceptionConfig",
     "ArmPlanningConfig",
+    "ArmSafetyConfig",
     "ArmServoConfig",
     "ArmSettings",
     "ArmSimConfig",
@@ -58,6 +63,7 @@ __all__ = [
     "ArmTaskConfig",
     "ArmTrainingConfig",
     "ArmTransportConfig",
+    "ArmVlaConfig",
     "BleTransportConfig",
     "JointLimits",
     "LLMReplannerConfig",

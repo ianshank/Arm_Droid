@@ -11,6 +11,55 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **Gemini ER 1.6 foundation scaffolding (Phase A)** — landed on
+  `claude/gemini-robotics-embodied-reasoning-KrlEw`. Lays the slots
+  that subsequent phases (B perception, C planning, D VLA, E live, F
+  safety) populate; zero behavioural change to default rollouts.
+  Touches:
+  - **`armdroid.domain.state`** — new `ArmAction` (frozen, slotted)
+    plus `from_array` boundary converter; new `SceneInsight`,
+    `Verdict`, `InteractionEvent` value objects. `DetectedObject`
+    widened via keyword-only `affordances`, `is_fragile`, `is_fixed`,
+    `semantic_tags`, `text_query` fields with falsy defaults; the
+    positional six-arg ctor stays identical so every existing call
+    site (`perception.object_detector`, unit + integration tests)
+    keeps working.
+  - **`armdroid.domain.protocols`** — four new
+    `@runtime_checkable` Protocols (`VisionLanguageAgentProtocol`,
+    `HighLevelPlannerProtocol`, `SafetyGuardProtocol`,
+    `InteractionSessionProtocol`). The VLA protocol uses disjoint
+    method names (`build_vla`, `act`, `is_vla_built`, `is_vla_loaded`)
+    from `ArmRLAgentProtocol` so runtime `isinstance` dispatch in the
+    Phase D `ArmController` rewrite is unambiguous (peer-review B3).
+  - **`armdroid.config.schema`** — three new sub-configs
+    (`ArmVlaConfig`, `ArmSafetyConfig`, `ArmInteractionConfig`) wired
+    into `ArmSettings` with `default_factory`. `LLMReplannerConfig`
+    widens `backend` to include `"gemini"` and adds `api_endpoint`,
+    `safety_tier`, `transport` envelope fields.
+    `ArmPerceptionConfig` adds `detector_kind` (`"yolo"` |
+    `"gemini_er"`), frame-buffer + open-vocab + point-cloud knobs.
+  - **`armdroid.telemetry`** — declares 17 new module-level SPAN
+    constants (`SPAN_PERCEPTION_*`, `SPAN_LLM_REPLAN_*`, `SPAN_VLA_*`,
+    `SPAN_INTERACTION_*`, `SPAN_SAFETY_*`) and exports them via
+    `__all__`. String values are pinned by
+    `tests/unit/telemetry/test_span_constants.py`.
+  - **`pyproject.toml`** — three new opt-in extras (`gemini`,
+    `gemini-live`, `gemini-vla`) and a Phase F wheel asset slot
+    (`assets/safety` -> `armdroid/safety/data`) so the NEISS corpus
+    ships inside the wheel.
+  - **`tests/helpers/fake_llm_sdk`** — lifted the `_fake_sdk` helper
+    out of `tests/unit/planning/test_llm_replanners.py` so perception
+    (Phase B), planning (Phase C), control (Phase D), and interaction
+    (Phase E) tests can all reuse the same fake under
+    `fake_anthropic_sdk` / `fake_gemini_sdk` / `fake_llm_sdk`.
+  - **`config/examples/gemini.example.yaml`** — exhaustive worked
+    overlay covering every new sub-config in disabled state.
+  - **`docs/architecture/ADR/ADR-0007-vision-language-agent-protocol.md`**,
+    **`ADR-0008-open-vocabulary-detector.md`**,
+    **`ADR-0009-safety-middleware.md`**, plus
+    **`docs/architecture/add-a-vision-agent.md`** and
+    **`docs/architecture/add-a-detector.md`** extension guides.
+
 - **F1: Vectorised env path (`num_envs > 1`)** — landed via
   [ADR-0006](docs/architecture/ADR/ADR-0006-vec-env-protocol.md) on
   `feature/f1-vec-env-protocol`. Introduces `VecArmEnvironmentProtocol`

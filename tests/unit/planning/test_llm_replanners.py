@@ -16,6 +16,7 @@ from armdroid.planning.llm_replanners.anthropic_backend import (
 )
 from armdroid.planning.llm_replanners.base import LLMReplannerProtocol
 from armdroid.planning.llm_replanners.null_backend import NullLLMReplanner
+from tests.helpers.fake_llm_sdk import fake_anthropic_sdk
 
 
 def _state(predicates: set[str] | None = None) -> SymbolicState:
@@ -25,53 +26,13 @@ def _state(predicates: set[str] | None = None) -> SymbolicState:
     )
 
 
-def _fake_sdk(response_text: str, *, with_async: bool = False) -> Any:
-    """Build a minimal stand-in for the ``anthropic`` SDK.
+def _fake_sdk(response_text: str, *, with_async: bool = False) -> SimpleNamespace:
+    """Backward-compatible alias kept so the test file's call sites read the same.
 
-    ``with_async=True`` also exposes an ``AsyncAnthropic`` class whose
-    ``messages.create`` is awaitable, used by the ``areplan`` tests.
+    Delegates to the lifted helper in ``tests/helpers/fake_llm_sdk.py`` so
+    the same fake is reused across LLM backends.
     """
-
-    class _Block:
-        def __init__(self, text: str) -> None:
-            self.type = "text"
-            self.text = text
-
-    class _Response:
-        def __init__(self, text: str) -> None:
-            self.content = [_Block(text)]
-
-    class _Messages:
-        def __init__(self) -> None:
-            self.calls: list[dict[str, Any]] = []
-
-        def create(self, **kwargs: Any) -> _Response:
-            self.calls.append(kwargs)
-            return _Response(response_text)
-
-    class _Client:
-        def __init__(self, api_key: str | None = None) -> None:
-            self.api_key = api_key
-            self.messages = _Messages()
-
-    class _AsyncMessages:
-        def __init__(self) -> None:
-            self.calls: list[dict[str, Any]] = []
-
-        async def create(self, **kwargs: Any) -> _Response:
-            self.calls.append(kwargs)
-            return _Response(response_text)
-
-    class _AsyncClient:
-        def __init__(self, api_key: str | None = None) -> None:
-            self.api_key = api_key
-            self.messages = _AsyncMessages()
-
-    members: dict[str, Any] = {"Anthropic": _Client}
-    if with_async:
-        members["AsyncAnthropic"] = _AsyncClient
-    sdk = SimpleNamespace(**members)
-    return sdk
+    return fake_anthropic_sdk(response_text, with_async=with_async)
 
 
 # ---------------------------------------------------------------------------
