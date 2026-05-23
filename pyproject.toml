@@ -248,6 +248,11 @@ markers = [
 addopts = "-v --tb=short"
 
 [tool.coverage.run]
+# Branch coverage in addition to line coverage. Catches missed
+# else-branches and short-circuited boolean paths that pure line
+# coverage silently lets through. Enabled in Phase A of the Gemini ER
+# 1.6 integration as part of the broader tech-debt sweep.
+branch = true
 source = ["src/armdroid"]
 omit = [
     "*/tests/*",
