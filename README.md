@@ -148,6 +148,18 @@ pip install -e ".[realsense]"
 # Claude API LLM replanner (anthropic SDK)
 pip install -e ".[anthropic]"
 
+# Gemini Robotics ER 1.6 integration (foundation-model perception,
+# replanner, VLA control). Phase A of the integration landed only the
+# scaffolding; concrete backends light up across Phases B-F. Each surface
+# is gated behind its own extra so operators opt into the audio Live API
+# surface independently of the perception / replanner / VLA surfaces.
+#   [gemini]      — open-vocabulary detector + replanner + VLA SDK
+#   [gemini-live] — additionally the bidirectional Live API
+#   [gemini-vla]  — VLA-only (reserved for when Google splits the SDK)
+pip install -e ".[gemini]"
+pip install -e ".[gemini-live]"
+pip install -e ".[gemini-vla]"
+
 # OpenTelemetry observability backend (zero-overhead by default)
 pip install -e ".[telemetry]"
 
@@ -163,6 +175,9 @@ pip install -e ".[isaac]" --extra-index-url https://pypi.nvidia.com
 
 # Install everything (default-CI-compatible subset)
 pip install -e ".[dev,hardware,ble,realsense,anthropic,telemetry]"
+
+# Same plus the Gemini ER 1.6 surfaces
+pip install -e ".[dev,hardware,ble,realsense,anthropic,telemetry,gemini,gemini-live,gemini-vla]"
 ```
 
 ### Windows note — MuJoCo and Visual C++ Redistributable
@@ -220,6 +235,11 @@ python -m armdroid rollout
 - `config/tower_of_hanoi.yaml`: full Tower of Hanoi preset with mock hardware and a 3-disk
   curriculum.
 - `config/training.yaml`: longer training run tuned for RTX 5060 Ti (5M timesteps, batch 512).
+- `config/examples/gemini.example.yaml`: documented overlay for the Phase A Gemini ER 1.6
+  scaffolding. Every surface (`arm_vla`, `arm_safety`, `arm_interaction`, the widened
+  `arm_perception` and `arm_planning.llm_replanner` blocks) is shown in its disabled
+  default state. Phase A only ships the wiring slots; concrete backends light up in
+  Phases B-F. See [ADR-0007 through ADR-0009](docs/architecture/ADR/) for the design.
 
 ---
 

@@ -59,6 +59,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
     **`ADR-0009-safety-middleware.md`**, plus
     **`docs/architecture/add-a-vision-agent.md`** and
     **`docs/architecture/add-a-detector.md`** extension guides.
+  - **Public-API re-exports** — every Phase A value object and protocol
+    is reachable via `armdroid`, `armdroid.api`, and `armdroid.domain`
+    so external consumers do not have to spelunk through
+    `armdroid.domain.{state,protocols}` directly. Identity-checked by
+    `tests/regression/test_public_api_phase_a.py`.
+  - **`docs/architecture/C4.md`** gains a Phase A scaffolding diagram
+    showing every new protocol slot, config sub-model, telemetry SPAN
+    family, and how they feed Phases B-F. The domain-layer and
+    config-layer boxes in the v0.2+ source-package layout diagram
+    are also updated with the new types and fields.
+  - **`NEXT_STEPS.md`** records Phase A in the "Landed in" log and
+    upgrades F2 from "GR00T / foundation-model" placeholder to the
+    concrete plan landing schedule. Adds a new `SAF-1` row reserved
+    for the safety roadmap follow-up that ADR-0009 establishes.
+  - **`README.md`** documents the `[gemini]`, `[gemini-live]`, and
+    `[gemini-vla]` extras and references the new example overlay.
 
 - **F1: Vectorised env path (`num_envs > 1`)** — landed via
   [ADR-0006](docs/architecture/ADR/ADR-0006-vec-env-protocol.md) on

@@ -139,6 +139,55 @@ exceeds runner disk quota in practice, the workflow falls back to
   list; pure-Python siblings (gripper math, configs) are explicitly
   covered.
 
+## Landed in `claude/gemini-robotics-embodied-reasoning-KrlEw`
+
+* **Phase A of Gemini Robotics ER 1.6 integration** — landed via
+  ADRs 0007 / 0008 / 0009. Foundation scaffolding only; zero
+  behavioural change to default rollouts. Adds:
+  * Four new `@runtime_checkable` protocols in
+    `armdroid.domain.protocols`: `VisionLanguageAgentProtocol`
+    (with disjoint method names from `ArmRLAgentProtocol` per
+    ADR-0007 to keep the Phase D `isinstance` dispatch
+    unambiguous), `HighLevelPlannerProtocol`,
+    `SafetyGuardProtocol`, `InteractionSessionProtocol`.
+  * Four new frozen, slotted value objects in
+    `armdroid.domain.state`: `ArmAction` (with `from_array`
+    boundary converter), `SceneInsight`, `Verdict`,
+    `InteractionEvent`. `DetectedObject` widened with five
+    keyword-only fields preserving the positional six-arg ctor;
+    `__slots__` pinned by regression test.
+  * Three new sub-configs (`ArmVlaConfig`, `ArmSafetyConfig`,
+    `ArmInteractionConfig`) wired into `ArmSettings`.
+    `LLMReplannerConfig.backend` widened to include `"gemini"`.
+    `ArmPerceptionConfig` gains `detector_kind`, frame-buffer,
+    open-vocab, and Gemini-envelope fields. All numeric bounds
+    enforced.
+  * 17 new module-level `SPAN_*` constants in
+    `armdroid.telemetry` for perception / replanner / VLA /
+    interaction / safety families. String values pinned by
+    `tests/unit/telemetry/test_span_constants.py`.
+  * Three new opt-in extras in `pyproject.toml`: `[gemini]`,
+    `[gemini-live]`, `[gemini-vla]`. Wheel asset slot reserved
+    for Phase F's NEISS safety corpus.
+  * `tests/helpers/fake_llm_sdk` lifted from
+    `tests/unit/planning/test_llm_replanners.py` so Phases B-E
+    test suites share one provider-agnostic fake SDK harness.
+  * `config/examples/gemini.example.yaml` exhaustive overlay,
+    documented + regression-tested.
+  * Three ADRs (0007 / 0008 / 0009) plus two extension guides
+    (`add-a-vision-agent.md`, `add-a-detector.md`).
+  * Public-API re-exports lifted into `armdroid`, `armdroid.api`,
+    and `armdroid.domain` so the new types and protocols are
+    discoverable through every documented import path; pinned by
+    identity-checked regression at
+    `tests/regression/test_public_api_phase_a.py`.
+
+  Quality: 910 tests pass (+66 net), coverage 95.53%, ruff +
+  mypy `--strict` clean. See
+  `docs/architecture/ADR/ADR-0007-vision-language-agent-protocol.md`
+  (and 0008 / 0009) plus the integration plan at
+  `/root/.claude/plans/as-per-the-research-radiant-nova.md`.
+
 ## Landed in `feature/f1-vec-env-protocol`
 
 * **F1 (Vectorised env path, `num_envs > 1`)** — landed via ADR-0006.
@@ -157,7 +206,8 @@ exceeds runner disk quota in practice, the workflow falls back to
 
 | ID | Description | Notes |
 | --- | --- | --- |
-| **F2** | GR00T / foundation-model integration. | Documented in PHASES.md Stretch axis. |
+| **F2** | Foundation-model integration. Phase A scaffolding landed via ADRs 0007-0009 on `claude/gemini-robotics-embodied-reasoning-KrlEw`. Phases B (perception detector + frame buffer + scene reasoner), C (`GeminiReplanner` + LLM-replanner registry + factory wiring), D (`VisionLanguageAgentProtocol` + Gemini VLA backend), E (Live API), F (Asimov safety chain) are the remaining work. | See `/root/.claude/plans/as-per-the-research-radiant-nova.md`. |
+| **SAF-1** | Safety roadmap follow-up reserved by ADR-0009. NEISS corpus refresh cadence, OEM-specific velocity profiles, and operator-supplied custom rule sets. Lands alongside Phase F. | New track. |
 | **F3** | Real-time Isaac Sim GUI viewer. | Currently headless only. |
 | **F4** | Domain-randomisation parity between MuJoCo and Isaac. | Mass / friction / lighting ranges currently MuJoCo-only. |
 | **F5** | Tighten `ArmEnvironmentProtocol.step` return signature from `dict[str, Any]` to `dict[str, NDArray[np.float64]]`. | Touches every env. Defer to a dedicated protocol-tightening PR. |
