@@ -33,7 +33,7 @@ from armdroid.config.schema.arm import (
     TransportAuthConfig,
 )
 from armdroid.config.schema.llm import LLMReplannerConfig
-from armdroid.config.schema.perception import ArmPerceptionConfig
+from armdroid.config.schema.perception import ArmPerceptionConfig, ObjectGeometryCfg
 from armdroid.config.schema.planning import ArmPlanningConfig
 from armdroid.config.schema.settings import ArmSettings, load_settings
 from armdroid.config.schema.sim import ArmSimConfig
@@ -61,6 +61,7 @@ __all__ = [
     "BleTransportConfig",
     "JointLimits",
     "LLMReplannerConfig",
+    "ObjectGeometryCfg",
     "RslRlPpoConfig",
     "TcpTransportConfig",
     "TransportAuthConfig",

@@ -96,11 +96,31 @@ class SoArmReachIsaacEnv:
 
         from armdroid.environments.isaac.tasks import reach as _  # noqa: F401
 
-        self._isaac_env = gym.make(
-            self._sim_cfg.reach_env_id,
-            num_envs=self._sim_cfg.num_envs,
-            disable_env_checker=self._sim_cfg.disable_env_checker,
-        )
+        if self._sim_cfg.randomize_physics:
+            from isaaclab.envs import parse_env_cfg
+
+            from armdroid.environments.isaac._domain_randomization import (
+                apply_domain_randomization,
+            )
+
+            env_cfg = parse_env_cfg(
+                self._sim_cfg.reach_env_id,
+                num_envs=self._sim_cfg.num_envs,
+                use_cli_args=False,
+            )
+            apply_domain_randomization(env_cfg, self._sim_cfg)
+            self._isaac_env = gym.make(
+                self._sim_cfg.reach_env_id,
+                cfg=env_cfg,
+                num_envs=self._sim_cfg.num_envs,
+                disable_env_checker=self._sim_cfg.disable_env_checker,
+            )
+        else:
+            self._isaac_env = gym.make(
+                self._sim_cfg.reach_env_id,
+                num_envs=self._sim_cfg.num_envs,
+                disable_env_checker=self._sim_cfg.disable_env_checker,
+            )
         _log.info("so_arm_reach_isaac_built", env_id=self._sim_cfg.reach_env_id)
 
     def reset(
