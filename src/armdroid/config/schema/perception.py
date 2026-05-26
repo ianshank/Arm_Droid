@@ -8,6 +8,30 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class ObjectGeometryCfg(BaseModel):
+    """3D geometry keypoints for known objects (used by PnP).
+
+    Note:
+        The 3D keypoints MUST correspond exactly in order to the approximated
+        2D bounding box corners used in Perspective-n-Point estimation:
+        [top-left, top-right, bottom-right, bottom-left].
+    """
+
+    keypoints_3d_m: list[tuple[float, float, float]] = Field(
+        ...,
+        description=(
+            "List of 3D keypoints in the object's local coordinate frame (m). "
+            "MUST correspond in order to 2D bounding box corners: "
+            "[top-left, top-right, bottom-right, bottom-left]."
+        ),
+    )
+
+    @property
+    def num_keypoints(self) -> int:
+        """Return the number of 3D keypoints defined for this object."""
+        return len(self.keypoints_3d_m)
+
+
 class ArmPerceptionConfig(BaseModel):
     """Perception stack configuration for robot arm platform.
 
@@ -134,6 +158,17 @@ class ArmPerceptionConfig(BaseModel):
     default_focal_length: float = Field(500.0, gt=0, description="Default camera focal length (px)")
     default_principal_x: float = Field(320.0, gt=0, description="Default principal point X (px)")
     default_principal_y: float = Field(240.0, gt=0, description="Default principal point Y (px)")
+    distortion_coeffs: tuple[float, ...] = Field(
+        default=(0.0, 0.0, 0.0, 0.0),
+        description=(
+            "Camera lens distortion coefficients (k1, k2, p1, p2, ...). "
+            "Passed directly to cv2.solvePnP. Default assumes no distortion."
+        ),
+    )
+    object_geometries: dict[str, ObjectGeometryCfg] = Field(
+        default_factory=dict,
+        description="Mapping from object class name to its 3D geometry keypoints.",
+    )
 
 
-__all__ = ["ArmPerceptionConfig"]
+__all__ = ["ArmPerceptionConfig", "ObjectGeometryCfg"]

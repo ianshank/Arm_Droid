@@ -56,6 +56,26 @@ def _build_isaac_env(
 
     from armdroid.environments.isaac.tasks import reach as _  # noqa: F401
 
+    if sim_isaac_cfg.randomize_physics:
+        from isaaclab.envs import parse_env_cfg
+
+        from armdroid.environments.isaac._domain_randomization import (
+            apply_domain_randomization,
+        )
+
+        env_cfg = parse_env_cfg(
+            sim_isaac_cfg.reach_env_id,
+            num_envs=sim_isaac_cfg.num_envs,
+            use_cli_args=False,
+        )
+        apply_domain_randomization(env_cfg, sim_isaac_cfg)
+        return gym.make(
+            sim_isaac_cfg.reach_env_id,
+            cfg=env_cfg,
+            num_envs=sim_isaac_cfg.num_envs,
+            disable_env_checker=sim_isaac_cfg.disable_env_checker,
+        )
+
     return gym.make(
         sim_isaac_cfg.reach_env_id,
         num_envs=sim_isaac_cfg.num_envs,

@@ -326,6 +326,35 @@ python -m armdroid --config config/tower_of_hanoi.yaml rollout
 python -m armdroid --mock-hardware --config config/tower_of_hanoi.yaml rollout
 ```
 
+### Physical Calibration
+
+For safety and precision, calibrate your physical arm's joint limits before running real rollouts:
+
+```bash
+# Run the interactive calibration script
+python scripts/calibrate_arm.py --port /dev/ttyUSB0
+```
+This utility steps each joint individually under human supervision to find physical extreme bounds, automatically outputting a local YAML overlay at `config/calibrated_limits.yaml`. This file is ignored by Git by default but is loaded as a YAML overlay at runtime to override default joint bounds.
+
+### Deploying on NVIDIA Jetson Edge Platforms
+
+armdroid supports native containerized edge deployment on NVIDIA Jetson platforms (Orin Nano, Orin NX, AGX Orin) running JetPack 6.x.
+
+1. **Build the container** optimized for Linux for Tegra (L4T) and CUDA:
+   ```bash
+   docker compose -f docker-compose.jetson.yml build
+   ```
+2. **Run the container** with device mapping for the ESP32 serial UART and RealSense cameras:
+   ```bash
+   docker compose -f docker-compose.jetson.yml up -d
+   ```
+3. **Verify edge health** (checks CUDA, ESP32 USB serial connection, and camera feeds):
+   ```bash
+   docker exec -it armdroid python scripts/jetson_health_check.py
+   ```
+
+For detailed setup instructions, udev rules, and troubleshooting, see the [Jetson Deployment Guide](docs/deployment/JETSON.md).
+
 ---
 
 ## Development
@@ -444,42 +473,17 @@ tests/
 
 ## Roadmap / Next steps
 
-> **Recently landed (`feature/f1-vec-env-protocol`):** the vectorised env path
-> (`VecArmEnvironmentProtocol` + `VecArmRLAgentProtocol`) is now in place. The default
-> single-env path is byte-identical to pre-F1 behaviour. See
-> [ADR-0006](docs/architecture/ADR/ADR-0006-vec-env-protocol.md) and
-> [NEXT_STEPS.md](NEXT_STEPS.md) for the full landed scope.
+> **Recently landed (`feat/production-blockers-sim2real`):** Physical production blockers have been fully resolved! This release lands interactive physical calibration (`calibrate_arm.py`), physical domain randomization scaling (friction, mass, gains) under `ArmSimIsaacConfig` for zero-shot sim-to-real transfer, real OpenCV Perspective-n-Point (PnP) 6-DoF orientation estimation in `PoseEstimator`, and multi-stage L4T edge-docker deployment support for NVIDIA Jetson devices (with automated healthchecks via `jetson_health_check.py`).
 
-1. **Real arm validation across all transports** — run the decomposed ESP32 driver on the
-   physical MakerWorld arm over USB-UART, Wi-Fi (TCP), and BLE; calibrate joint limits and
-   home pose; validate emergency-stop / reconnect / HMAC-auth behaviour for each transport.
+1. **Real-time Isaac Sim GUI viewer** — wire up real-time rendering and interactive GUI control when launching Isaac Sim training/rollouts, rather than running solely in headless mode.
 
-2. **Isaac Sim sim-to-real bridge** — with the vec path now landed (F1), install `[isaac]`
-   on Ampere+ hardware (the probe at `scripts/check_isaac_install.py` reports readiness),
-   train PPO via `RslRlPpoAgent.train_vec` at `num_envs >> 1`, add domain randomisation
-   over PD gains / friction / mass, and validate zero-shot transfer to the real arm.
-   Tower of Hanoi as an Isaac task (currently only the reach primitive is wired) is part
-   of this.
+2. **Complete registry dispatch** — extend the same modular named-factory lookup used for drivers and environments to the remaining planner, perception, and controller composition paths where external plugins are expected.
 
-3. **MuJoCo render + perception PnP** — implement
-   `BaseEnv.render` against `mujoco.Renderer` (TD-6) and replace the bbox-derived
-   orientation in `PoseEstimator` with full OpenCV PnP keyed off per-class 3D models
-   (TD-7). Both are currently scope-deferred with structured-log placeholders.
+3. **MuJoCo render pipeline (TD-6)** — implement the offscreen framebuffer rendering pipeline against `mujoco.Renderer` to finalize simulation visualization.
 
-4. **Complete registry dispatch** — extend the same named-factory lookup used for drivers and
-  environments to the remaining planner, perception, and controller composition paths where
-  external plugins are expected.
+4. **Tighten the typing envelope** — retire the remaining targeted mypy relaxations in `config.schema`, `control.sac_agent`, `perception.object_detector`, and `perception.depth_processor` as third-party boundaries are wrapped more narrowly.
 
-5. **Tighten the typing envelope** — retire the remaining targeted mypy relaxations in
-  `config.schema`, `control.sac_agent`, `perception.object_detector`, and
-  `perception.depth_processor` as third-party boundaries are wrapped more narrowly.
-
-6. **Broaden public-surface regression coverage** — keep expanding regression tests around
-  `armdroid.api`, root-package re-exports, and entry-point/plugin discovery so future internal
-  refactors cannot silently change the public contract.
-
-7. **7-DoF and full perception loop** — finish the MuJoCo scene assets, connect the live D435i
-   pipeline, and only then consider making 7-DoF the default config.
+5. **7-DoF and Laundry Sorting Curriculum** — complete the MuJoCo/Isaac scene assets for 7-DoF, connect the live RealSense D435i pipeline, and integrate the laundry sorting transfer task curriculum.
 
 ---
 

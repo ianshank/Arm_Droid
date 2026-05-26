@@ -96,6 +96,30 @@ class TestBoundsValidation:
         with pytest.raises(ValidationError, match="arm_stiffness_shoulder_pan"):
             ArmSimIsaacConfig(arm_stiffness_shoulder_pan=-1.0)
 
+    def test_friction_range_inverted_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="friction_range_sim"):
+            ArmSimIsaacConfig(friction_range_sim=(1.5, 0.5))
+
+    def test_mass_scale_range_inverted_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="mass_scale_range"):
+            ArmSimIsaacConfig(mass_scale_range=(1.2, 0.8))
+
+    def test_valid_dr_ranges_accepted(self) -> None:
+        cfg = ArmSimIsaacConfig(
+            friction_range_sim=(0.5, 1.5),
+            mass_scale_range=(0.8, 1.2),
+        )
+        assert cfg.friction_range_sim == (0.5, 1.5)
+        assert cfg.mass_scale_range == (0.8, 1.2)
+
+    def test_equal_range_endpoints_accepted(self) -> None:
+        """Equal min/max (no randomization) should be valid."""
+        cfg = ArmSimIsaacConfig(
+            friction_range_sim=(1.0, 1.0),
+            mass_scale_range=(1.0, 1.0),
+        )
+        assert cfg.friction_range_sim == (1.0, 1.0)
+
 
 class TestEnvVarOverride:
     def test_env_var_overrides_num_envs_via_arm_settings(

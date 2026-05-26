@@ -67,6 +67,8 @@ the suppressed error is documented inline.
 | Vec / Isaac work | [`ADR-0006`](docs/architecture/ADR/ADR-0006-vec-env-protocol.md), [`registry_vec.py`](src/armdroid/environments/registry_vec.py), [`reach_vec.py`](src/armdroid/environments/isaac/reach_vec.py) |
 | Telemetry / observability | [`armdroid.telemetry`](src/armdroid/telemetry/__init__.py) - add SPAN constants there, never hardcoded |
 | Config schemas | [`src/armdroid/config/schema/`](src/armdroid/config/schema) - Pydantic v2 with bounds on every numeric field |
+| Physical Calibration & Limits | [`scripts/calibrate_arm.py`](scripts/calibrate_arm.py) - interactive joint extreme calibration script |
+| Jetson Edge Deployment & Health | [`docs/deployment/JETSON.md`](docs/deployment/JETSON.md), [`Dockerfile`](Dockerfile), [`docker-compose.jetson.yml`](docker-compose.jetson.yml), [`scripts/jetson_health_check.py`](scripts/jetson_health_check.py) |
 
 ---
 
@@ -103,14 +105,7 @@ the suppressed error is documented inline.
 
 ---
 
-## Recent history pointer
+The current branch `feat/production-blockers-sim2real` resolves all blockers for physical production (Sim-to-Real). It delivers interactive physical calibration (`calibrate_arm.py`), configurable domain randomization (friction, mass, gains) in the environments, OpenCV-based 6-DoF Perspective-n-Point orientation estimation in the perception PoseEstimator, and an end-to-end multi-stage L4T Docker deployment framework for NVIDIA Jetson devices with a dedicated health probe (`jetson_health_check.py`).
 
-The current branch `feature/f1-vec-env-protocol` lands the vectorised
-env path (F1 from [`NEXT_STEPS.md`](NEXT_STEPS.md)). See
-[`ADR-0006`](docs/architecture/ADR/ADR-0006-vec-env-protocol.md) for
-the architectural decisions. The PR is at
-https://github.com/ianshank/Arm_Droid/pull/19.
+Before starting a new branch, check `NEXT_STEPS.md` for the active roadmap thread and `git log --oneline origin/main..HEAD` on any open PRs to avoid stepping on landing work.
 
-Before starting a new branch, check `NEXT_STEPS.md` for the active
-roadmap thread and `git log --oneline origin/main..HEAD` on any open
-PRs to avoid stepping on landing work.

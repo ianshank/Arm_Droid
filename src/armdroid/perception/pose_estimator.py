@@ -85,23 +85,77 @@ class PoseEstimator:
         y = (cy - cy_cam) * z / fy
 
         position = np.array([x, y, z], dtype=np.float64)
-        # TD-7: orientation is zeros until OpenCV PnP is wired up. Full
-        # PnP needs (a) per-class 3D model points (corners, keypoints
-        # extracted from the URDF / mesh), (b) corresponding 2D
-        # detections (currently we only have bbox center + corners), and
-        # (c) a calibrated camera matrix. Until those land, downstream
-        # code must treat orientation as unmeasured and rely on
-        # symbolic/grasp-pose heuristics. The structured log surfaces
-        # the gap so callers can detect the unmeasured field at runtime
-        # (e.g. for sim-only callers that don't actually need
-        # orientation, this confirms the placeholder is in effect).
-        orientation = np.zeros(3, dtype=np.float64)
+
+        # PnP Orientation Estimation
+        # Check if we have 3D keypoints defined for this object class
+        geom = self._cfg.object_geometries.get(detection.class_name)
+        orientation_source = "fallback"
+        if geom is None or geom.num_keypoints < 4:
+            # Fallback to zero orientation if no geometry or insufficient points for PnP
+            orientation = np.zeros(3, dtype=np.float64)
+            _log.debug(
+                "pose_pnp_fallback_no_geometry",
+                object_id=detection.object_id,
+                class_name=detection.class_name,
+            )
+        else:
+            try:
+                import cv2
+
+                # Assuming the 2D keypoints are corners of the bounding box if we only have bbox.
+                # In a real scenario, a keypoint detector would provide exact 2D matching points.
+                # Here we approximate 4 corners for a 2D bbox.
+                #
+                # Note: The 3D keypoints from config (geom.keypoints_3d_m) MUST correspond
+                # exactly in order to these 2D bounding box corners:
+                # 1. top-left (corners 0)
+                # 2. top-right (corners 1)
+                # 3. bottom-right (corners 2)
+                # 4. bottom-left (corners 3)
+                pts_2d = np.array(
+                    [
+                        [bbox[0], bbox[1]],  # top-left
+                        [bbox[2], bbox[1]],  # top-right
+                        [bbox[2], bbox[3]],  # bottom-right
+                        [bbox[0], bbox[3]],  # bottom-left
+                    ],
+                    dtype=np.float64,
+                )
+
+                pts_3d = np.array(geom.keypoints_3d_m[:4], dtype=np.float64)
+
+                dist_coeffs = np.array(
+                    self._cfg.distortion_coeffs,
+                    dtype=np.float64,
+                ).reshape(-1, 1)
+                success, rvec, _tvec = cv2.solvePnP(
+                    pts_3d, pts_2d, self._intrinsics, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE
+                )
+
+                if success:
+                    # rvec is axis-angle representation; extract the orientation vector
+                    orientation = rvec.flatten().astype(np.float64)
+                    orientation_source = "pnp"
+                else:
+                    orientation = np.zeros(3, dtype=np.float64)
+                    _log.debug("pose_pnp_failed", object_id=detection.object_id)
+            except ImportError:
+                orientation = np.zeros(3, dtype=np.float64)
+                _log.warning("pose_pnp_cv2_missing", object_id=detection.object_id)
+            except Exception:
+                orientation = np.zeros(3, dtype=np.float64)
+                _log.error(
+                    "pose_pnp_exception",
+                    object_id=detection.object_id,
+                    exc_info=True,
+                )
 
         _log.debug(
             "pose_estimated",
             object_id=detection.object_id,
             position=position.tolist(),
-            orientation_unmeasured=True,
+            orientation=orientation.tolist(),
+            orientation_source=orientation_source,
         )
         return position, orientation
 

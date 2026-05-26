@@ -28,6 +28,7 @@ hardware = [
 ]
 realsense = [
     "pyrealsense2>=2.55",
+    "opencv-python>=4.8.0",
 ]
 anthropic = [
     "anthropic>=0.40",

@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from armdroid.config.paths import SO101_URDF_REL
 
@@ -283,6 +283,52 @@ class ArmSimIsaacConfig(BaseModel):
         default="adaptive",
         description="Default LR schedule kind. RslRlPpoConfig may override.",
     )
+
+    # ------------------------------------------------------------------ #
+    # Domain Randomization (Sim-to-Real Bridge)
+    # ------------------------------------------------------------------ #
+
+    randomize_physics: bool = Field(
+        default=False,
+        description="Enable domain randomization (friction, mass, PD gains) on environment reset.",
+    )
+    friction_range_sim: tuple[float, float] = Field(
+        default=(1.0, 1.0),
+        description="Range to scale link friction (multiplier) on reset. e.g., (0.5, 1.5).",
+    )
+    mass_scale_range: tuple[float, float] = Field(
+        default=(1.0, 1.0),
+        description="Range to scale link mass (multiplier) on reset. e.g., (0.8, 1.2).",
+    )
+    stiffness_noise_pct: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=100.0,
+        description=(
+            "Percentage of uniform noise to apply to PD stiffness gains. e.g., 10.0 for ±10%."
+        ),
+    )
+    damping_noise_pct: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=100.0,
+        description=(
+            "Percentage of uniform noise to apply to PD damping gains. e.g., 10.0 for ±10%."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _check_ranges(self) -> ArmSimIsaacConfig:
+        """Validate that randomization range tuples have min <= max."""
+        lo, hi = self.friction_range_sim
+        if lo > hi:
+            msg = f"friction_range_sim min ({lo}) > max ({hi}); swap values or widen the range"
+            raise ValueError(msg)
+        lo, hi = self.mass_scale_range
+        if lo > hi:
+            msg = f"mass_scale_range min ({lo}) > max ({hi}); swap values or widen the range"
+            raise ValueError(msg)
+        return self
 
 
 def _default_sim_cfg() -> ArmSimIsaacConfig:

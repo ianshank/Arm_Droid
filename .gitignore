@@ -89,6 +89,9 @@ mjcache/
 # Local-only configs
 config/local.yaml
 config/*.local.yaml
+config/calibrated_limits.yaml
+config/*calibrated*.yaml
+
 
 # Training weights and datasets (large files — store in DVC or cloud storage)
 weights/
