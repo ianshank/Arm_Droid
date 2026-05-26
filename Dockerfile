@@ -10,7 +10,7 @@
 #
 # Run (Jetson with ESP32 + RealSense):
 #   docker run --runtime nvidia --device /dev/ttyUSB0 --device /dev/video0 \
-#     -v $(pwd)/config:/app/config:ro \
+#     -v $(pwd)/config:/app/config:rw \
 #     -e ARMDROID_HMAC_KEY \
 #     armdroid:jetson
 # =============================================================================
@@ -50,7 +50,7 @@ COPY src/armdroid/api/ src/armdroid/api/
 
 # Install Python dependencies into a prefix we can copy later
 RUN pip install --no-cache-dir --prefix=/install \
-    -e ".[hardware,realsense]"
+    ".[hardware,realsense]"
 
 # Copy full source for the final install
 COPY src/ src/
@@ -62,7 +62,7 @@ COPY firmware/ firmware/
 COPY Makefile README.md LICENSE AGENTS.md ./
 
 # Install armdroid itself into the prefix
-RUN pip install --no-cache-dir --prefix=/install --no-deps -e .
+RUN pip install --no-cache-dir --prefix=/install --no-deps .
 
 # =============================================================================
 # Stage 2: Runtime — minimal image with only runtime dependencies
@@ -108,7 +108,7 @@ ENV PYTHONPATH="/app/src:${PYTHONPATH}"
 RUN usermod -aG dialout ${APP_USER}
 
 # Health check — verifies GPU, armdroid import, and serial port
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=30s --start-period=45s --retries=3 \
     CMD ["python", "/app/scripts/jetson_health_check.py", "--probe-only"]
 
 # Switch to non-root user

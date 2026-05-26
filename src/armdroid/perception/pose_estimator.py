@@ -105,6 +105,13 @@ class PoseEstimator:
                 # Assuming the 2D keypoints are corners of the bounding box if we only have bbox.
                 # In a real scenario, a keypoint detector would provide exact 2D matching points.
                 # Here we approximate 4 corners for a 2D bbox.
+                #
+                # Note: The 3D keypoints from config (geom.keypoints_3d_m) MUST correspond
+                # exactly in order to these 2D bounding box corners:
+                # 1. top-left (corners 0)
+                # 2. top-right (corners 1)
+                # 3. bottom-right (corners 2)
+                # 4. bottom-left (corners 3)
                 pts_2d = np.array(
                     [
                         [bbox[0], bbox[1]],  # top-left

@@ -32,7 +32,7 @@ def _check_gpu() -> tuple[bool, str]:
 
         if torch.cuda.is_available():
             name = torch.cuda.get_device_name(0)
-            mem_mb = torch.cuda.get_device_properties(0).total_mem // (1024 * 1024)
+            mem_mb = torch.cuda.get_device_properties(0).total_memory // (1024 * 1024)
             return True, f"GPU: {name} ({mem_mb} MB)"
         return False, "CUDA not available (torch.cuda.is_available() == False)"
     except ImportError:
@@ -59,12 +59,17 @@ def _check_serial() -> tuple[bool, str]:
     try:
         from pathlib import Path
 
+        # Check for custom udev symlink first (documented in AGENTS.md / JETSON.md)
+        symlink = Path("/dev/armdroid-esp32")
+        if symlink.exists():
+            return True, f"Serial port found: {symlink} (custom udev symlink)"
+
         # Check common Jetson serial device paths
         candidates = list(Path("/dev").glob("ttyUSB*")) + list(Path("/dev").glob("ttyACM*"))
         if candidates:
             ports = ", ".join(str(p) for p in sorted(candidates))
             return True, f"Serial ports found: {ports}"
-        return False, "No /dev/ttyUSB* or /dev/ttyACM* devices found"
+        return False, "No /dev/armdroid-esp32 or /dev/ttyUSB* or /dev/ttyACM* devices found"
     except Exception as e:
         return False, f"Serial probe error: {e}"
 

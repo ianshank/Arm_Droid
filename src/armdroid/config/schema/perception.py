@@ -9,11 +9,21 @@ from pydantic import BaseModel, Field
 
 
 class ObjectGeometryCfg(BaseModel):
-    """3D geometry keypoints for known objects (used by PnP)."""
+    """3D geometry keypoints for known objects (used by PnP).
+
+    Note:
+        The 3D keypoints MUST correspond exactly in order to the approximated
+        2D bounding box corners used in Perspective-n-Point estimation:
+        [top-left, top-right, bottom-right, bottom-left].
+    """
 
     keypoints_3d_m: list[tuple[float, float, float]] = Field(
         ...,
-        description="List of 3D keypoints in the object's local coordinate frame (m).",
+        description=(
+            "List of 3D keypoints in the object's local coordinate frame (m). "
+            "MUST correspond in order to 2D bounding box corners: "
+            "[top-left, top-right, bottom-right, bottom-left]."
+        ),
     )
 
     @property

@@ -89,7 +89,7 @@ docker run -d \
   --name armdroid \
   --runtime nvidia \
   --device /dev/ttyUSB0 \
-  -v $(pwd)/config:/app/config:ro \
+  -v $(pwd)/config:/app/config:rw \
   -v $(pwd)/.secrets:/app/.secrets:ro \
   -e ARMDROID_HMAC_KEY \
   armdroid:jetson \
@@ -149,10 +149,10 @@ docker run \
 
 ### YAML Overlays
 
-Mount your configuration at `/app/config/`:
+Mount your configuration at `/app/config/` (mounted as read-write to allow saving calibration results):
 
 ```bash
-docker run -v $(pwd)/config:/app/config:ro ...
+docker run -v $(pwd)/config:/app/config:rw ...
 ```
 
 The container reads `config/tower_of_hanoi.yaml` by default. Override
