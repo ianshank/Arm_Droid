@@ -1,15 +1,19 @@
 # Next Steps
 
-This document tracks the roadmap from PR-A → PR-B → Phase 1.0 multi-
-transport → tech-debt cleanup, plus the follow-ups still outstanding.
-The PR-#10 (PR-A) and PR-#11 (PR-B) histories on GitHub are the
-canonical record of what landed in the Isaac integration line.
-``feature/phase-1.0-esp32-multi-transport`` is the parallel ESP32
-multi-transport line; ``feature/tech-debt-cleanup`` is the current
-follow-up that lands TD-1 / TD-4 / TD-5 / TD-6 / TD-7 cleanups on top
-of the rebased Phase 1.0 base.
+This document tracks the roadmap, milestones, and outstanding/landed items for the `armdroid` platform.
 
-## Phase 1.0 + tech-debt cleanup (current branch)
+## Landed: Physical Production Blocker Resolution (current branch)
+
+We have successfully resolved all major hurdles blocking physical robot arm deployment in the real world (Sim-to-Real):
+
+* **Physical Calibration Utility** (`scripts/calibrate_arm.py`) — Provides an interactive command-line interface for human operators to step joints to extreme positions to determine min/max rad boundaries and home poses safely, exporting local overlays to `config/calibrated_limits.yaml`.
+* **Domain Randomization Bridge** (`src/armdroid/environments/isaac/_domain_randomization.py`) — Integrated physical scaling ranges (mass, friction multipliers) and joint PD stiffness/damping gain noise directly into the environment reset hooks using Pydantic configurations on `ArmSimIsaacConfig` to enable robust zero-shot Sim-to-Real transfer.
+* **OpenCV PnP Pose Estimator** (`src/armdroid/perception/pose_estimator.py`) — Replaced the placeholder zero orientation with a real OpenCV Perspective-n-Point (`solvePnP`) 6-DoF pose estimator utilizing 2D detection keypoints, 3D object geometries, and camera/distortion matrices.
+* **NVIDIA Jetson Containerization** (`Dockerfile`, `docker-compose.jetson.yml`, `.dockerignore`) — Multi-stage edge build optimized for Linux for Tegra (L4T PyTorch base) with device passthrough rules for ESP32 UART serial and RealSense camera feeds, along with Bluetooth dbus sharing.
+* **Diagnostics Health Probe** (`scripts/jetson_health_check.py`) — Container health probe verifying CUDA availability, depth camera feed, and ESP32 UART port status.
+* **Regression and Type Hardening** (`tests/regression/test_sim2real_perception_regression.py`) — Added regression checks ensuring validation bounds of domain randomization ranges and object geometry specifications.
+
+## Phase 1.0 + tech-debt cleanup (previous branch milestones)
 
 Landing in ``feature/tech-debt-cleanup``:
 

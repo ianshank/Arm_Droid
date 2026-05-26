@@ -27,6 +27,9 @@ These live in the codebase and can be invoked by name.
 | **Protocol-first design** | [`armdroid.domain.protocols`](src/armdroid/domain/protocols.py) | Defining or changing a cross-subsystem boundary. |
 | **Lazy optional-import gate** | [`_so_arm_reach_isaac_factory`](src/armdroid/environments/registry.py), [`_so_arm_reach_isaac_vec_factory`](src/armdroid/environments/registry_vec.py) | Adding any code that imports `isaaclab`, `bleak`, `opentelemetry`, etc. |
 | **AppLauncher singleton coordination** | [`armdroid.hardware.isaac_sim._app_state`](src/armdroid/hardware/isaac_sim/_app_state.py), [`SoArmReachIsaacVecEnv._ensure_built`](src/armdroid/environments/isaac/reach_vec.py) | Building a new Isaac runtime entry point (driver, env, agent). |
+| **OpenCV PnP 6-DoF estimation** | [`armdroid.perception.pose_estimator`](src/armdroid/perception/pose_estimator.py) | Upgrading PoseEstimator from a zero placeholder to full 3D translation/rotation. |
+| **Physical domain randomization** | [`armdroid.environments.isaac._domain_randomization`](src/armdroid/environments/isaac/_domain_randomization.py) | Randomizing link masses, frictions, and joint controller PD gains. |
+
 
 ### Telemetry skills
 
@@ -54,6 +57,9 @@ These live in the codebase and can be invoked by name.
 | **`scripts/check_isaac_install.py`** | [`scripts/check_isaac_install.py`](scripts/check_isaac_install.py) | Pre-install probe for the `[isaac]` extra - safe on any host. |
 | **`scripts/gen_firmware_config.py`** | [`scripts/gen_firmware_config.py`](scripts/gen_firmware_config.py) | Codegen for the ESP32 firmware config header. |
 | **HIL runner scripts** | [`scripts/run_hil.sh`](scripts/run_hil.sh), [`scripts/run_hil.ps1`](scripts/run_hil.ps1) | One-command hardware gate. |
+| **`scripts/calibrate_arm.py`** | [`scripts/calibrate_arm.py`](scripts/calibrate_arm.py) | Interactive extreme joint range and homing calibration utility. |
+| **`scripts/jetson_health_check.py`** | [`scripts/jetson_health_check.py`](scripts/jetson_health_check.py) | Self-diagnostic CLI probe for Jetson Docker healthchecks (CUDA, UART, RealSense). |
+
 
 ---
 

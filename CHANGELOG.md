@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **Sim-to-Real Calibration Utility** — `scripts/calibrate_arm.py` provides an interactive CLI for determining safe joint limits (`min_rad` / `max_rad`) and homing positions on the physical MakerWorld 6-DoF arm, saving results to a local configuration overlay (`config/calibrated_limits.yaml`).
+- **Physical Domain Randomization (Sim-to-Real)** — `src/armdroid/environments/isaac/_domain_randomization.py` introduces customizable physical randomization on environment reset (scaling friction and link masses, and adding uniform noise to PD actuator stiffness and damping gains) to enable zero-shot sim-to-real transfer.
+- **OpenCV 6-DoF PnP Pose Estimation** — `src/armdroid/perception/pose_estimator.py` implements OpenCV Perspective-n-Point (`solvePnP`) target orientation estimation, resolving the prior zero-placeholder by mapping 2D keypoints to 3D object geometry.
+- **NVIDIA Jetson Edge Deployment Support** — Added a multi-stage L4T (Linux for Tegra) `Dockerfile`, `docker-compose.jetson.yml` with hardware passthrough (Intel RealSense depth camera, USB-UART serial ESP32 connection), `scripts/jetson_health_check.py` for diagnostic self-checks within the container, and extensive deployment guides in `docs/deployment/JETSON.md`.
 - **F1: Vectorised env path (`num_envs > 1`)** — landed via
   [ADR-0006](docs/architecture/ADR/ADR-0006-vec-env-protocol.md) on
   `feature/f1-vec-env-protocol`. Introduces `VecArmEnvironmentProtocol`

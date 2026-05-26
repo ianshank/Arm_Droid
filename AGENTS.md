@@ -196,6 +196,13 @@ This is a v0.4.0-track change. Open an ADR under
 shims in `armdroid.compat`. Extend `tests/regression/` to pin both old
 and new surfaces.
 
+### Calibrate and deploy to physical hardware (Jetson Edge)
+
+1. Run the interactive utility `scripts/calibrate_arm.py` with the physical arm connected to calibrate joint min/max limits. This writes a local configuration overlay (ignored by default).
+2. Build the L4T-optimized container using `docker compose -f docker-compose.jetson.yml build`.
+3. Run the deployment container, ensuring correct device mappings (`--device /dev/ttyUSB0` for the serial connection and RealSense video nodes).
+4. Run `python scripts/jetson_health_check.py` inside the running container to run self-diagnostics on CUDA availability, camera state, and ESP32 connectivity.
+
 ---
 
 ## When in doubt
