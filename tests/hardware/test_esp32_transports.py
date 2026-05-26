@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from collections.abc import AsyncGenerator
 
 import pytest
 
@@ -29,7 +30,9 @@ def transport_settings(request: pytest.FixtureRequest, hil_settings: ArmSettings
     return base.model_copy(update={"arm": patched_arm})
 
 @pytest.fixture
-async def transport_driver(transport_settings: ArmSettings): # type: ignore
+async def transport_driver(
+    transport_settings: ArmSettings,
+) -> AsyncGenerator[Esp32JsonDriver, None]:
     drv = Esp32JsonDriver(transport_settings.arm)
     try:
         # Give transports like BLE a little longer to discover/connect

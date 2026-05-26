@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from armdroid.config.schema import ArmPerceptionConfig
 from armdroid.domain.state import DetectedObject
@@ -172,3 +173,78 @@ class TestPoseEstimator:
 
         # Rotation vector should no longer be exactly zero
         assert not np.allclose(ori, np.zeros(3))
+
+    def test_pnp_fallback_on_cv2_import_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Orientation falls back to zeros when cv2 is not importable."""
+        import builtins
+
+        from armdroid.config.schema.perception import ObjectGeometryCfg
+
+        estimator = _make_estimator()
+        estimator._cfg.object_geometries["test_box"] = ObjectGeometryCfg(
+            keypoints_3d_m=[
+                (-0.05, -0.05, 0.0),
+                (0.05, -0.05, 0.0),
+                (0.05, 0.05, 0.0),
+                (-0.05, 0.05, 0.0),
+            ]
+        )
+
+        det = DetectedObject(
+            object_id="box_import",
+            class_name="test_box",
+            confidence=0.9,
+            position_m=np.zeros(3, dtype=np.float64),
+            orientation_rad=np.zeros(3, dtype=np.float64),
+            bbox=np.array([295.0, 215.0, 345.0, 265.0], dtype=np.float64),
+        )
+        depth = np.full((480, 640), 1.0, dtype=np.float32)
+
+        real_import = builtins.__import__
+
+        def _block_cv2(name: str, *args: object, **kwargs: object) -> object:
+            if name == "cv2":
+                raise ImportError("cv2 blocked for test")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", _block_cv2)
+        _pos, ori = estimator.estimate_pose(det, depth)
+        np.testing.assert_array_equal(ori, np.zeros(3))
+
+    def test_pnp_fallback_on_solve_exception(self) -> None:
+        """Orientation falls back to zeros when solvePnP raises an exception."""
+        try:
+            import cv2  # noqa: F401
+        except ImportError:
+            import pytest
+
+            pytest.skip("cv2 not installed")
+
+        from unittest.mock import patch
+
+        from armdroid.config.schema.perception import ObjectGeometryCfg
+
+        estimator = _make_estimator()
+        estimator._cfg.object_geometries["test_box"] = ObjectGeometryCfg(
+            keypoints_3d_m=[
+                (-0.05, -0.05, 0.0),
+                (0.05, -0.05, 0.0),
+                (0.05, 0.05, 0.0),
+                (-0.05, 0.05, 0.0),
+            ]
+        )
+
+        det = DetectedObject(
+            object_id="box_exc",
+            class_name="test_box",
+            confidence=0.9,
+            position_m=np.zeros(3, dtype=np.float64),
+            orientation_rad=np.zeros(3, dtype=np.float64),
+            bbox=np.array([295.0, 215.0, 345.0, 265.0], dtype=np.float64),
+        )
+        depth = np.full((480, 640), 1.0, dtype=np.float32)
+
+        with patch("cv2.solvePnP", side_effect=RuntimeError("test PnP failure")):
+            _pos, ori = estimator.estimate_pose(det, depth)
+
+        np.testing.assert_array_equal(ori, np.zeros(3))

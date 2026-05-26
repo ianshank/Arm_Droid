@@ -114,7 +114,9 @@ class PoseEstimator:
 
                 pts_3d = np.array(geom.keypoints_3d_m[:4], dtype=np.float64)
 
-                dist_coeffs = np.zeros((4, 1)) # Assume no distortion for now
+                dist_coeffs = np.array(
+                    self._cfg.distortion_coeffs, dtype=np.float64,
+                ).reshape(-1, 1)
                 success, rvec, _tvec = cv2.solvePnP(
                     pts_3d,
                     pts_2d,

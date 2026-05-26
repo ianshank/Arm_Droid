@@ -84,6 +84,13 @@ class ArmPerceptionConfig(BaseModel):
     default_focal_length: float = Field(500.0, gt=0, description="Default camera focal length (px)")
     default_principal_x: float = Field(320.0, gt=0, description="Default principal point X (px)")
     default_principal_y: float = Field(240.0, gt=0, description="Default principal point Y (px)")
+    distortion_coeffs: tuple[float, ...] = Field(
+        default=(0.0, 0.0, 0.0, 0.0),
+        description=(
+            "Camera lens distortion coefficients (k1, k2, p1, p2, ...). "
+            "Passed directly to cv2.solvePnP. Default assumes no distortion."
+        ),
+    )
     object_geometries: dict[str, ObjectGeometryCfg] = Field(
         default_factory=dict,
         description="Mapping from object class name to its 3D geometry keypoints.",
