@@ -99,6 +99,7 @@ class TestBuildArmController:
         # Default algorithm is sac_her; both sac and sac_her registered to SACAgent.
         assert cfg.arm_training.algorithm == "sac_her"
         controller = build_arm_controller(cfg)
+        # Narrow from ArmControllerProtocol to ArmController to access .agent
         assert isinstance(controller, ArmController)
         assert isinstance(controller.agent, SACAgent)
 
@@ -113,6 +114,8 @@ class TestBuildArmController:
             arm_training=ArmTrainingConfig(algorithm="sac"),
         )
         controller = build_arm_controller(cfg)
+        # Narrow from ArmControllerProtocol to ArmController to access .agent
+        assert isinstance(controller, ArmController)
         assert isinstance(controller.agent, SACAgent)
 
 

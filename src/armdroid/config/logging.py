@@ -16,10 +16,10 @@ class LoggingConfig(BaseModel):
     """
 
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
-        default="INFO",
+        "INFO",
         description="Minimum log level emitted.",
     )
     format: Literal["console", "json"] = Field(
-        default="console",
+        "console",
         description="Renderer format.",
     )
