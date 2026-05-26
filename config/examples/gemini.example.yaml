@@ -1,0 +1,70 @@
+# gemini.example.yaml - Example armdroid config exercising every Gemini
+# ER 1.6 sub-config introduced in Phase A of the integration plan. All
+# sections default to disabled so this file documents the wiring
+# without changing default behaviour. Copy it, flip ``enabled: true``
+# on the surfaces you want, and reference with:
+#
+#   python -m armdroid --config path/to/gemini.yaml
+#
+# Required extras per surface:
+#   pip install -e ".[gemini]"        # detector + replanner + VLA SDK
+#   pip install -e ".[gemini-live]"   # additionally for the Live API
+#
+# The ``GEMINI_API_KEY`` env var is consumed by every Gemini surface
+# below unless an ``api_key_env_var`` field overrides it. None of these
+# settings are read until the corresponding Phase (B/C/D/E/F) lands its
+# concrete backend; Phase A only ensures the schema loads cleanly.
+
+arm_perception:
+  detector_kind: yolo           # flip to ``gemini_er`` for open-vocab detection
+  frame_buffer_seconds: 30.0    # ring-buffer span for temporal reasoning
+  frame_buffer_fps: 2.0
+  open_vocab_max_queries: 8
+  gemini_model: "gemini-robotics-er-1.6"
+  gemini_api_key_env_var: GEMINI_API_KEY
+  gemini_request_timeout_s: 15.0
+  gemini_max_retries: 2
+  pointcloud_max_points: 8192
+  pointcloud_subsample_stride: 4
+
+arm_planning:
+  llm_replanner_enabled: false  # legacy flag, kept for backwards-compat
+  llm_replanner:
+    enabled: false              # Phase C wires Replanner only when this is true
+    backend: gemini             # one of: null, llama, anthropic, gemini
+    model: "gemini-robotics-er-1.6"
+    api_key_env_var: GEMINI_API_KEY
+    api_endpoint: ""            # empty -> SDK default
+    safety_tier: standard       # one of: off, standard, strict
+    transport: rest             # one of: rest, grpc
+    max_tokens: 1024
+    temperature: 0.0
+    system_prompt: ""
+    request_timeout_s: 30.0
+    max_retries: 3
+
+arm_vla:
+  enabled: false                # Phase D routes to VLA only when true
+  model: "gemini-robotics-er-1.6"
+  api_key_env_var: GEMINI_API_KEY
+  max_horizon_steps: 16
+  action_clip_rad: 0.25         # joint delta cap per step (radians)
+  frame_stack: 4
+  request_timeout_s: 15.0
+  max_retries: 2
+
+arm_interaction:
+  enabled: false                # Phase E opens a Gemini Live session when true
+  backend: "null"               # one of: null, gemini_live (registry name)
+  api_key_env_var: GEMINI_API_KEY
+  audio_sample_rate_hz: 16000
+  video_fps: 5.0
+  session_timeout_s: 300.0
+
+arm_safety:
+  asimov_rule_set: "off"        # one of: off, lab, strict, custom
+  max_tcp_speed_mps: 0.5        # ISO TS 15066 cap (m/s)
+  max_joint_velocity_rad_s: 1.5
+  fragile_force_n: 5.0          # max contact force against ``is_fragile`` objects
+  neiss_corpus_path: assets/safety/neiss_corpus.json
+  chain_deny_overrides: true

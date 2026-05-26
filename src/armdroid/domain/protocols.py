@@ -11,9 +11,21 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from armdroid.domain.state import ArmState, DetectedObject, PlanStep, SymbolicState
+from armdroid.domain.state import (
+    ArmAction,
+    ArmState,
+    DetectedObject,
+    InteractionEvent,
+    PlanStep,
+    SceneInsight,
+    SymbolicState,
+    Verdict,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+    from types import TracebackType
+
     import numpy as np
     import torch
     from numpy.typing import NDArray
@@ -485,6 +497,177 @@ class VecArmRLAgentProtocol(Protocol):
         ...
 
 
+@runtime_checkable
+class VisionLanguageAgentProtocol(Protocol):
+    """Vision-Language-Action agent contract (Gemini ER 1.6 and successors).
+
+    Sibling to :class:`ArmRLAgentProtocol` per ADR-0007. Methods are
+    intentionally disjoint from the RL surface (``build``, ``train``,
+    ``predict``, ``save``, ``load``, ``is_built``, ``is_trained``) so
+    runtime ``isinstance`` dispatch is unambiguous. See ADR-0007 for the
+    rationale.
+
+    A VLA agent consumes raw observations (RGB + depth + natural-language
+    instruction + arm state) and emits :class:`ArmAction` directly; the
+    pixels never pass through a symbolic state extractor.
+    """
+
+    def build_vla(self, env: ArmEnvironmentProtocol) -> None:
+        """Bind the VLA backend to ``env``. Idempotent.
+
+        Args:
+            env: Gymnasium-compatible environment whose action space the
+                VLA's output must satisfy. Used to validate joint count
+                and action ranges at build time.
+        """
+        ...
+
+    def act(
+        self,
+        rgb: NDArray[np.uint8],
+        depth: NDArray[np.float32],
+        instruction: str,
+        state: ArmState,
+    ) -> ArmAction:
+        """Produce one action for the given multi-modal observation.
+
+        Args:
+            rgb: Current RGB frame, shape ``(H, W, 3)``.
+            depth: Current depth frame, shape ``(H, W)`` (metres).
+            instruction: Natural-language task instruction.
+            state: Latest :class:`ArmState` snapshot from the driver.
+
+        Returns:
+            :class:`ArmAction` whose ``joint_targets`` length matches the
+            arm's degrees of freedom.
+        """
+        ...
+
+    @property
+    def is_vla_built(self) -> bool:
+        """Whether :meth:`build_vla` has bound an environment."""
+        ...
+
+    @property
+    def is_vla_loaded(self) -> bool:
+        """Whether the underlying VLA weights / SDK handle are ready."""
+        ...
+
+
+@runtime_checkable
+class HighLevelPlannerProtocol(Protocol):
+    """Foundation-model high-level planner contract (e.g. Gemini ER 1.6).
+
+    Takes a natural-language goal plus optional scene context and emits
+    a sequence of :class:`PlanStep` items that the standard PDDL
+    executor can run. Disjoint from :class:`ArmPlannerProtocol` because
+    inputs and outputs are different: a high-level planner accepts free
+    text, not a symbolic state.
+    """
+
+    @property
+    def name(self) -> str:
+        """Backend name (``"gemini_er"`` etc.) for logging and registry lookup."""
+        ...
+
+    def plan_high_level(
+        self,
+        goal_text: str,
+        scene: SceneInsight | None = None,
+    ) -> list[PlanStep]:
+        """Translate a natural-language goal into ordered :class:`PlanStep`s.
+
+        Args:
+            goal_text: Free-form task description (e.g. "put the blue
+                block in the orange bowl").
+            scene: Optional :class:`SceneInsight` providing grounded
+                visual context (crops, detections, notes). When ``None``
+                the planner relies on the goal text alone.
+
+        Returns:
+            Ordered list of :class:`PlanStep` items. Empty list is the
+            documented "give up" signal so callers can fall back to a
+            symbolic planner without raising.
+        """
+        ...
+
+
+@runtime_checkable
+class SafetyGuardProtocol(Protocol):
+    """Single layer in the Swiss-cheese safety chain (ADR-0009).
+
+    A guard either approves or rejects a candidate plan or action. The
+    chain composer enforces deny-overrides semantics so any single
+    ``allowed=False`` verdict short-circuits the chain.
+    """
+
+    @property
+    def name(self) -> str:
+        """Guard name (``"iso_kinematic"``, ``"asimov"`` etc.) for logs."""
+        ...
+
+    def check_plan(self, steps: list[PlanStep]) -> Verdict:
+        """Evaluate a candidate plan against the guard's rules.
+
+        Args:
+            steps: Ordered plan steps from a planner or replanner.
+
+        Returns:
+            :class:`Verdict` with ``allowed=True`` to approve, or
+            ``allowed=False`` plus a populated ``reason``.
+        """
+        ...
+
+    def check_action(self, action: ArmAction, state: ArmState) -> Verdict:
+        """Evaluate a single action against the guard's rules.
+
+        Args:
+            action: :class:`ArmAction` produced by the controller.
+            state: Current :class:`ArmState` to inform the check
+                (velocity, position, e-stop state).
+
+        Returns:
+            :class:`Verdict` matching :meth:`check_plan` semantics.
+        """
+        ...
+
+
+@runtime_checkable
+class InteractionSessionProtocol(Protocol):
+    """Bidirectional audio/video interaction session (Gemini Live API).
+
+    Implementations act as async context managers so the session
+    lifecycle is bounded by ``async with``. The orchestrator awaits
+    :meth:`receive_events` on a separate task and forwards
+    ``InteractionEvent`` items to the replanner.
+    """
+
+    async def __aenter__(self) -> InteractionSessionProtocol:
+        """Open the underlying transport (e.g. Gemini Live websocket)."""
+        ...
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        """Close the underlying transport. Idempotent."""
+        ...
+
+    async def send_audio(self, chunk: bytes) -> None:
+        """Forward a PCM audio chunk upstream."""
+        ...
+
+    async def send_frame(self, rgb: NDArray[np.uint8]) -> None:
+        """Forward an RGB frame upstream."""
+        ...
+
+    def receive_events(self) -> AsyncIterator[InteractionEvent]:
+        """Async iterator of events emitted by the remote service."""
+        ...
+
+
 __all__ = [
     "ArmControllerProtocol",
     "ArmDriverProtocol",
@@ -492,6 +675,10 @@ __all__ = [
     "ArmPerceptionProtocol",
     "ArmPlannerProtocol",
     "ArmRLAgentProtocol",
+    "HighLevelPlannerProtocol",
+    "InteractionSessionProtocol",
+    "SafetyGuardProtocol",
     "VecArmEnvironmentProtocol",
     "VecArmRLAgentProtocol",
+    "VisionLanguageAgentProtocol",
 ]

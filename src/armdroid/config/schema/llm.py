@@ -20,9 +20,31 @@ class LLMReplannerConfig(BaseModel):
         False,
         description="Enable LLM-backed replanning",
     )
-    backend: Literal["null", "llama", "anthropic"] = Field(
+    backend: Literal["null", "llama", "anthropic", "gemini"] = Field(
         "null",
         description="Replanner backend selection",
+    )
+    api_endpoint: str = Field(
+        "",
+        description=(
+            "Optional explicit API endpoint URL. Empty string ('') means "
+            "the backend SDK chooses the default (recommended)."
+        ),
+    )
+    safety_tier: Literal["off", "standard", "strict"] = Field(
+        "standard",
+        description=(
+            "Provider-side safety filter tier. ``off`` disables provider "
+            "filters; ``standard`` matches provider default; ``strict`` "
+            "applies the most aggressive filtering."
+        ),
+    )
+    transport: Literal["rest", "grpc"] = Field(
+        "rest",
+        description=(
+            "Wire transport for SDK calls. ``rest`` is the safe default; "
+            "``grpc`` requires the backend SDK to support it."
+        ),
     )
     model: str = Field(
         "claude-sonnet-4-6",

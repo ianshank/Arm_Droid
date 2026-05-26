@@ -52,6 +52,70 @@ class ArmPerceptionConfig(BaseModel):
         "ultralytics",
         description="YOLO inference backend (ultralytics on CUDA)",
     )
+    detector_kind: Literal["yolo", "gemini_er"] = Field(
+        "yolo",
+        description=(
+            "Object-detector discriminator (ADR-0008). ``yolo`` keeps "
+            "the current ultralytics path; ``gemini_er`` routes through "
+            "the open-vocabulary Gemini ER 1.6 backend (requires the "
+            "[gemini] extra)."
+        ),
+    )
+    frame_buffer_seconds: float = Field(
+        30.0,
+        gt=0.0,
+        le=120.0,
+        description=(
+            "Ring-buffer duration (seconds) for temporal reasoning. "
+            "Sized as ``frame_buffer_seconds * frame_buffer_fps``."
+        ),
+    )
+    frame_buffer_fps: float = Field(
+        2.0,
+        gt=0.0,
+        le=30.0,
+        description="Ring-buffer sampling rate (Hz).",
+    )
+    open_vocab_max_queries: int = Field(
+        8,
+        gt=0,
+        le=64,
+        description="Maximum natural-language queries per Gemini detect call.",
+    )
+    gemini_model: str = Field(
+        "gemini-robotics-er-1.6",
+        min_length=1,
+        description="Gemini ER detector model identifier.",
+    )
+    gemini_api_key_env_var: str = Field(
+        "GEMINI_API_KEY",
+        min_length=1,
+        description="Env var holding the Gemini API key for the detector.",
+    )
+    gemini_request_timeout_s: float = Field(
+        15.0,
+        gt=0.0,
+        le=300.0,
+        description="Per-request timeout for Gemini detector calls (seconds).",
+    )
+    gemini_max_retries: int = Field(
+        2,
+        ge=0,
+        le=10,
+        description="Maximum exponential-backoff retries on transient errors.",
+    )
+    pointcloud_max_points: int = Field(
+        8192,
+        gt=0,
+        le=131072,
+        description="Cap on point-cloud size fed to the scene reasoner.",
+    )
+    pointcloud_subsample_stride: int = Field(
+        4,
+        gt=0,
+        le=32,
+        description="Stride (px) when sub-sampling depth into the point cloud.",
+    )
     pose_estimator: Literal["pnp", "learned"] = Field(
         "pnp",
         description="Pose estimation method",

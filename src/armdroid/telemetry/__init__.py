@@ -107,6 +107,72 @@ SPAN_ENV_VEC_CLOSE: str = "armdroid.env.vec_close"
 #: inside :meth:`SoArmReachIsaacVecEnv._ensure_built`.
 SPAN_ENV_VEC_KIT_BOOT: str = "armdroid.env.vec_kit_boot"
 
+# Perception span constants (Phase A scaffolding; emission lands in Phase B).
+# Names use the existing ``armdroid.*`` prefix convention for consistency
+# with SPAN_DRIVER_*, SPAN_ENV_*, SPAN_AGENT_*.
+
+#: Span covering ``ObjectDetectorProtocol.detect``.
+SPAN_PERCEPTION_DETECT: str = "armdroid.perception.detect"
+
+#: Span covering ``ObjectDetectorProtocol.detect_text`` (open-vocab queries).
+SPAN_PERCEPTION_DETECT_TEXT: str = "armdroid.perception.detect_text"
+
+#: Span covering ``SceneReasoner.reason_about_scene``.
+SPAN_PERCEPTION_SCENE_REASON: str = "armdroid.perception.scene_reason"
+
+#: Span covering ``FrameBuffer.append`` plus the facade single-slot
+#: cache update (atomic per peer-review H8).
+SPAN_PERCEPTION_FRAME_BUFFER_APPEND: str = "armdroid.perception.frame_buffer_append"
+
+# LLM replanner span constants (Phase A scaffolding; emission lands in Phase C).
+
+#: Span covering an LLM replanner request (network round-trip).
+SPAN_LLM_REPLAN_REQUEST: str = "armdroid.llm_replan.request"
+
+#: Span covering parse-and-validate of the LLM replanner response.
+SPAN_LLM_REPLAN_PARSE: str = "armdroid.llm_replan.parse"
+
+#: Span covering the fallback to symbolic re-planning when the LLM returns empty.
+SPAN_LLM_REPLAN_FALLBACK: str = "armdroid.llm_replan.fallback"
+
+# VLA span constants (Phase A scaffolding; emission lands in Phase D).
+
+#: Span covering ``VisionLanguageAgentProtocol.build_vla``.
+SPAN_VLA_BUILD: str = "armdroid.vla.build"
+
+#: Span covering ``VisionLanguageAgentProtocol.act``.
+SPAN_VLA_ACT: str = "armdroid.vla.act"
+
+#: Span covering parse-and-clamp of the VLA backend's action response.
+SPAN_VLA_PARSE: str = "armdroid.vla.parse"
+
+# Interaction session span constants (Phase A scaffolding; emission lands in Phase E).
+# One session-level span per ``InteractionSessionProtocol.__aenter__`` rather
+# than per-frame to avoid 30 spans/sec noise (open-question 5).
+
+#: Span covering an interaction session's lifecycle.
+SPAN_INTERACTION_SESSION_OPEN: str = "armdroid.interaction.session_open"
+
+#: Span covering one ``send_frame`` call.
+SPAN_INTERACTION_SEND_FRAME: str = "armdroid.interaction.send_frame"
+
+#: Span covering one ``send_audio`` call.
+SPAN_INTERACTION_SEND_AUDIO: str = "armdroid.interaction.send_audio"
+
+#: Span covering one event received from the remote service.
+SPAN_INTERACTION_EVENT: str = "armdroid.interaction.event"
+
+# Safety chain span constants (Phase A scaffolding; emission lands in Phase F).
+
+#: Span covering ``SafetyGuardProtocol.check_plan``.
+SPAN_SAFETY_CHECK_PLAN: str = "armdroid.safety.check_plan"
+
+#: Span covering ``SafetyGuardProtocol.check_action``.
+SPAN_SAFETY_CHECK_ACTION: str = "armdroid.safety.check_action"
+
+#: Span covering a guard chain that returned ``allowed=False``.
+SPAN_SAFETY_DENY: str = "armdroid.safety.deny"
+
 
 # ---------------------------------------------------------------------------
 # TelemetryProvider protocol
@@ -234,6 +300,23 @@ __all__ = [
     "SPAN_ENV_VEC_KIT_BOOT",
     "SPAN_ENV_VEC_RESET",
     "SPAN_ENV_VEC_STEP",
+    "SPAN_INTERACTION_EVENT",
+    "SPAN_INTERACTION_SEND_AUDIO",
+    "SPAN_INTERACTION_SEND_FRAME",
+    "SPAN_INTERACTION_SESSION_OPEN",
+    "SPAN_LLM_REPLAN_FALLBACK",
+    "SPAN_LLM_REPLAN_PARSE",
+    "SPAN_LLM_REPLAN_REQUEST",
+    "SPAN_PERCEPTION_DETECT",
+    "SPAN_PERCEPTION_DETECT_TEXT",
+    "SPAN_PERCEPTION_FRAME_BUFFER_APPEND",
+    "SPAN_PERCEPTION_SCENE_REASON",
+    "SPAN_SAFETY_CHECK_ACTION",
+    "SPAN_SAFETY_CHECK_PLAN",
+    "SPAN_SAFETY_DENY",
+    "SPAN_VLA_ACT",
+    "SPAN_VLA_BUILD",
+    "SPAN_VLA_PARSE",
     "NullTelemetry",
     "TelemetryProvider",
     "configure_telemetry",

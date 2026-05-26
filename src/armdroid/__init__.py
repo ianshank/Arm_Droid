@@ -13,6 +13,7 @@ may change between minor versions.
 from __future__ import annotations
 
 from armdroid.api import (
+    ArmAction,
     ArmCommandRejected,
     ArmControllerProtocol,
     ArmDriverError,
@@ -26,10 +27,17 @@ from armdroid.api import (
     ArmState,
     ConfigError,
     DetectedObject,
+    HighLevelPlannerProtocol,
+    InteractionEvent,
+    InteractionSessionProtocol,
     PerceptionError,
     PlanningError,
     PlanStep,
+    SafetyGuardProtocol,
+    SceneInsight,
     SymbolicState,
+    Verdict,
+    VisionLanguageAgentProtocol,
     __version__,
     build_arm_controller,
     build_arm_driver,
@@ -40,6 +48,7 @@ from armdroid.api import (
 )
 
 __all__ = [
+    "ArmAction",
     "ArmCommandRejected",
     "ArmControllerProtocol",
     "ArmDriverError",
@@ -53,10 +62,17 @@ __all__ = [
     "ArmState",
     "ConfigError",
     "DetectedObject",
+    "HighLevelPlannerProtocol",
+    "InteractionEvent",
+    "InteractionSessionProtocol",
     "PerceptionError",
     "PlanStep",
     "PlanningError",
+    "SafetyGuardProtocol",
+    "SceneInsight",
     "SymbolicState",
+    "Verdict",
+    "VisionLanguageAgentProtocol",
     "__version__",
     "build_arm_controller",
     "build_arm_driver",
