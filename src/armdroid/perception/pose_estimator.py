@@ -105,24 +105,24 @@ class PoseEstimator:
                 # Assuming the 2D keypoints are corners of the bounding box if we only have bbox.
                 # In a real scenario, a keypoint detector would provide exact 2D matching points.
                 # Here we approximate 4 corners for a 2D bbox.
-                pts_2d = np.array([
-                    [bbox[0], bbox[1]],  # top-left
-                    [bbox[2], bbox[1]],  # top-right
-                    [bbox[2], bbox[3]],  # bottom-right
-                    [bbox[0], bbox[3]],  # bottom-left
-                ], dtype=np.float64)
+                pts_2d = np.array(
+                    [
+                        [bbox[0], bbox[1]],  # top-left
+                        [bbox[2], bbox[1]],  # top-right
+                        [bbox[2], bbox[3]],  # bottom-right
+                        [bbox[0], bbox[3]],  # bottom-left
+                    ],
+                    dtype=np.float64,
+                )
 
                 pts_3d = np.array(geom.keypoints_3d_m[:4], dtype=np.float64)
 
                 dist_coeffs = np.array(
-                    self._cfg.distortion_coeffs, dtype=np.float64,
+                    self._cfg.distortion_coeffs,
+                    dtype=np.float64,
                 ).reshape(-1, 1)
                 success, rvec, _tvec = cv2.solvePnP(
-                    pts_3d,
-                    pts_2d,
-                    self._intrinsics,
-                    dist_coeffs,
-                    flags=cv2.SOLVEPNP_ITERATIVE
+                    pts_3d, pts_2d, self._intrinsics, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE
                 )
 
                 if success:

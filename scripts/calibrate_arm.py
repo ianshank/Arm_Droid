@@ -27,6 +27,7 @@ _STEP_SETTLE_S: Final[float] = 0.5
 _DEFAULT_STEP_RAD: Final[float] = 0.05
 _DEFAULT_OUTPUT: Final[str] = "config/calibrated_limits.yaml"
 
+
 # Pydantic schema for the output YAML
 class CalibratedLimit(BaseModel):
     """A single joint's calibrated angular limits."""
@@ -41,7 +42,10 @@ async def main() -> int:
         description="Calibrate arm joint limits interactively.",
     )
     parser.add_argument(
-        "--port", type=str, default="auto", help="Serial port for the ESP32",
+        "--port",
+        type=str,
+        default="auto",
+        help="Serial port for the ESP32",
     )
     parser.add_argument(
         "--output",
@@ -103,8 +107,7 @@ async def main() -> int:
     print("\n=== Calibration Instructions ===")
     print(f"For each of the {dof} joints, you will step the arm to its safe MIN and MAX limits.")
     print(
-        "Controls: 'w' (increase), 's' (decrease), "
-        "'d' (done with current limit), 'q' (quit/estop)",
+        "Controls: 'w' (increase), 's' (decrease), 'd' (done with current limit), 'q' (quit/estop)",
     )
 
     try:
@@ -116,11 +119,11 @@ async def main() -> int:
 
                 while True:
                     cmd = input(f"J{joint_idx} {bound} [w/s/d/q]: ").strip().lower()
-                    if cmd == 'q':
+                    if cmd == "q":
                         print("Emergency Stop!")
                         await driver.emergency_stop()
                         return 1
-                    elif cmd == 'd':
+                    elif cmd == "d":
                         # Record the value
                         if bound == "MIN":
                             min_val = current_pos[joint_idx]
@@ -133,9 +136,9 @@ async def main() -> int:
                                 ),
                             )
                         break
-                    elif cmd == 'w':
+                    elif cmd == "w":
                         current_pos[joint_idx] += args.step_rad
-                    elif cmd == 's':
+                    elif cmd == "s":
                         current_pos[joint_idx] -= args.step_rad
                     else:
                         print("Invalid command.")
@@ -144,15 +147,16 @@ async def main() -> int:
                     print(f"Moving Joint {joint_idx} to {current_pos[joint_idx]:.3f} rad...")
                     try:
                         await driver.send_joint_positions(
-                            tuple(current_pos), duration_s=_STEP_DURATION_S,
+                            tuple(current_pos),
+                            duration_s=_STEP_DURATION_S,
                         )
                         await asyncio.sleep(_STEP_SETTLE_S)
                     except Exception as e:
                         print(f"Command rejected (firmware limit?): {e}")
                         # Revert the increment
-                        if cmd == 'w':
+                        if cmd == "w":
                             current_pos[joint_idx] -= args.step_rad
-                        if cmd == 's':
+                        if cmd == "s":
                             current_pos[joint_idx] += args.step_rad
     finally:
         print("\nReturning to home position before exit...")
@@ -185,6 +189,7 @@ async def main() -> int:
     print("To use this overlay, run: python -m armdroid --config config/calibrated_limits.yaml ...")
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(asyncio.run(main()))

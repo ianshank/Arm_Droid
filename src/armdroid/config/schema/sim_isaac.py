@@ -305,8 +305,7 @@ class ArmSimIsaacConfig(BaseModel):
         ge=0.0,
         le=100.0,
         description=(
-            "Percentage of uniform noise to apply to PD stiffness gains. "
-            "e.g., 10.0 for ±10%."
+            "Percentage of uniform noise to apply to PD stiffness gains. e.g., 10.0 for ±10%."
         ),
     )
     damping_noise_pct: float = Field(
@@ -314,8 +313,7 @@ class ArmSimIsaacConfig(BaseModel):
         ge=0.0,
         le=100.0,
         description=(
-            "Percentage of uniform noise to apply to PD damping gains. "
-            "e.g., 10.0 for ±10%."
+            "Percentage of uniform noise to apply to PD damping gains. e.g., 10.0 for ±10%."
         ),
     )
 
@@ -324,17 +322,11 @@ class ArmSimIsaacConfig(BaseModel):
         """Validate that randomization range tuples have min <= max."""
         lo, hi = self.friction_range_sim
         if lo > hi:
-            msg = (
-                f"friction_range_sim min ({lo}) > max ({hi}); "
-                "swap values or widen the range"
-            )
+            msg = f"friction_range_sim min ({lo}) > max ({hi}); swap values or widen the range"
             raise ValueError(msg)
         lo, hi = self.mass_scale_range
         if lo > hi:
-            msg = (
-                f"mass_scale_range min ({lo}) > max ({hi}); "
-                "swap values or widen the range"
-            )
+            msg = f"mass_scale_range min ({lo}) > max ({hi}); swap values or widen the range"
             raise ValueError(msg)
         return self
 

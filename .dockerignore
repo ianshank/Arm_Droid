@@ -1,0 +1,40 @@
+# ---- Build artifacts ----
+.git
+.github
+.venv
+.venv-1
+.venv311
+__pycache__
+*.pyc
+*.pyo
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.hypothesis
+.benchmarks
+.coverage
+htmlcov
+dist
+build
+*.egg-info
+coverage_output.txt
+
+# ---- IDE / editor ----
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# ---- Dev-only files ----
+.pre-commit-config.yaml
+.claude
+.secrets
+armdroid_isaac_bundle.zip
+
+# ---- Docs & CI (not needed in runtime image) ----
+docs/
+.github/
+
+# ---- Test fixtures (not needed in runtime image) ----
+tests/

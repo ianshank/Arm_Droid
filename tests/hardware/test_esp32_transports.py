@@ -29,6 +29,7 @@ def transport_settings(request: pytest.FixtureRequest, hil_settings: ArmSettings
     patched_arm = base.arm.model_copy(update={"transport": patched_transport})
     return base.model_copy(update={"arm": patched_arm})
 
+
 @pytest.fixture
 async def transport_driver(
     transport_settings: ArmSettings,

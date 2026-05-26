@@ -1,0 +1,83 @@
+# =============================================================================
+# Armdroid — Docker Compose for NVIDIA Jetson deployment
+#
+# Usage:
+#   docker compose -f docker-compose.jetson.yml up --build
+#
+# Prerequisites:
+#   - NVIDIA Container Toolkit installed (nvidia-ctk)
+#   - ESP32 connected via USB (/dev/ttyUSB0)
+#   - ARMDROID_HMAC_KEY set in environment or .secrets/.env
+#
+# Configuration:
+#   - Mount your YAML overlay at ./config/
+#   - Mount secrets at ./.secrets/ (gitignored)
+#   - Adjust device paths for your hardware
+# =============================================================================
+
+services:
+  armdroid:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # JetPack 6.1 (L4T r36.4.0) — override for your JetPack version
+        L4T_TAG: ${L4T_TAG:-r36.4.0-py3}
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.11}
+        CUDA_ARCH_LIST: ${CUDA_ARCH_LIST:-8.7}
+    image: armdroid:jetson
+    container_name: armdroid-jetson
+    restart: unless-stopped
+
+    # NVIDIA GPU runtime
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    # Environment — secrets via host env or .env file
+    environment:
+      - ARMDROID_HMAC_KEY
+      - ARMDROID_LOG_LEVEL=${ARMDROID_LOG_LEVEL:-INFO}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+    # Config and secrets as read-only volumes
+    volumes:
+      - ./config:/app/config:ro
+      - ./.secrets:/app/.secrets:ro
+      # Persist training checkpoints and calibration output
+      - armdroid-data:/app/data
+
+    # Device passthrough for physical hardware
+    devices:
+      # ESP32 serial — adjust path for your setup
+      - ${ESP32_DEVICE:-/dev/ttyUSB0}:/dev/ttyUSB0
+      # RealSense D435i — uncomment if using depth camera
+      # - /dev/video0:/dev/video0
+      # - /dev/video1:/dev/video1
+
+    # Network: host mode for mDNS discovery (BLE/TCP transports)
+    network_mode: ${NETWORK_MODE:-bridge}
+
+    # Override default CMD for continuous operation
+    command:
+      - "--config"
+      - "/app/config/tower_of_hanoi.yaml"
+      - "--mode"
+      - "run"
+
+    # Logging
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  armdroid-data:
+    driver: local

@@ -96,4 +96,5 @@ class ArmPerceptionConfig(BaseModel):
         description="Mapping from object class name to its 3D geometry keypoints.",
     )
 
+
 __all__ = ["ArmPerceptionConfig", "ObjectGeometryCfg"]
