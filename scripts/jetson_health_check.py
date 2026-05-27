@@ -77,7 +77,17 @@ def _check_serial() -> tuple[bool, str]:
 def _check_realsense() -> tuple[bool, str]:
     """Check RealSense camera connectivity."""
     try:
-        import pyrealsense2 as rs
+        try:
+            import pyrealsense2 as rs_base
+            # Verify both context and camera_info exist in the imported bindings
+            if hasattr(rs_base, "context") and hasattr(rs_base, "camera_info"):
+                rs = rs_base
+            else:
+                import pyrealsense2.pyrealsense2 as rs_sub
+                rs = rs_sub
+        except ImportError:
+            import pyrealsense2.pyrealsense2 as rs_sub
+            rs = rs_sub
 
         ctx = rs.context()
         devices = ctx.query_devices()
