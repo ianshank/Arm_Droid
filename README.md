@@ -35,8 +35,10 @@ extended toward laundry sorting as a transfer task.
 
 ## Architecture overview
 
-Full C4 diagrams live in [docs/architecture/C4.md](docs/architecture/C4.md), and the design
-decisions for the v0.2 refactor live under [docs/architecture/ADR/](docs/architecture/ADR/).
+Full C4 diagrams live in [docs/architecture/C4.md](docs/architecture/C4.md), the hardware
+wiring and construction blueprints live in
+[docs/architecture/WIRING.md](docs/architecture/WIRING.md), and the design decisions for the
+v0.2 refactor live under [docs/architecture/ADR/](docs/architecture/ADR/).
 
 ### Layered application model
 
