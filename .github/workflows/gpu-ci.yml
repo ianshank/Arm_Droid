@@ -39,7 +39,7 @@ jobs:
           && (contains(github.event.pull_request.labels.*.name, 'gpu')
               || github.event.action != 'labeled'))
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Free disk space for the multi-GB isaaclab wheel set
         # isaacsim + isaaclab + CUDA runtime wheels exceed the
