@@ -33,6 +33,14 @@ realsense = [
 anthropic = [
     "anthropic>=0.40",
 ]
+# OpenAI-compatible replanner backend (LLMReplannerConfig.backend =
+# "openai_compat" / "llama"). Drives any chat/completions endpoint --
+# local vLLM/llama.cpp, or hosted gateways (Groq, Together, OpenRouter,
+# ...) -- via a config-supplied base_url. Lazily imported, so the base
+# install never requires it.
+openai = [
+    "openai>=1.0",
+]
 # Gemini Robotics ER 1.6 integration (ADRs 0007-0009). Three extras so
 # operators can opt into perception/replanner/VLA paths without pulling
 # the Live API audio surface, and vice versa. ``google-genai`` is

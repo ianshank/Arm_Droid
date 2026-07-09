@@ -20,15 +20,21 @@ class LLMReplannerConfig(BaseModel):
         False,
         description="Enable LLM-backed replanning",
     )
-    backend: Literal["null", "llama", "anthropic", "gemini"] = Field(
+    backend: Literal["null", "llama", "anthropic", "gemini", "openai_compat"] = Field(
         "null",
-        description="Replanner backend selection",
+        description=(
+            "Replanner backend selection. ``llama`` and ``openai_compat`` "
+            "both select the OpenAI-compatible backend (vLLM, Groq, "
+            "Together, OpenRouter, or any gateway speaking that wire "
+            "shape); ``openai_compat`` is the protocol-accurate alias."
+        ),
     )
     api_endpoint: str = Field(
         "",
         description=(
-            "Optional explicit API endpoint URL. Empty string ('') means "
-            "the backend SDK chooses the default (recommended)."
+            "Optional explicit API endpoint URL (the ``base_url`` for the "
+            "OpenAI-compatible backend). Empty string ('') means the "
+            "backend SDK chooses the default (recommended)."
         ),
     )
     safety_tier: Literal["off", "standard", "strict"] = Field(

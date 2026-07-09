@@ -32,6 +32,11 @@ def test_llm_backend_literal_includes_gemini() -> None:
     assert cfg.backend == "gemini"
 
 
+def test_llm_backend_literal_includes_openai_compat() -> None:
+    cfg = LLMReplannerConfig(backend="openai_compat")
+    assert cfg.backend == "openai_compat"
+
+
 def test_llm_backend_rejects_unknown() -> None:
     with pytest.raises(ValidationError):
         LLMReplannerConfig(backend="grok")  # type: ignore[arg-type]
