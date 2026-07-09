@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   - **Debug logging** for backend selection, code-fence stripping, and
     each backoff sleep, to aid diagnosis of small-model responses and
     rate-limited gateways.
+  - **Docs + hygiene** — `docs/architecture/C4.md` updated so the planner
+    node, `LLMReplannerConfig` fields, and the registry extension-points
+    section reflect the new backends and `armdroid.llm_replanners`
+    entry-point group. Untracked the stale `coverage_output.txt` build
+    artifact (already covered by `.gitignore`).
 - **OpenAI-compatible LLM replanner backend** — landed on
   `claude/apekey-ai-integration-85tq5p`. Fills the previously dead
   `LLMReplannerConfig.backend = "llama"` slot and the ignored
