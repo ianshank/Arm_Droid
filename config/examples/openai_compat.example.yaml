@@ -38,3 +38,8 @@ arm_planning:
     system_prompt: ""
     request_timeout_s: 30.0
     max_retries: 3
+    # Exponential backoff between retries: delay after the Nth failed
+    # attempt is retry_backoff_base_s * 2**N. 0.0 (default) retries
+    # immediately. A small value (e.g. 0.5) is gentler on rate-limited
+    # free-tier gateways.
+    retry_backoff_base_s: 0.5

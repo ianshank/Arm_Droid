@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **LLM replanner extensibility + resilience hardening** — follow-up on
+  `claude/apekey-ai-integration-85tq5p` from a branch gap analysis:
+  - **`armdroid.planning.llm_replanners.registry`** — replaces the
+    ad-hoc factory dict with the shared `Registry` + a new
+    `armdroid.llm_replanners` entry-point group (mirrored in
+    `pyproject.toml` and the `test_entry_point_mirror` regression), so
+    out-of-tree replanner backends plug in exactly like drivers,
+    planners, environments, and RL agents. Exposes
+    `register_llm_replanner` / `get_llm_replanner` /
+    `available_llm_replanners` / `load_llm_replanner_plugins`.
+  - **`LLMReplannerBackend.from_config`** — a uniform construction
+    contract implemented by every backend (`null`, `anthropic`,
+    `openai_compat`), so the registry builds any backend the same way
+    and the factory no longer special-cases constructors.
+  - **Config-driven exponential backoff** — `LLMReplannerConfig` gains
+    `retry_backoff_base_s` (default `0.0`, i.e. disabled/immediate retry
+    for backwards-compat); both backends now sleep
+    `retry_backoff_base_s * 2**attempt` between retries instead of
+    retrying instantly, making the config's documented backoff real. No
+    delay is hardcoded.
+  - **Debug logging** for backend selection, code-fence stripping, and
+    each backoff sleep, to aid diagnosis of small-model responses and
+    rate-limited gateways.
 - **OpenAI-compatible LLM replanner backend** — landed on
   `claude/apekey-ai-integration-85tq5p`. Fills the previously dead
   `LLMReplannerConfig.backend = "llama"` slot and the ignored
