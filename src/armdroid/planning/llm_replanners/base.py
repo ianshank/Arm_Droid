@@ -12,6 +12,7 @@ existing call sites and tests stay stable.
 from __future__ import annotations
 
 import json
+import re
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from armdroid.domain.state import PlanStep
@@ -21,6 +22,27 @@ if TYPE_CHECKING:
     from armdroid.domain.state import SymbolicState
 
 _log = get_logger(__name__)
+
+# Matches a whole markdown code fence, capturing the body: an opening
+# ``` optionally followed by a language tag (``json``), the content, and
+# a closing ```. Small open models frequently wrap JSON in these despite
+# the prompt asking for a bare array, so the parser strips them first.
+_CODE_FENCE_RE = re.compile(r"^```[A-Za-z0-9_]*\n?(?P<body>.*?)\n?```$", re.DOTALL)
+
+
+def _strip_code_fences(text: str) -> str:
+    """Return ``text`` with a surrounding markdown code fence removed.
+
+    Leaves text without a fence untouched. Only a fence that wraps the
+    entire (stripped) string is removed; trailing prose after a closing
+    fence means no match, and the raw text is returned for the parser to
+    reject in the usual way.
+    """
+    stripped = text.strip()
+    match = _CODE_FENCE_RE.match(stripped)
+    if match is None:
+        return stripped
+    return match.group("body").strip()
 
 
 @runtime_checkable
@@ -71,17 +93,19 @@ def build_replan_prompt(
 def parse_plan_steps(text: str) -> list[PlanStep]:
     """Parse an LLM response into a list of :class:`PlanStep`.
 
-    Tolerant by design: empty text, non-JSON text, a non-list top level,
-    or malformed entries all resolve to a (possibly partial) list without
-    raising. An empty result signals the outer replanner to fall back to
-    symbolic planning, so a bad response degrades safely.
+    Tolerant by design: empty text, a markdown-fenced payload, non-JSON
+    text, a non-list top level, or malformed entries all resolve to a
+    (possibly partial) list without raising. An empty result signals the
+    outer replanner to fall back to symbolic planning, so a bad response
+    degrades safely.
     """
-    if not text:
+    cleaned = _strip_code_fences(text)
+    if not cleaned:
         return []
     try:
-        raw = json.loads(text)
+        raw = json.loads(cleaned)
     except json.JSONDecodeError:
-        _log.warning("llm_replan_non_json_response", preview=text[:120])
+        _log.warning("llm_replan_non_json_response", preview=cleaned[:120])
         return []
     if not isinstance(raw, list):
         _log.warning("llm_replan_non_list_response")

@@ -78,16 +78,27 @@ class OpenAICompatReplanner:
                 raises :class:`OpenAICompatSDKMissingError` if unavailable.
         """
         self._cfg = cfg
-        self._sdk = sdk if sdk is not None else self._import_sdk()
-        self._client = self._build_client(cfg, self._sdk)
+        self._sdk: Any = sdk
+        self._client: Any = None
         self._async_client_cache: Any | None = None
-        _log.info(
-            "openai_compat_replanner_initialised",
-            model=cfg.model,
-            max_tokens=cfg.max_tokens,
-            timeout_s=cfg.request_timeout_s,
-            base_url=cfg.api_endpoint or "<sdk-default>",
-        )
+        # Only import the optional ``openai`` SDK and build the client when
+        # the backend is actually enabled. A configured-but-disabled backend
+        # (e.g. ``backend: openai_compat`` with ``enabled: false``) must not
+        # fail to construct just because the extra is not installed; fail-fast
+        # is reserved for the enabled path where the SDK is genuinely needed.
+        if cfg.enabled:
+            if self._sdk is None:
+                self._sdk = self._import_sdk()
+            self._client = self._build_client(cfg, self._sdk)
+            _log.info(
+                "openai_compat_replanner_initialised",
+                model=cfg.model,
+                max_tokens=cfg.max_tokens,
+                timeout_s=cfg.request_timeout_s,
+                base_url=cfg.api_endpoint or "<sdk-default>",
+            )
+        else:
+            _log.debug("openai_compat_replanner_constructed_disabled")
 
     # -------------------------------------------------------- public API
     def replan(

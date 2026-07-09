@@ -7,9 +7,10 @@ declared-but-unimplemented backends (e.g. ``"gemini"``) resolve to
 :class:`NullLLMReplanner` with a warning, so a misconfigured backend
 degrades to symbolic planning rather than raising.
 
-Backends whose SDK is missing still raise on construction (fail-fast on a
-genuine misconfiguration) because the concrete backend's lazy import is
-what surfaces the missing extra.
+A backend whose optional SDK is missing surfaces that as its own
+construction error (the concrete backend's lazy import), so an enabled
+backend fails fast on a genuine misconfiguration. A configured-but-disabled
+backend constructs without the extra installed.
 """
 
 from __future__ import annotations

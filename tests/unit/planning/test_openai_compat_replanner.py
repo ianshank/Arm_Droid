@@ -8,7 +8,10 @@ import pytest
 
 from armdroid.config.schema import LLMReplannerConfig
 from armdroid.domain.state import PlanStep, SymbolicState
-from armdroid.planning.llm_replanners.base import LLMReplannerProtocol
+from armdroid.planning.llm_replanners.base import (
+    LLMReplannerProtocol,
+    parse_plan_steps,
+)
 from armdroid.planning.llm_replanners.openai_compat_backend import (
     OpenAICompatReplanner,
     OpenAICompatSDKMissingError,
@@ -35,6 +38,15 @@ def test_openai_compat_disabled_returns_empty() -> None:
     sdk = fake_openai_sdk('[{"action": "noop", "args": []}]')
     r = OpenAICompatReplanner(cfg, sdk=sdk)
     assert r.replan(_state(), _state(), "fail") == []
+
+
+def test_openai_compat_disabled_without_sdk_does_not_construct_client() -> None:
+    """A configured-but-disabled backend must construct even when the
+    ``openai`` extra is absent -- no SDK import, no client, no crash."""
+    cfg = LLMReplannerConfig(enabled=False, backend="openai_compat")
+    r = OpenAICompatReplanner(cfg)  # no sdk injected; openai not installed
+    assert r._client is None  # type: ignore[attr-defined]
+    assert r.replan(_state(), _state(), "x") == []
 
 
 def test_openai_compat_parses_json_response() -> None:
@@ -64,6 +76,17 @@ def test_openai_compat_non_list_response_returns_empty() -> None:
     sdk = fake_openai_sdk('{"action": "move"}')
     r = OpenAICompatReplanner(cfg, sdk=sdk)
     assert r.replan(_state(), _state(), "x") == []
+
+
+def test_openai_compat_parses_markdown_fenced_response() -> None:
+    """Small open models often wrap JSON in ```json fences despite the
+    prompt; the shared parser strips them before decoding."""
+    cfg = LLMReplannerConfig(enabled=True, backend="openai_compat")
+    sdk = fake_openai_sdk('```json\n[{"action": "move", "args": ["a"]}]\n```')
+    r = OpenAICompatReplanner(cfg, sdk=sdk)
+    steps = r.replan(_state(), _state(), "x")
+    assert len(steps) == 1
+    assert steps[0].action == "move"
 
 
 def test_openai_compat_empty_choices_returns_empty() -> None:
@@ -249,3 +272,37 @@ def test_openai_compat_sdk_missing_raises() -> None:
 
     with pytest.raises(OpenAICompatSDKMissingError):
         _BadReplanner(cfg)
+
+
+# ---------------------------------------------------------------------------
+# Shared parser: markdown code-fence stripping (relevant to small models)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '[{"action": "move", "args": ["a"]}]',  # bare JSON, no fence
+        '```json\n[{"action": "move", "args": ["a"]}]\n```',  # ```json fence
+        '```JSON\n[{"action": "move", "args": ["a"]}]\n```',  # upper-case tag
+        '```\n[{"action": "move", "args": ["a"]}]\n```',  # fence, no tag
+        '```json [{"action": "move", "args": ["a"]}]```',  # single-line fence
+        '  ```json\n[{"action": "move", "args": ["a"]}]\n```  ',  # padded
+    ],
+)
+def test_parse_plan_steps_strips_code_fences(text: str) -> None:
+    steps = parse_plan_steps(text)
+    assert len(steps) == 1
+    assert steps[0].action == "move"
+    assert steps[0].args == ["a"]
+
+
+def test_parse_plan_steps_lone_fence_is_empty() -> None:
+    """A fence with no JSON body yields no steps rather than raising."""
+    assert parse_plan_steps("```json\n```") == []
+
+
+def test_parse_plan_steps_trailing_prose_after_fence_falls_back_to_empty() -> None:
+    """Text with a fence plus trailing prose does not match the whole-string
+    fence, so it is parsed as-is and rejected (empty plan)."""
+    assert parse_plan_steps('```json\n[{"action": "x"}]\n``` and then more') == []
