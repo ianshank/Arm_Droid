@@ -57,9 +57,7 @@ def test_factory_llama_result_is_functional() -> None:
     from armdroid.domain.state import SymbolicState
 
     cfg = LLMReplannerConfig(enabled=True, backend="llama")
-    backend = build_llm_replanner(
-        cfg, sdk=fake_openai_sdk('[{"action": "move", "args": ["a"]}]')
-    )
+    backend = build_llm_replanner(cfg, sdk=fake_openai_sdk('[{"action": "move", "args": ["a"]}]'))
     state = SymbolicState(predicates=frozenset({"p"}), objects={})
     steps = backend.replan(state, state, "boom")
     assert len(steps) == 1
