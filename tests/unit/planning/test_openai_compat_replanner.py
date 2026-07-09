@@ -107,6 +107,67 @@ def test_openai_compat_null_content_returns_empty() -> None:
     assert r._extract_text(resp) == ""  # type: ignore[attr-defined]
 
 
+def _response_with_content(content: object) -> object:
+    """Build a minimal chat-completion response with the given content."""
+    message = type("M", (), {"content": content})()
+    choice = type("C", (), {"message": message})()
+    return type("R", (), {"choices": [choice]})()
+
+
+def test_openai_compat_extract_text_joins_list_dict_parts() -> None:
+    """Some gateways return content as a list of ``{"type","text"}`` dicts."""
+    cfg = LLMReplannerConfig(enabled=True, backend="openai_compat")
+    r = OpenAICompatReplanner(cfg, sdk=fake_openai_sdk("[]"))
+    resp = _response_with_content(
+        [
+            {"type": "text", "text": '[{"action": "move",'},
+            {"type": "text", "text": ' "args": ["a"]}]'},
+            {"type": "image", "url": "http://x"},  # non-text part skipped
+        ]
+    )
+    assert r._extract_text(resp) == '[{"action": "move", "args": ["a"]}]'  # type: ignore[attr-defined]
+
+
+def test_openai_compat_extract_text_joins_list_object_and_str_parts() -> None:
+    """List parts may be objects with ``.text`` or raw strings."""
+    cfg = LLMReplannerConfig(enabled=True, backend="openai_compat")
+    r = OpenAICompatReplanner(cfg, sdk=fake_openai_sdk("[]"))
+    part = type("P", (), {"text": "world"})()
+    assert r._extract_text(_response_with_content(["hello ", part])) == "hello world"  # type: ignore[attr-defined]
+
+
+def test_openai_compat_parses_list_shaped_content_end_to_end() -> None:
+    """A list-shaped content response parses through replan to steps."""
+    cfg = LLMReplannerConfig(enabled=True, backend="openai_compat")
+
+    class _ListContentSdk:
+        class OpenAI:
+            def __init__(self, **kwargs: Any) -> None:
+                self.init_kwargs = kwargs
+                self.chat = type(
+                    "Chat",
+                    (),
+                    {
+                        "completions": type(
+                            "Comp",
+                            (),
+                            {
+                                "create": staticmethod(
+                                    lambda **kw: _response_with_content(
+                                        [{"type": "text", "text": '[{"action": "ok"}]'}]
+                                    )
+                                )
+                            },
+                        )()
+                    },
+                )()
+
+    r = OpenAICompatReplanner(cfg, sdk=_ListContentSdk())
+    steps = r.replan(_state(), _state(), "x")
+    assert len(steps) == 1
+    assert steps[0].action == "ok"
+
+
 def test_openai_compat_retries_on_exception() -> None:
     cfg = LLMReplannerConfig(enabled=True, backend="openai_compat", max_retries=2)
     sdk = fake_openai_sdk('[{"action": "ok", "args": []}]')
@@ -213,6 +274,27 @@ async def test_openai_compat_areplan_uses_async_client() -> None:
     async_client = r._async_client_cache
     assert async_client is not None
     assert len(async_client.chat.completions.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_openai_compat_areplan_plumbs_config_and_base_url() -> None:
+    """The async path reuses the same client kwargs + message builder."""
+    cfg = LLMReplannerConfig(
+        enabled=True,
+        backend="openai_compat",
+        model="llama-3.1-8b-instant",
+        system_prompt="You are a robot.",
+        api_endpoint="https://gateway.example/v1",
+    )
+    sdk = fake_openai_sdk("[]", with_async=True)
+    r = OpenAICompatReplanner(cfg, sdk=sdk)
+    await r.areplan(_state(), _state(), "fail")
+    async_client = r._async_client_cache
+    assert async_client.init_kwargs["base_url"] == "https://gateway.example/v1"
+    call = async_client.chat.completions.calls[0]
+    assert call["model"] == "llama-3.1-8b-instant"
+    assert call["messages"][0] == {"role": "system", "content": "You are a robot."}
+    assert call["messages"][1]["role"] == "user"
 
 
 @pytest.mark.asyncio

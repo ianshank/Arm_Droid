@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 
@@ -9,8 +10,6 @@ import pytest
 
 from armdroid.config.schema import LLMReplannerConfig
 from armdroid.domain.state import SymbolicState
-from armdroid.planning.llm_replanners import anthropic_backend as anb
-from armdroid.planning.llm_replanners import openai_compat_backend as ocb
 from armdroid.planning.llm_replanners.anthropic_backend import AnthropicReplanner
 from armdroid.planning.llm_replanners.base import backoff_delay_s
 from armdroid.planning.llm_replanners.openai_compat_backend import (
@@ -130,7 +129,7 @@ async def test_async_backoff_awaits_sleep(monkeypatch: pytest.MonkeyPatch) -> No
     async def fake_sleep(s: float) -> None:
         slept.append(s)
 
-    monkeypatch.setattr(ocb.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
 
     cfg = LLMReplannerConfig(
         enabled=True,
@@ -196,7 +195,7 @@ async def test_anthropic_async_backoff_awaits_sleep(
     async def fake_sleep(s: float) -> None:
         slept.append(s)
 
-    monkeypatch.setattr(anb.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
 
     cfg = LLMReplannerConfig(
         enabled=True,

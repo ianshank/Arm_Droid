@@ -29,16 +29,14 @@ Two surfaces are exposed, mirroring :class:`AnthropicReplanner`:
 
 from __future__ import annotations
 
-import asyncio
 import os
-import time
 from typing import TYPE_CHECKING, Any
 
 from armdroid.logging.setup import get_logger
 from armdroid.planning.llm_replanners.base import (
-    backoff_delay_s,
+    arun_replan_with_retries,
     build_replan_prompt,
-    parse_plan_steps,
+    run_replan_with_retries,
 )
 
 if TYPE_CHECKING:
@@ -129,44 +127,23 @@ class OpenAICompatReplanner:
             _log.debug("openai_compat_replanner_disabled")
             return []
         messages = self._build_messages(current_state, goal_state, error)
-        last_exc: BaseException | None = None
-        for attempt in range(self._cfg.max_retries + 1):
-            start = time.monotonic()
-            try:
-                response = self._client.chat.completions.create(
-                    model=self._cfg.model,
-                    max_tokens=self._cfg.max_tokens,
-                    temperature=self._cfg.temperature,
-                    messages=messages,
-                    timeout=self._cfg.request_timeout_s,
-                )
-            except Exception as exc:  # pylint: disable=broad-except
-                last_exc = exc
-                _log.warning(
-                    "openai_compat_replanner_request_failed",
-                    attempt=attempt,
-                    error=str(exc),
-                )
-                delay = backoff_delay_s(attempt, self._cfg.retry_backoff_base_s)
-                if delay > 0.0 and attempt < self._cfg.max_retries:
-                    _log.debug("openai_compat_replanner_backoff", delay_s=delay)
-                    time.sleep(delay)
-                continue
-            latency_ms = (time.monotonic() - start) * 1000.0
-            text = self._extract_text(response)
-            steps = parse_plan_steps(text)
-            _log.info(
-                "openai_compat_replanner_response",
-                latency_ms=latency_ms,
-                step_count=len(steps),
+
+        def _request() -> str:
+            response = self._client.chat.completions.create(
+                model=self._cfg.model,
+                max_tokens=self._cfg.max_tokens,
+                temperature=self._cfg.temperature,
+                messages=messages,
+                timeout=self._cfg.request_timeout_s,
             )
-            return steps
-        _log.error(
-            "openai_compat_replanner_exhausted",
-            attempts=self._cfg.max_retries + 1,
-            error=str(last_exc) if last_exc else "unknown",
+            return self._extract_text(response)
+
+        return run_replan_with_retries(
+            _request,
+            cfg=self._cfg,
+            log=_log,
+            event_prefix="openai_compat_replanner",
         )
-        return []
 
     async def areplan(
         self,
@@ -185,44 +162,23 @@ class OpenAICompatReplanner:
             return []
         client = self._async_client()
         messages = self._build_messages(current_state, goal_state, error)
-        last_exc: BaseException | None = None
-        for attempt in range(self._cfg.max_retries + 1):
-            start = time.monotonic()
-            try:
-                response = await client.chat.completions.create(
-                    model=self._cfg.model,
-                    max_tokens=self._cfg.max_tokens,
-                    temperature=self._cfg.temperature,
-                    messages=messages,
-                    timeout=self._cfg.request_timeout_s,
-                )
-            except Exception as exc:  # pylint: disable=broad-except
-                last_exc = exc
-                _log.warning(
-                    "openai_compat_replanner_async_request_failed",
-                    attempt=attempt,
-                    error=str(exc),
-                )
-                delay = backoff_delay_s(attempt, self._cfg.retry_backoff_base_s)
-                if delay > 0.0 and attempt < self._cfg.max_retries:
-                    _log.debug("openai_compat_replanner_async_backoff", delay_s=delay)
-                    await asyncio.sleep(delay)
-                continue
-            latency_ms = (time.monotonic() - start) * 1000.0
-            text = self._extract_text(response)
-            steps = parse_plan_steps(text)
-            _log.info(
-                "openai_compat_replanner_async_response",
-                latency_ms=latency_ms,
-                step_count=len(steps),
+
+        async def _request() -> str:
+            response = await client.chat.completions.create(
+                model=self._cfg.model,
+                max_tokens=self._cfg.max_tokens,
+                temperature=self._cfg.temperature,
+                messages=messages,
+                timeout=self._cfg.request_timeout_s,
             )
-            return steps
-        _log.error(
-            "openai_compat_replanner_async_exhausted",
-            attempts=self._cfg.max_retries + 1,
-            error=str(last_exc) if last_exc else "unknown",
+            return self._extract_text(response)
+
+        return await arun_replan_with_retries(
+            _request,
+            cfg=self._cfg,
+            log=_log,
+            event_prefix="openai_compat_replanner_async",
         )
-        return []
 
     def _async_client(self) -> Any:
         """Lazily build an ``AsyncOpenAI`` client on first use."""
@@ -295,18 +251,51 @@ class OpenAICompatReplanner:
     def _extract_text(self, response: Any) -> str:
         """Pull the assistant text from an OpenAI chat completion response.
 
-        Reads ``choices[0].message.content``, tolerating a missing or
-        ``None`` content field (returns an empty string, which
-        :func:`parse_plan_steps` turns into an empty plan).
+        Reads ``choices[0].message.content``. ``content`` is usually a
+        plain string, but some OpenAI-compatible gateways return it as a
+        list of content parts (``{"type": "text", "text": ...}`` dicts or
+        objects with a ``.text`` attribute); both shapes are handled. A
+        missing/empty ``choices`` or a content shape that yields no text
+        returns an empty string (which :func:`parse_plan_steps` turns into
+        an empty plan) and emits a debug log so an operator can tell "the
+        model answered in an unexpected shape" apart from "the model
+        genuinely returned an empty plan".
         """
         choices = getattr(response, "choices", None) or []
         if not choices:
+            _log.debug("openai_compat_replanner_no_choices")
             return ""
         message = getattr(choices[0], "message", None)
         content = getattr(message, "content", None)
         if isinstance(content, str):
             return content.strip()
+        if isinstance(content, list):
+            text = self._join_content_parts(content)
+            if text:
+                return text
+        _log.debug(
+            "openai_compat_replanner_nonstr_content",
+            content_type=type(content).__name__,
+        )
         return ""
+
+    @staticmethod
+    def _join_content_parts(parts: list[Any]) -> str:
+        """Concatenate the text of a list-shaped ``message.content``.
+
+        Each part may be a raw string, a ``{"type": "text", "text": ...}``
+        dict, or an object exposing a ``.text`` attribute. Non-text parts
+        (e.g. images) are skipped.
+        """
+        chunks: list[str] = []
+        for part in parts:
+            if isinstance(part, str):
+                chunks.append(part)
+                continue
+            text = part.get("text") if isinstance(part, dict) else getattr(part, "text", None)
+            if isinstance(text, str):
+                chunks.append(text)
+        return "".join(chunks).strip()
 
 
 __all__ = ["OpenAICompatReplanner", "OpenAICompatSDKMissingError"]

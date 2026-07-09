@@ -27,16 +27,15 @@ bridges, sub-agents) can opt into the non-blocking variant.
 
 from __future__ import annotations
 
-import asyncio
 import os
-import time
 from typing import TYPE_CHECKING, Any
 
 from armdroid.logging.setup import get_logger
 from armdroid.planning.llm_replanners.base import (
-    backoff_delay_s,
+    arun_replan_with_retries,
     build_replan_prompt,
     parse_plan_steps,
+    run_replan_with_retries,
 )
 
 if TYPE_CHECKING:
@@ -114,45 +113,24 @@ class AnthropicReplanner:
             _log.debug("anthropic_replanner_disabled")
             return []
         prompt = self._build_user_prompt(current_state, goal_state, error)
-        last_exc: BaseException | None = None
-        for attempt in range(self._cfg.max_retries + 1):
-            start = time.monotonic()
-            try:
-                response = self._client.messages.create(
-                    model=self._cfg.model,
-                    max_tokens=self._cfg.max_tokens,
-                    temperature=self._cfg.temperature,
-                    system=self._cfg.system_prompt,
-                    messages=[{"role": "user", "content": prompt}],
-                    timeout=self._cfg.request_timeout_s,
-                )
-            except Exception as exc:  # pylint: disable=broad-except
-                last_exc = exc
-                _log.warning(
-                    "anthropic_replanner_request_failed",
-                    attempt=attempt,
-                    error=str(exc),
-                )
-                delay = backoff_delay_s(attempt, self._cfg.retry_backoff_base_s)
-                if delay > 0.0 and attempt < self._cfg.max_retries:
-                    _log.debug("anthropic_replanner_backoff", delay_s=delay)
-                    time.sleep(delay)
-                continue
-            latency_ms = (time.monotonic() - start) * 1000.0
-            text = self._extract_text(response)
-            steps = self._parse_steps(text)
-            _log.info(
-                "anthropic_replanner_response",
-                latency_ms=latency_ms,
-                step_count=len(steps),
+
+        def _request() -> str:
+            response = self._client.messages.create(
+                model=self._cfg.model,
+                max_tokens=self._cfg.max_tokens,
+                temperature=self._cfg.temperature,
+                system=self._cfg.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+                timeout=self._cfg.request_timeout_s,
             )
-            return steps
-        _log.error(
-            "anthropic_replanner_exhausted",
-            attempts=self._cfg.max_retries + 1,
-            error=str(last_exc) if last_exc else "unknown",
+            return self._extract_text(response)
+
+        return run_replan_with_retries(
+            _request,
+            cfg=self._cfg,
+            log=_log,
+            event_prefix="anthropic_replanner",
         )
-        return []
 
     async def areplan(
         self,
@@ -173,45 +151,24 @@ class AnthropicReplanner:
             return []
         client = self._async_client()
         prompt = self._build_user_prompt(current_state, goal_state, error)
-        last_exc: BaseException | None = None
-        for attempt in range(self._cfg.max_retries + 1):
-            start = time.monotonic()
-            try:
-                response = await client.messages.create(
-                    model=self._cfg.model,
-                    max_tokens=self._cfg.max_tokens,
-                    temperature=self._cfg.temperature,
-                    system=self._cfg.system_prompt,
-                    messages=[{"role": "user", "content": prompt}],
-                    timeout=self._cfg.request_timeout_s,
-                )
-            except Exception as exc:  # pylint: disable=broad-except
-                last_exc = exc
-                _log.warning(
-                    "anthropic_replanner_async_request_failed",
-                    attempt=attempt,
-                    error=str(exc),
-                )
-                delay = backoff_delay_s(attempt, self._cfg.retry_backoff_base_s)
-                if delay > 0.0 and attempt < self._cfg.max_retries:
-                    _log.debug("anthropic_replanner_async_backoff", delay_s=delay)
-                    await asyncio.sleep(delay)
-                continue
-            latency_ms = (time.monotonic() - start) * 1000.0
-            text = self._extract_text(response)
-            steps = self._parse_steps(text)
-            _log.info(
-                "anthropic_replanner_async_response",
-                latency_ms=latency_ms,
-                step_count=len(steps),
+
+        async def _request() -> str:
+            response = await client.messages.create(
+                model=self._cfg.model,
+                max_tokens=self._cfg.max_tokens,
+                temperature=self._cfg.temperature,
+                system=self._cfg.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+                timeout=self._cfg.request_timeout_s,
             )
-            return steps
-        _log.error(
-            "anthropic_replanner_async_exhausted",
-            attempts=self._cfg.max_retries + 1,
-            error=str(last_exc) if last_exc else "unknown",
+            return self._extract_text(response)
+
+        return await arun_replan_with_retries(
+            _request,
+            cfg=self._cfg,
+            log=_log,
+            event_prefix="anthropic_replanner_async",
         )
-        return []
 
     def _async_client(self) -> Any:
         """Lazily build an ``AsyncAnthropic`` client on first use."""

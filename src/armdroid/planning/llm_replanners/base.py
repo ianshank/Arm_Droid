@@ -11,14 +11,18 @@ existing call sites and tests stay stable.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
+import time
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from armdroid.domain.state import PlanStep
 from armdroid.logging.setup import get_logger
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from armdroid.config.schema import LLMReplannerConfig
     from armdroid.domain.state import SymbolicState
 
@@ -61,6 +65,90 @@ def backoff_delay_s(attempt: int, base_s: float) -> float:
     if base_s <= 0.0 or attempt < 0:
         return 0.0
     return base_s * (2.0**attempt)
+
+
+def run_replan_with_retries(
+    request: Callable[[], str],
+    *,
+    cfg: LLMReplannerConfig,
+    log: Any,
+    event_prefix: str,
+) -> list[PlanStep]:
+    """Drive a synchronous replan request with retries + config backoff.
+
+    Provider-neutral retry loop shared by every sync backend. ``request``
+    is a zero-arg thunk that performs the provider call and returns the
+    assistant text; this function owns the retry count, exponential
+    backoff (:func:`backoff_delay_s`, config-driven, never on the final
+    attempt), :func:`parse_plan_steps`, and structured logging. ``log``
+    is the caller's bound logger so events keep the backend's namespace;
+    ``event_prefix`` names the structured events (e.g.
+    ``"anthropic_replanner"`` -> ``"anthropic_replanner_response"``). An
+    exhausted or failing request yields ``[]`` so the outer replanner
+    falls back to symbolic planning.
+    """
+    last_exc: BaseException | None = None
+    for attempt in range(cfg.max_retries + 1):
+        start = time.monotonic()
+        try:
+            text = request()
+        except Exception as exc:  # broad by design: any provider error retries/falls back
+            last_exc = exc
+            log.warning(f"{event_prefix}_request_failed", attempt=attempt, error=str(exc))
+            delay = backoff_delay_s(attempt, cfg.retry_backoff_base_s)
+            if delay > 0.0 and attempt < cfg.max_retries:
+                log.debug(f"{event_prefix}_backoff", delay_s=delay)
+                time.sleep(delay)
+            continue
+        latency_ms = (time.monotonic() - start) * 1000.0
+        steps = parse_plan_steps(text)
+        log.info(f"{event_prefix}_response", latency_ms=latency_ms, step_count=len(steps))
+        return steps
+    log.error(
+        f"{event_prefix}_exhausted",
+        attempts=cfg.max_retries + 1,
+        error=str(last_exc) if last_exc else "unknown",
+    )
+    return []
+
+
+async def arun_replan_with_retries(
+    request: Callable[[], Awaitable[str]],
+    *,
+    cfg: LLMReplannerConfig,
+    log: Any,
+    event_prefix: str,
+) -> list[PlanStep]:
+    """Async-native counterpart of :func:`run_replan_with_retries`.
+
+    Identical retry/backoff/parse/logging semantics, but ``request`` is
+    awaited and the backoff uses :func:`asyncio.sleep` so the event loop
+    is never blocked. Kept as a separate driver because sync and async
+    control flow cannot be unified without blocking one or the other.
+    """
+    last_exc: BaseException | None = None
+    for attempt in range(cfg.max_retries + 1):
+        start = time.monotonic()
+        try:
+            text = await request()
+        except Exception as exc:  # broad by design: any provider error retries/falls back
+            last_exc = exc
+            log.warning(f"{event_prefix}_request_failed", attempt=attempt, error=str(exc))
+            delay = backoff_delay_s(attempt, cfg.retry_backoff_base_s)
+            if delay > 0.0 and attempt < cfg.max_retries:
+                log.debug(f"{event_prefix}_backoff", delay_s=delay)
+                await asyncio.sleep(delay)
+            continue
+        latency_ms = (time.monotonic() - start) * 1000.0
+        steps = parse_plan_steps(text)
+        log.info(f"{event_prefix}_response", latency_ms=latency_ms, step_count=len(steps))
+        return steps
+    log.error(
+        f"{event_prefix}_exhausted",
+        attempts=cfg.max_retries + 1,
+        error=str(last_exc) if last_exc else "unknown",
+    )
+    return []
 
 
 @runtime_checkable
@@ -164,7 +252,9 @@ def parse_plan_steps(text: str) -> list[PlanStep]:
 __all__ = [
     "LLMReplannerBackend",
     "LLMReplannerProtocol",
+    "arun_replan_with_retries",
     "backoff_delay_s",
     "build_replan_prompt",
     "parse_plan_steps",
+    "run_replan_with_retries",
 ]
