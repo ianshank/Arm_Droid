@@ -1,0 +1,40 @@
+# openai_compat.example.yaml - Route the LLM replanner through any
+# OpenAI-compatible chat/completions endpoint. The same backend drives a
+# local vLLM / llama.cpp server, a hosted gateway, or providers such as
+# Groq, Together, or OpenRouter -- the target is chosen entirely by
+# ``api_endpoint`` (the base URL) and ``api_key_env_var``, so no provider
+# is baked into the source tree.
+#
+# Copy this file, set ``enabled: true``, point ``api_endpoint`` at your
+# host, and reference with:
+#
+#   python -m armdroid --config path/to/openai_compat.yaml
+#
+# Required extra:
+#   pip install -e ".[openai]"    # installs the ``openai`` SDK
+#
+# The replanner only fires on a symbolic execution failure and falls back
+# to the symbolic planner whenever the model returns no usable plan, so a
+# cheaper/smaller model degrades safely rather than blocking the arm.
+
+arm_planning:
+  llm_replanner_enabled: false    # legacy flag, kept for backwards-compat
+  llm_replanner:
+    enabled: true                 # turn the LLM replan path on
+    backend: openai_compat        # alias of ``llama``; both select this backend
+    model: "llama-3.1-8b-instant" # any model the endpoint serves
+
+    # --- Endpoint selection (pick ONE base_url; keep the key env var in sync) ---
+    # Local vLLM / llama.cpp:  http://localhost:8000/v1   (any dummy key)
+    # Groq:                    https://api.groq.com/openai/v1   + GROQ_API_KEY
+    # Together:                https://api.together.xyz/v1      + TOGETHER_API_KEY
+    # OpenRouter:              https://openrouter.ai/api/v1     + OPENROUTER_API_KEY
+    # apekey.ai gateway:       https://api.apekey.ai/v1         + APEKEY_API_KEY
+    api_endpoint: "http://localhost:8000/v1"
+    api_key_env_var: OPENAI_API_KEY   # env var holding the endpoint's API key
+
+    max_tokens: 1024
+    temperature: 0.0
+    system_prompt: ""
+    request_timeout_s: 30.0
+    max_retries: 3

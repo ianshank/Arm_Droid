@@ -35,14 +35,17 @@ routing, deformable manipulation.
 
 ## Axis 3 — Multi-planner (Foundation)
 
-Current: pyperplan symbolic planner + LLM replanner stub (Anthropic).
+Current: pyperplan symbolic planner + LLM replanners (`anthropic`, and
+`openai_compat`/`llama` for any OpenAI-compatible endpoint -- local vLLM,
+Groq, Together, OpenRouter, or a gateway -- selected via a config-supplied
+`base_url`).
 
 Foundation seam: `armdroid.planning.registry` + entry-point group
 `armdroid.planners` and `armdroid.planning.backends.llm.base.ReplannerBackend`
 protocol.
 
-Future backends (Planned): `fast-downward`, `pddlstream`, OpenAI replanner,
-local LLM replanner, hybrid task-and-motion planner.
+Future backends (Planned): `fast-downward`, `pddlstream`, `gemini`
+replanner, hybrid task-and-motion planner.
 
 ## Axis 4 — Multi-sim (Foundation; PR-A scaffolding + PR-B Isaac runtime both shipped)
 

@@ -11,6 +11,37 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **OpenAI-compatible LLM replanner backend** — landed on
+  `claude/apekey-ai-integration-85tq5p`. Fills the previously dead
+  `LLMReplannerConfig.backend = "llama"` slot and the ignored
+  `api_endpoint` field with a working backend, and adds an explicit
+  `"openai_compat"` alias. Touches:
+  - **`armdroid.planning.llm_replanners.openai_compat_backend`** — new
+    `OpenAICompatReplanner` (sync `replan` + async `areplan`) speaking
+    the OpenAI `chat/completions` wire shape. Drives any compatible
+    endpoint (local vLLM/llama.cpp, Groq, Together, OpenRouter, or a
+    gateway) via a config-supplied `base_url` — no provider name is
+    hardcoded. The `openai` SDK is a new optional extra
+    (`pip install -e ".[openai]"`), lazily imported so the base install
+    is unaffected.
+  - **`armdroid.planning.llm_replanners.base`** — extracted the
+    provider-neutral `build_replan_prompt` and `parse_plan_steps`
+    helpers so the Anthropic and OpenAI-compatible backends share one
+    prompt + parse path. `AnthropicReplanner` keeps its private wrappers
+    delegating to these (no behavioural change to existing call sites).
+  - **`armdroid.planning.llm_replanners.factory`** — new
+    `build_llm_replanner(cfg)` maps `cfg.backend` to a concrete backend
+    via a builder mapping (no `if backend == ...` ladder). `"llama"` and
+    `"openai_compat"` select the OpenAI-compatible backend; unmapped or
+    declared-but-unimplemented backends (`"gemini"`) fall back to
+    `NullLLMReplanner` with a warning, so a misconfigured backend
+    degrades to symbolic planning rather than raising.
+  - **`armdroid.config.schema.llm`** — `LLMReplannerConfig.backend`
+    literal widened with `"openai_compat"`; `api_endpoint` docstring
+    clarified as the OpenAI-compatible `base_url`.
+  - **`config/examples/openai_compat.example.yaml`** — documents the
+    wiring with copy-paste `base_url`/key-env-var pairs for vLLM, Groq,
+    Together, OpenRouter, and gateways.
 - **Gemini ER 1.6 foundation scaffolding (Phase A)** — landed on
   `claude/gemini-robotics-embodied-reasoning-KrlEw`. Lays the slots
   that subsequent phases (B perception, C planning, D VLA, E live, F
