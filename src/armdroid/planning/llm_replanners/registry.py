@@ -5,7 +5,7 @@ Mirrors the other subsystem registries (``armdroid.hardware.registry``,
 import, and out-of-tree backends plug in via the
 ``armdroid.llm_replanners`` entry-point group. The registry stores backend
 *classes* (identity-stable, so entry-point re-registration is idempotent);
-each class implements :class:`LLMReplannerBackend.from_config` so callers
+each class implements :meth:`LLMReplannerBackend.from_config` so callers
 construct any backend uniformly via ``cls.from_config(cfg, sdk=sdk)``.
 
 ``llama`` and ``openai_compat`` are both registered to the

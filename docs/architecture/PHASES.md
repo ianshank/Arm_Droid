@@ -37,8 +37,8 @@ routing, deformable manipulation.
 
 Current: pyperplan symbolic planner + LLM replanners (`anthropic`, and
 `openai_compat`/`llama` for any OpenAI-compatible endpoint -- local vLLM,
-Groq, Together, OpenRouter, or a gateway -- selected via a config-supplied
-`base_url`).
+Groq, Together, OpenRouter, or a gateway -- selected via the config field
+`LLMReplannerConfig.api_endpoint` (passed to the OpenAI SDK as `base_url`)).
 
 Foundation seam: `armdroid.planning.registry` + entry-point group
 `armdroid.planners` and `armdroid.planning.backends.llm.base.ReplannerBackend`

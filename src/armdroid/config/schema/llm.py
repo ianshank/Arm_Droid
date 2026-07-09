@@ -26,7 +26,10 @@ class LLMReplannerConfig(BaseModel):
             "Replanner backend selection. ``llama`` and ``openai_compat`` "
             "both select the OpenAI-compatible backend (vLLM, Groq, "
             "Together, OpenRouter, or any gateway speaking that wire "
-            "shape); ``openai_compat`` is the protocol-accurate alias."
+            "shape); ``openai_compat`` is the protocol-accurate alias. For "
+            "the OpenAI-compatible backends, set ``api_endpoint`` (the "
+            "base URL) and ``api_key_env_var`` (whose default is "
+            "Anthropic-specific) accordingly."
         ),
     )
     api_endpoint: str = Field(
@@ -73,7 +76,13 @@ class LLMReplannerConfig(BaseModel):
     )
     api_key_env_var: str = Field(
         "ANTHROPIC_API_KEY",
-        description="Env var holding the API key (Anthropic backend only)",
+        description=(
+            "Name of the env var holding the API key. Read by both the "
+            "``anthropic`` and OpenAI-compatible (``llama`` / "
+            "``openai_compat``) backends. The default is Anthropic-specific, "
+            "so override it when using an OpenAI-compatible backend (e.g. "
+            "``OPENAI_API_KEY`` / ``GROQ_API_KEY`` / ``APEKEY_API_KEY``)."
+        ),
     )
     request_timeout_s: float = Field(
         30.0,

@@ -34,11 +34,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   - **Debug logging** for backend selection, code-fence stripping, and
     each backoff sleep, to aid diagnosis of small-model responses and
     rate-limited gateways.
-  - **Docs + hygiene** — `docs/architecture/C4.md` updated so the planner
-    node, `LLMReplannerConfig` fields, and the registry extension-points
-    section reflect the new backends and `armdroid.llm_replanners`
-    entry-point group. Untracked the stale `coverage_output.txt` build
-    artifact (already covered by `.gitignore`).
+  - **Shared retry drivers** — the four near-identical sync/async retry
+    loops in the Anthropic and OpenAI-compatible backends are unified
+    behind `run_replan_with_retries` / `arun_replan_with_retries` in
+    `base.py` (config backoff + parse + structured logging in one place);
+    backends now only supply their provider-specific request thunk. The
+    OpenAI-compatible `_extract_text` also handles list-shaped
+    `message.content` (content parts) that some gateways return.
+  - **Docs + hygiene** — `docs/architecture/C4.md`, `PHASES.md`, and
+    `README.md` updated for the new backends, the `[openai]` extra, and
+    the `armdroid.llm_replanners` entry-point group; `LLMReplannerConfig`
+    field docs clarify that `api_endpoint`/`api_key_env_var` apply to the
+    OpenAI-compatible backends (whose key-env default is Anthropic-specific).
+    Untracked the stale `coverage_output.txt` build artifact (already
+    covered by `.gitignore`).
+  - **Note (observability):** the replanner JSON-parse warning event was
+    renamed `anthropic_replanner_non_json_response` ->
+    `llm_replan_non_json_response` (now shared/provider-neutral); update
+    any dashboards keyed on the old event name.
 - **OpenAI-compatible LLM replanner backend** — landed on
   `claude/apekey-ai-integration-85tq5p`. Fills the previously dead
   `LLMReplannerConfig.backend = "llama"` slot and the ignored
