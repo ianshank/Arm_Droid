@@ -27,17 +27,19 @@ bridges, sub-agents) can opt into the non-blocking variant.
 
 from __future__ import annotations
 
-import json
 import os
 import time
 from typing import TYPE_CHECKING, Any
 
-from armdroid.domain.state import PlanStep
 from armdroid.logging.setup import get_logger
+from armdroid.planning.llm_replanners.base import (
+    build_replan_prompt,
+    parse_plan_steps,
+)
 
 if TYPE_CHECKING:
     from armdroid.config.schema import LLMReplannerConfig
-    from armdroid.domain.state import SymbolicState
+    from armdroid.domain.state import PlanStep, SymbolicState
 
 _log = get_logger(__name__)
 
@@ -230,15 +232,7 @@ class AnthropicReplanner:
         goal_state: SymbolicState,
         error: str,
     ) -> str:
-        return (
-            "You are replanning a failed robot arm action.\n\n"
-            f"Current symbolic state predicates: {sorted(current_state.predicates)}\n"
-            f"Goal symbolic state predicates: {sorted(goal_state.predicates)}\n"
-            f"Failure description: {error}\n\n"
-            "Reply with a JSON array of plan steps. Each step is an object "
-            "with keys 'action' (str) and optional 'args' (list[str]). Reply "
-            "with ONLY the JSON array — no surrounding prose."
-        )
+        return build_replan_prompt(current_state, goal_state, error)
 
     def _extract_text(self, response: Any) -> str:
         # The Messages API returns ``content`` as a list of blocks, each
@@ -252,28 +246,7 @@ class AnthropicReplanner:
         return "".join(chunks).strip()
 
     def _parse_steps(self, text: str) -> list[PlanStep]:
-        if not text:
-            return []
-        try:
-            raw = json.loads(text)
-        except json.JSONDecodeError:
-            _log.warning("anthropic_replanner_non_json_response", preview=text[:120])
-            return []
-        if not isinstance(raw, list):
-            _log.warning("anthropic_replanner_non_list_response")
-            return []
-        steps: list[PlanStep] = []
-        for entry in raw:
-            if not isinstance(entry, dict):
-                continue
-            action = entry.get("action")
-            if not isinstance(action, str):
-                continue
-            args = entry.get("args", []) or []
-            if not isinstance(args, list):
-                continue
-            steps.append(PlanStep(action=action, args=[str(a) for a in args]))
-        return steps
+        return parse_plan_steps(text)
 
 
 __all__ = ["AnthropicReplanner", "AnthropicSDKMissingError"]
