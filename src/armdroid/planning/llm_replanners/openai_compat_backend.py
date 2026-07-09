@@ -29,12 +29,14 @@ Two surfaces are exposed, mirroring :class:`AnthropicReplanner`:
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 from typing import TYPE_CHECKING, Any
 
 from armdroid.logging.setup import get_logger
 from armdroid.planning.llm_replanners.base import (
+    backoff_delay_s,
     build_replan_prompt,
     parse_plan_steps,
 )
@@ -61,6 +63,16 @@ class OpenAICompatReplanner:
     """
 
     name = "openai_compat"
+
+    @classmethod
+    def from_config(
+        cls,
+        cfg: LLMReplannerConfig,
+        *,
+        sdk: Any | None = None,
+    ) -> OpenAICompatReplanner:
+        """Construct from config (registry/plugin entry point)."""
+        return cls(cfg, sdk=sdk)
 
     def __init__(
         self,
@@ -135,6 +147,10 @@ class OpenAICompatReplanner:
                     attempt=attempt,
                     error=str(exc),
                 )
+                delay = backoff_delay_s(attempt, self._cfg.retry_backoff_base_s)
+                if delay > 0.0 and attempt < self._cfg.max_retries:
+                    _log.debug("openai_compat_replanner_backoff", delay_s=delay)
+                    time.sleep(delay)
                 continue
             latency_ms = (time.monotonic() - start) * 1000.0
             text = self._extract_text(response)
@@ -187,6 +203,10 @@ class OpenAICompatReplanner:
                     attempt=attempt,
                     error=str(exc),
                 )
+                delay = backoff_delay_s(attempt, self._cfg.retry_backoff_base_s)
+                if delay > 0.0 and attempt < self._cfg.max_retries:
+                    _log.debug("openai_compat_replanner_async_backoff", delay_s=delay)
+                    await asyncio.sleep(delay)
                 continue
             latency_ms = (time.monotonic() - start) * 1000.0
             text = self._extract_text(response)

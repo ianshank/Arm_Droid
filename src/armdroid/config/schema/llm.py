@@ -83,7 +83,20 @@ class LLMReplannerConfig(BaseModel):
     max_retries: int = Field(
         3,
         ge=0,
-        description="Max exponential-backoff retries on transient errors",
+        description=(
+            "Max retries on transient errors. Delay between retries is "
+            "governed by ``retry_backoff_base_s``."
+        ),
+    )
+    retry_backoff_base_s: float = Field(
+        0.0,
+        ge=0.0,
+        description=(
+            "Base delay (seconds) for exponential backoff between retries: "
+            "the delay after the Nth failed attempt is "
+            "``retry_backoff_base_s * 2**N``. ``0.0`` (default) disables "
+            "backoff and retries immediately, preserving legacy behaviour."
+        ),
     )
 
 

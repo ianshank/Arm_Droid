@@ -47,6 +47,18 @@ def test_llm_envelope_defaults() -> None:
     assert cfg.api_endpoint == ""
     assert cfg.safety_tier == "standard"
     assert cfg.transport == "rest"
+    # Backoff defaults to disabled (immediate retry) for backwards-compat.
+    assert cfg.retry_backoff_base_s == 0.0
+
+
+def test_llm_retry_backoff_base_accepts_positive() -> None:
+    cfg = LLMReplannerConfig(retry_backoff_base_s=0.5)
+    assert cfg.retry_backoff_base_s == 0.5
+
+
+def test_llm_retry_backoff_base_rejects_negative() -> None:
+    with pytest.raises(ValidationError):
+        LLMReplannerConfig(retry_backoff_base_s=-0.1)
 
 
 # ---------------------------------------------------------------------------

@@ -13,12 +13,13 @@ from __future__ import annotations
 
 import json
 import re
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from armdroid.domain.state import PlanStep
 from armdroid.logging.setup import get_logger
 
 if TYPE_CHECKING:
+    from armdroid.config.schema import LLMReplannerConfig
     from armdroid.domain.state import SymbolicState
 
 _log = get_logger(__name__)
@@ -42,7 +43,24 @@ def _strip_code_fences(text: str) -> str:
     match = _CODE_FENCE_RE.match(stripped)
     if match is None:
         return stripped
+    _log.debug("llm_replan_stripped_code_fence")
     return match.group("body").strip()
+
+
+def backoff_delay_s(attempt: int, base_s: float) -> float:
+    """Return the exponential-backoff delay (seconds) for a retry attempt.
+
+    ``attempt`` is the 0-indexed attempt that just failed, so the delay
+    doubles each round: ``base_s * 2**attempt``. A non-positive
+    ``base_s`` disables backoff and returns ``0.0`` -- the historical
+    "retry immediately" behaviour and the default, which also keeps unit
+    tests free of real sleeps. The value is config-driven
+    (:attr:`LLMReplannerConfig.retry_backoff_base_s`); no delay is
+    hardcoded in the backends.
+    """
+    if base_s <= 0.0 or attempt < 0:
+        return 0.0
+    return base_s * (2.0**attempt)
 
 
 @runtime_checkable
@@ -65,6 +83,25 @@ class LLMReplannerProtocol(Protocol):
         goal_state: SymbolicState,
         error: str,
     ) -> list[PlanStep]: ...
+
+
+class LLMReplannerBackend(LLMReplannerProtocol, Protocol):
+    """A replanner that can be constructed uniformly from config.
+
+    Extends :class:`LLMReplannerProtocol` with a ``from_config``
+    classmethod so the registry can build any backend the same way --
+    ``cls.from_config(cfg, sdk=sdk)`` -- regardless of the concrete
+    constructor. This is the contract out-of-tree backends implement to
+    be discoverable via the ``armdroid.llm_replanners`` entry-point group.
+    """
+
+    @classmethod
+    def from_config(
+        cls,
+        cfg: LLMReplannerConfig,
+        *,
+        sdk: Any | None = None,
+    ) -> LLMReplannerProtocol: ...
 
 
 def build_replan_prompt(
@@ -125,7 +162,9 @@ def parse_plan_steps(text: str) -> list[PlanStep]:
 
 
 __all__ = [
+    "LLMReplannerBackend",
     "LLMReplannerProtocol",
+    "backoff_delay_s",
     "build_replan_prompt",
     "parse_plan_steps",
 ]
