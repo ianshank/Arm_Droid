@@ -284,16 +284,23 @@ class OpenAICompatReplanner:
         """Concatenate the text of a list-shaped ``message.content``.
 
         Each part may be a raw string, a ``{"type": "text", "text": ...}``
-        dict, or an object exposing a ``.text`` attribute. Non-text parts
-        (e.g. images) are skipped.
+        dict, or an object exposing a ``.text`` attribute. Parts whose
+        ``type`` is present and is not ``"text"`` (e.g. images) are
+        skipped even if they carry a ``text`` field; a missing ``type`` is
+        treated as text for backward compatibility.
         """
         chunks: list[str] = []
         for part in parts:
             if isinstance(part, str):
                 chunks.append(part)
                 continue
-            text = part.get("text") if isinstance(part, dict) else getattr(part, "text", None)
-            if isinstance(text, str):
+            if isinstance(part, dict):
+                part_type = part.get("type", "text")
+                text = part.get("text")
+            else:
+                part_type = getattr(part, "type", "text")
+                text = getattr(part, "text", None)
+            if part_type == "text" and isinstance(text, str):
                 chunks.append(text)
         return "".join(chunks).strip()
 

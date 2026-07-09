@@ -122,10 +122,11 @@ def test_openai_compat_extract_text_joins_list_dict_parts() -> None:
         [
             {"type": "text", "text": '[{"action": "move",'},
             {"type": "text", "text": ' "args": ["a"]}]'},
-            {"type": "image", "url": "http://x"},  # non-text part skipped
+            {"type": "image", "text": "SKIP", "url": "http://x"},  # non-text skipped
+            {"text": "kept"},  # missing type treated as text
         ]
     )
-    assert r._extract_text(resp) == '[{"action": "move", "args": ["a"]}]'  # type: ignore[attr-defined]
+    assert r._extract_text(resp) == '[{"action": "move", "args": ["a"]}]kept'  # type: ignore[attr-defined]
 
 
 def test_openai_compat_extract_text_joins_list_object_and_str_parts() -> None:

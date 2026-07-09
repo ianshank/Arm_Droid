@@ -93,8 +93,10 @@ class LLMReplannerConfig(BaseModel):
         3,
         ge=0,
         description=(
-            "Max retries on transient errors. Delay between retries is "
-            "governed by ``retry_backoff_base_s``."
+            "Number of retries *after* the initial attempt on transient "
+            "errors, so the total attempts are ``max_retries + 1`` (0 means "
+            "a single attempt, no retry). Delay between retries is governed "
+            "by ``retry_backoff_base_s``."
         ),
     )
     retry_backoff_base_s: float = Field(
