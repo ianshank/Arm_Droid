@@ -7,6 +7,12 @@ documents the conventions that automated changes MUST follow.
 If you are a human contributor, the same conventions apply - the AI
 agents are codifying what the maintainers already do by hand.
 
+The stable intent behind these conventions - vision, scope, non-goals,
+and the invariants a reviewer must enforce - lives in
+[`CHARTER.md`](CHARTER.md). Read it before planning any scope-affecting
+change; the "Non-negotiable conventions" below are the working codification
+of Charter §4.
+
 ---
 
 ## Architecture in one screen

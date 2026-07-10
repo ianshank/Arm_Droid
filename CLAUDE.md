@@ -4,6 +4,11 @@ This file is auto-loaded by Claude Code when working in this repo.
 It supplements [`AGENTS.md`](AGENTS.md) with Claude-Code-specific
 guidance. Read both before making changes.
 
+For the stable north-star (vision, scope, non-goals, invariants, and the
+carve-out amendment protocol), read [`CHARTER.md`](CHARTER.md) first. It
+changes rarely; if a task seems to require editing it, stop and raise it
+explicitly rather than editing in passing.
+
 ---
 
 ## Repository compass
