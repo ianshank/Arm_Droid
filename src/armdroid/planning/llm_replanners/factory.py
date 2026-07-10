@@ -54,14 +54,17 @@ def build_llm_replanner(
     load_llm_replanner_plugins()
     try:
         backend_cls = get_llm_replanner(cfg.backend)
-    except RegistryError:
+    except RegistryError as exc:
         _log.warning(
             "llm_replanner_backend_unimplemented",
             backend=cfg.backend,
             fallback="null",
             available=available_llm_replanners(),
+            error=str(exc),
         )
-        return NullLLMReplanner()
+        # Fall back through the same uniform construction contract every
+        # backend uses, so the null path is not a special case.
+        return NullLLMReplanner.from_config(cfg, sdk=sdk)
     _log.debug("llm_replanner_selected", backend=cfg.backend, enabled=cfg.enabled)
     return backend_cls.from_config(cfg, sdk=sdk)
 
