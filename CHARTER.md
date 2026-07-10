@@ -117,9 +117,10 @@ invariant.
    code.
 6. **Quality gates stay green** — `ruff check src/ tests/`, `mypy --strict src/`, and
    `pytest -m "not hardware and not isaac" --cov=armdroid --cov-fail-under=85` all pass.
-   The only permitted exclusions are the documented ones (the pre-existing UP038 on
-   `tests/helpers/fake_serial.py` and the Isaac-runtime mypy override block). Optional
-   extras stay lazily imported so the default install never breaks.
+   The only permitted exclusions are the documented ones (the ruff exclusion of
+   `tests/helpers/fake_serial.py`, carried for its pre-existing UP038 lint, and the
+   Isaac-runtime mypy override block). Optional extras stay lazily imported so the
+   default install never breaks.
 7. **Security** — no secrets, credentials, or machine fingerprints are committed;
    operational credentials and endpoints live in runtime config, not the repo.
 
@@ -187,8 +188,8 @@ Every carve-out MUST contain all of the following, or it is invalid and unenforc
   ratchet that per-ID counting misses: many small exceptions to *different* boundaries
   that together transform what the system is.
 - **Cumulative trigger:** when total active carve-outs reach **50% of the number of
-  non-goals** (currently 2 of 4), the next amendment proposal forces a review regardless
-  of the other two triggers.
+  non-goals** (with 4 non-goals today, a threshold of 2 active carve-outs; 0 are active
+  now), the next amendment proposal forces a review regardless of the other two triggers.
 
 ### 7.3 Anti-gaming rules
 
