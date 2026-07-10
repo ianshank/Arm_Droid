@@ -2,6 +2,11 @@
 
 This document tracks the roadmap, milestones, and outstanding/landed items for the `armdroid` platform.
 
+> This is the changeable, day-to-day companion to the stable
+> [`CHARTER.md`](CHARTER.md). Concrete to-dos live here; vision, scope,
+> non-goals, and invariants live in the charter and change only through the
+> §7 amendment protocol.
+
 ## Landed: Physical Production Blocker Resolution (current branch)
 
 We have successfully resolved all major hurdles blocking physical robot arm deployment in the real world (Sim-to-Real):
