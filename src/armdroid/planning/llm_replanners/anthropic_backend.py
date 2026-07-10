@@ -27,17 +27,20 @@ bridges, sub-agents) can opt into the non-blocking variant.
 
 from __future__ import annotations
 
-import json
 import os
-import time
 from typing import TYPE_CHECKING, Any
 
-from armdroid.domain.state import PlanStep
 from armdroid.logging.setup import get_logger
+from armdroid.planning.llm_replanners.base import (
+    arun_replan_with_retries,
+    build_replan_prompt,
+    parse_plan_steps,
+    run_replan_with_retries,
+)
 
 if TYPE_CHECKING:
     from armdroid.config.schema import LLMReplannerConfig
-    from armdroid.domain.state import SymbolicState
+    from armdroid.domain.state import PlanStep, SymbolicState
 
 _log = get_logger(__name__)
 
@@ -57,6 +60,16 @@ class AnthropicReplanner:
     """
 
     name = "anthropic"
+
+    @classmethod
+    def from_config(
+        cls,
+        cfg: LLMReplannerConfig,
+        *,
+        sdk: Any | None = None,
+    ) -> AnthropicReplanner:
+        """Construct from config (registry/plugin entry point)."""
+        return cls(cfg, sdk=sdk)
 
     def __init__(
         self,
@@ -100,41 +113,24 @@ class AnthropicReplanner:
             _log.debug("anthropic_replanner_disabled")
             return []
         prompt = self._build_user_prompt(current_state, goal_state, error)
-        last_exc: BaseException | None = None
-        for attempt in range(self._cfg.max_retries + 1):
-            start = time.monotonic()
-            try:
-                response = self._client.messages.create(
-                    model=self._cfg.model,
-                    max_tokens=self._cfg.max_tokens,
-                    temperature=self._cfg.temperature,
-                    system=self._cfg.system_prompt,
-                    messages=[{"role": "user", "content": prompt}],
-                    timeout=self._cfg.request_timeout_s,
-                )
-            except Exception as exc:  # pylint: disable=broad-except
-                last_exc = exc
-                _log.warning(
-                    "anthropic_replanner_request_failed",
-                    attempt=attempt,
-                    error=str(exc),
-                )
-                continue
-            latency_ms = (time.monotonic() - start) * 1000.0
-            text = self._extract_text(response)
-            steps = self._parse_steps(text)
-            _log.info(
-                "anthropic_replanner_response",
-                latency_ms=latency_ms,
-                step_count=len(steps),
+
+        def _request() -> str:
+            response = self._client.messages.create(
+                model=self._cfg.model,
+                max_tokens=self._cfg.max_tokens,
+                temperature=self._cfg.temperature,
+                system=self._cfg.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+                timeout=self._cfg.request_timeout_s,
             )
-            return steps
-        _log.error(
-            "anthropic_replanner_exhausted",
-            attempts=self._cfg.max_retries + 1,
-            error=str(last_exc) if last_exc else "unknown",
+            return self._extract_text(response)
+
+        return run_replan_with_retries(
+            _request,
+            cfg=self._cfg,
+            log=_log,
+            event_prefix="anthropic_replanner",
         )
-        return []
 
     async def areplan(
         self,
@@ -155,41 +151,24 @@ class AnthropicReplanner:
             return []
         client = self._async_client()
         prompt = self._build_user_prompt(current_state, goal_state, error)
-        last_exc: BaseException | None = None
-        for attempt in range(self._cfg.max_retries + 1):
-            start = time.monotonic()
-            try:
-                response = await client.messages.create(
-                    model=self._cfg.model,
-                    max_tokens=self._cfg.max_tokens,
-                    temperature=self._cfg.temperature,
-                    system=self._cfg.system_prompt,
-                    messages=[{"role": "user", "content": prompt}],
-                    timeout=self._cfg.request_timeout_s,
-                )
-            except Exception as exc:  # pylint: disable=broad-except
-                last_exc = exc
-                _log.warning(
-                    "anthropic_replanner_async_request_failed",
-                    attempt=attempt,
-                    error=str(exc),
-                )
-                continue
-            latency_ms = (time.monotonic() - start) * 1000.0
-            text = self._extract_text(response)
-            steps = self._parse_steps(text)
-            _log.info(
-                "anthropic_replanner_async_response",
-                latency_ms=latency_ms,
-                step_count=len(steps),
+
+        async def _request() -> str:
+            response = await client.messages.create(
+                model=self._cfg.model,
+                max_tokens=self._cfg.max_tokens,
+                temperature=self._cfg.temperature,
+                system=self._cfg.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+                timeout=self._cfg.request_timeout_s,
             )
-            return steps
-        _log.error(
-            "anthropic_replanner_async_exhausted",
-            attempts=self._cfg.max_retries + 1,
-            error=str(last_exc) if last_exc else "unknown",
+            return self._extract_text(response)
+
+        return await arun_replan_with_retries(
+            _request,
+            cfg=self._cfg,
+            log=_log,
+            event_prefix="anthropic_replanner_async",
         )
-        return []
 
     def _async_client(self) -> Any:
         """Lazily build an ``AsyncAnthropic`` client on first use."""
@@ -230,15 +209,7 @@ class AnthropicReplanner:
         goal_state: SymbolicState,
         error: str,
     ) -> str:
-        return (
-            "You are replanning a failed robot arm action.\n\n"
-            f"Current symbolic state predicates: {sorted(current_state.predicates)}\n"
-            f"Goal symbolic state predicates: {sorted(goal_state.predicates)}\n"
-            f"Failure description: {error}\n\n"
-            "Reply with a JSON array of plan steps. Each step is an object "
-            "with keys 'action' (str) and optional 'args' (list[str]). Reply "
-            "with ONLY the JSON array — no surrounding prose."
-        )
+        return build_replan_prompt(current_state, goal_state, error)
 
     def _extract_text(self, response: Any) -> str:
         # The Messages API returns ``content`` as a list of blocks, each
@@ -252,28 +223,7 @@ class AnthropicReplanner:
         return "".join(chunks).strip()
 
     def _parse_steps(self, text: str) -> list[PlanStep]:
-        if not text:
-            return []
-        try:
-            raw = json.loads(text)
-        except json.JSONDecodeError:
-            _log.warning("anthropic_replanner_non_json_response", preview=text[:120])
-            return []
-        if not isinstance(raw, list):
-            _log.warning("anthropic_replanner_non_list_response")
-            return []
-        steps: list[PlanStep] = []
-        for entry in raw:
-            if not isinstance(entry, dict):
-                continue
-            action = entry.get("action")
-            if not isinstance(action, str):
-                continue
-            args = entry.get("args", []) or []
-            if not isinstance(args, list):
-                continue
-            steps.append(PlanStep(action=action, args=[str(a) for a in args]))
-        return steps
+        return parse_plan_steps(text)
 
 
 __all__ = ["AnthropicReplanner", "AnthropicSDKMissingError"]

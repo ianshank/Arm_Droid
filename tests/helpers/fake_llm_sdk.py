@@ -28,6 +28,7 @@ __all__ = [
     "fake_anthropic_sdk",
     "fake_gemini_sdk",
     "fake_llm_sdk",
+    "fake_openai_sdk",
 ]
 
 
@@ -126,3 +127,86 @@ def fake_gemini_sdk(response_text: str, *, with_async: bool = False) -> SimpleNa
         client_class="Client",
         async_client_class="AsyncClient" if with_async else None,
     )
+
+
+# ---------------------------------------------------------------------------
+# OpenAI chat-completions shape (``choices[0].message.content``)
+# ---------------------------------------------------------------------------
+
+
+class _OAMessage:
+    """Assistant message, matching ``choices[*].message.content``."""
+
+    def __init__(self, text: str) -> None:
+        self.role = "assistant"
+        self.content = text
+
+
+class _OAChoice:
+    """Single choice wrapping one assistant message."""
+
+    def __init__(self, text: str) -> None:
+        self.message = _OAMessage(text)
+
+
+class _OAResponse:
+    """Chat completion response holding one choice."""
+
+    def __init__(self, text: str) -> None:
+        self.choices = [_OAChoice(text)]
+
+
+class _OASyncCompletions:
+    """Sync ``chat.completions.create`` recording call kwargs."""
+
+    def __init__(self, response_text: str) -> None:
+        self._response_text = response_text
+        self.calls: list[dict[str, Any]] = []
+
+    def create(self, **kwargs: Any) -> _OAResponse:
+        self.calls.append(kwargs)
+        return _OAResponse(self._response_text)
+
+
+class _OAAsyncCompletions:
+    """Async ``chat.completions.create`` recording call kwargs."""
+
+    def __init__(self, response_text: str) -> None:
+        self._response_text = response_text
+        self.calls: list[dict[str, Any]] = []
+
+    async def create(self, **kwargs: Any) -> _OAResponse:
+        self.calls.append(kwargs)
+        return _OAResponse(self._response_text)
+
+
+def _make_openai_client_class(completions_factory: Any) -> type:
+    """Build an OpenAI-shaped client exposing ``chat.completions.create``.
+
+    Records the constructor kwargs (``api_key``, ``base_url``) on the
+    instance so tests can assert the backend plumbed config through.
+    """
+
+    class _OAClient:
+        def __init__(self, **kwargs: Any) -> None:
+            self.init_kwargs = kwargs
+            self.chat = SimpleNamespace(completions=completions_factory())
+
+    return _OAClient
+
+
+def fake_openai_sdk(response_text: str, *, with_async: bool = False) -> SimpleNamespace:
+    """Stand-in for the ``openai`` SDK used by ``OpenAICompatReplanner``.
+
+    Exposes ``OpenAI`` (and optionally ``AsyncOpenAI``) client classes
+    whose ``chat.completions.create`` returns a canned response and
+    records call kwargs. Pass to the backend's ``sdk=`` constructor kwarg.
+    """
+    members: dict[str, Any] = {
+        "OpenAI": _make_openai_client_class(lambda: _OASyncCompletions(response_text)),
+    }
+    if with_async:
+        members["AsyncOpenAI"] = _make_openai_client_class(
+            lambda: _OAAsyncCompletions(response_text)
+        )
+    return SimpleNamespace(**members)

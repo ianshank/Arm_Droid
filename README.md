@@ -148,6 +148,13 @@ pip install -e ".[realsense]"
 # Claude API LLM replanner (anthropic SDK)
 pip install -e ".[anthropic]"
 
+# OpenAI-compatible LLM replanner (openai SDK). Drives any chat/completions
+# endpoint -- local vLLM/llama.cpp, or hosted gateways (Groq, Together,
+# OpenRouter, ...) -- selected entirely by config (backend: openai_compat
+# or llama, plus api_endpoint / api_key_env_var). See
+# config/examples/openai_compat.example.yaml.
+pip install -e ".[openai]"
+
 # Gemini Robotics ER 1.6 integration (foundation-model perception,
 # replanner, VLA control). Phase A of the integration landed only the
 # scaffolding; concrete backends light up across Phases B-F. Each surface
@@ -174,10 +181,10 @@ pip install -e ".[telemetry]"
 pip install -e ".[isaac]" --extra-index-url https://pypi.nvidia.com
 
 # Install everything (default-CI-compatible subset)
-pip install -e ".[dev,hardware,ble,realsense,anthropic,telemetry]"
+pip install -e ".[dev,hardware,ble,realsense,anthropic,openai,telemetry]"
 
 # Same plus the Gemini ER 1.6 surfaces
-pip install -e ".[dev,hardware,ble,realsense,anthropic,telemetry,gemini,gemini-live,gemini-vla]"
+pip install -e ".[dev,hardware,ble,realsense,anthropic,openai,telemetry,gemini,gemini-live,gemini-vla]"
 ```
 
 ### Windows note — MuJoCo and Visual C++ Redistributable

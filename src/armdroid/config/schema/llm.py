@@ -20,15 +20,24 @@ class LLMReplannerConfig(BaseModel):
         False,
         description="Enable LLM-backed replanning",
     )
-    backend: Literal["null", "llama", "anthropic", "gemini"] = Field(
+    backend: Literal["null", "llama", "anthropic", "gemini", "openai_compat"] = Field(
         "null",
-        description="Replanner backend selection",
+        description=(
+            "Replanner backend selection. ``llama`` and ``openai_compat`` "
+            "both select the OpenAI-compatible backend (vLLM, Groq, "
+            "Together, OpenRouter, or any gateway speaking that wire "
+            "shape); ``openai_compat`` is the protocol-accurate alias. For "
+            "the OpenAI-compatible backends, set ``api_endpoint`` (the "
+            "base URL) and ``api_key_env_var`` (whose default is "
+            "Anthropic-specific) accordingly."
+        ),
     )
     api_endpoint: str = Field(
         "",
         description=(
-            "Optional explicit API endpoint URL. Empty string ('') means "
-            "the backend SDK chooses the default (recommended)."
+            "Optional explicit API endpoint URL (the ``base_url`` for the "
+            "OpenAI-compatible backend). Empty string ('') means the "
+            "backend SDK chooses the default (recommended)."
         ),
     )
     safety_tier: Literal["off", "standard", "strict"] = Field(
@@ -67,7 +76,13 @@ class LLMReplannerConfig(BaseModel):
     )
     api_key_env_var: str = Field(
         "ANTHROPIC_API_KEY",
-        description="Env var holding the API key (Anthropic backend only)",
+        description=(
+            "Name of the env var holding the API key. Read by both the "
+            "``anthropic`` and OpenAI-compatible (``llama`` / "
+            "``openai_compat``) backends. The default is Anthropic-specific, "
+            "so override it when using an OpenAI-compatible backend (e.g. "
+            "``OPENAI_API_KEY`` / ``GROQ_API_KEY`` / ``APEKEY_API_KEY``)."
+        ),
     )
     request_timeout_s: float = Field(
         30.0,
@@ -77,7 +92,22 @@ class LLMReplannerConfig(BaseModel):
     max_retries: int = Field(
         3,
         ge=0,
-        description="Max exponential-backoff retries on transient errors",
+        description=(
+            "Number of retries *after* the initial attempt on transient "
+            "errors, so the total attempts are ``max_retries + 1`` (0 means "
+            "a single attempt, no retry). Delay between retries is governed "
+            "by ``retry_backoff_base_s``."
+        ),
+    )
+    retry_backoff_base_s: float = Field(
+        0.0,
+        ge=0.0,
+        description=(
+            "Base delay (seconds) for exponential backoff between retries: "
+            "the delay after the Nth failed attempt is "
+            "``retry_backoff_base_s * 2**N``. ``0.0`` (default) disables "
+            "backoff and retries immediately, preserving legacy behaviour."
+        ),
     )
 
 

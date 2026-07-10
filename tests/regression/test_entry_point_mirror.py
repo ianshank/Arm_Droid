@@ -21,6 +21,7 @@ import pytest
 
 from armdroid.environments.registry import available_environments
 from armdroid.hardware.registry import available_drivers
+from armdroid.planning.llm_replanners import available_llm_replanners
 from armdroid.planning.registry import available_planners
 
 try:
@@ -45,6 +46,7 @@ _GROUPS: list[tuple[str, object]] = [
     ("armdroid.environments", available_environments),
     ("armdroid.rl_agents", available_rl_agents),
     ("armdroid.planners", available_planners),
+    ("armdroid.llm_replanners", available_llm_replanners),
 ]
 if available_perception_backends is not None:
     _GROUPS.append(("armdroid.perception_backends", available_perception_backends))
