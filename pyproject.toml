@@ -82,7 +82,7 @@ dev = [
     "pytest-timeout>=2.3",
     "pytest-xdist>=3.0",
     "hypothesis>=6.80",
-    "ruff==0.15.12",
+    "ruff==0.15.21",
     # mypy 1.13+ — earlier versions crash with internal AssertionError
     # ("Cannot find module for _frozen_importlib.ModuleSpec") on strict
     # scans of code that calls ``importlib.util.find_spec``. Multiple
